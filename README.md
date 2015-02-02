@@ -2,6 +2,8 @@
 
 MSSQL / TDS Database driver for Elixir.
 
+Work in Progress... 
+
 ## Usage
 
 Add Tds as a dependency in your `mix.exs` file.
@@ -51,6 +53,7 @@ In order to connect to a SQL instance, you must assign a static port to the TCP 
     datetime	    {{2013, 10, 12}, {0, 37, 14}}
     uuid            <<160,238,188,153,156,11,78,248,187,109,107,185,189,56,10,17>>
 
+All data types will be supported, unsupported types currently are udt, xml
 
 ## Contributing
 
