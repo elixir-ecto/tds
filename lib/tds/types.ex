@@ -248,6 +248,8 @@
         @tds_data_type_variant 
       ] ->
         <<length::signed-32, tail::binary>> = tail
+        col_info = col_info
+          |> Map.put(:length, length)
         cond do
           @data_type_code in [@tds_data_type_text, @tds_data_type_ntext] ->
             <<collation::binary-size(5), tail::binary>> = tail
@@ -265,6 +267,7 @@
           true -> Logger.debug "Not Implemented"
         end
 
+
     end
     {col_info,tail}
   end
@@ -274,18 +277,16 @@
   #
 
   def decode_data(%{data_type: :fixed, data_type_code: data_type_code, length: length}, <<tail::binary>>) do
-    Logger.debug "Decoding Fixed Length Data: #{data_type_code}"
+    #Logger.debug "Decoding Fixed Length Data: #{data_type_code}"
     <<value_binary::binary-size(length)-unit(8), tail::binary>> = tail
     value = case data_type_code do
       @tds_data_type_null -> 
         nil
       @tds_data_type_bit -> 
-        Logger.debug "Bit: #{Tds.Utils.to_hex_string value_binary}"
         value_binary != <<0x00>>
       @tds_data_type_smalldatetime -> decode_smalldatetime(value_binary)
       @tds_data_type_smallmoney -> decode_smallmoney(value_binary)
       @tds_data_type_real ->
-        Logger.debug "Real: #{Tds.Utils.to_hex_string value_binary}"
         <<value::little-float-size(32)>> = value_binary
         Float.round value, 4
       @tds_data_type_datetime -> decode_datetime(value_binary)
@@ -300,9 +301,9 @@
   end
 
   # ByteLength Types
-  def decode_data(%{data_reader: :bytelen}, <<0x00, tail::binary>> = data), do: {nil, tail}
+  def decode_data(%{data_reader: :bytelen}, <<0x00, tail::binary>>), do: {nil, tail}
   def decode_data(%{data_type_code: data_type_code, data_reader: :bytelen, length: length} = data_info, <<size::unsigned-8, data::binary-size(size), tail::binary>>) do
-      Logger.debug "Decoding Byte Length Data: #{data_type_code}"
+      #Logger.debug "Decoding Byte Length Data: #{data_type_code}"
       value = cond do
         data_type_code == @tds_data_type_daten -> decode_date(data)
         data_type_code == @tds_data_type_timen -> decode_time(data_info[:scale], data)
@@ -317,8 +318,6 @@
             4 -> <<value::little-signed-32, tail::binary>> = data
             8 -> <<value::little-signed-64, tail::binary>> = data
           end
-          Logger.debug "Intn Value: #{value}"
-          Logger.debug "Intn Tail: #{Tds.Utils.to_hex_string tail}"
           value
         data_type_code in [
           @tds_data_type_decimal,
@@ -328,7 +327,6 @@
         ] ->
           decode_decimal(data_info[:precision], data_info[:scale], data)
         data_type_code == @tds_data_type_bitn ->
-          Logger.debug "Bitn: #{Tds.Utils.to_hex_string data}"
           data != <<0x00>>
         data_type_code == @tds_data_type_floatn ->
           data = data <> tail
@@ -361,8 +359,8 @@
 
   # ShortLength Types
   def decode_data(%{data_reader: :shortlen}, <<0xFFFF, tail::binary>>), do: {nil, tail}
-  def decode_data(%{data_type_code: data_type_code, data_reader: :shortlen, length: length} = data_info, <<size::little-unsigned-16, data::binary-size(size), tail::binary>>) do
-    Logger.debug "Decoding Short Length Data: #{data_type_code}"
+  def decode_data(%{data_type_code: data_type_code, data_reader: :shortlen} = data_info, <<size::little-unsigned-16, data::binary-size(size), tail::binary>>) do
+    #Logger.debug "Decoding Short Length Data: #{data_type_code}"
     value = cond do
       data_type_code in [
         @tds_data_type_bigvarchar,
@@ -392,8 +390,8 @@
   # TODO PLP TYpes
   # ShortLength Types
   def decode_data(%{data_reader: :plp}, <<@tds_plp_null, tail::binary>>), do: {nil, tail}
-  def decode_data(%{data_type_code: data_type_code, data_reader: :plp, length: length} = data_info, <<size::little-unsigned-64, tail::binary>>) do
-    Logger.debug "Decoding PLP Data: #{data_type_code}"
+  def decode_data(%{data_type_code: data_type_code, data_reader: :plp} = data_info, <<_size::little-unsigned-64, tail::binary>>) do
+    #Logger.debug "Decoding PLP Data: #{data_type_code}"
     {data, tail} = decode_plp_chunk(tail, <<>>)    
 
     value = cond do
@@ -428,8 +426,7 @@
     decode_plp_chunk(tail, buf <> chunk)
   end
 
-  def decode_smalldatetime(<<days::little-unsigned-16, mins::little-unsigned-16>> = data) do
-    Logger.debug "SmallDateTime: #{Tds.Utils.to_hex_string data}"
+  def decode_smalldatetime(<<days::little-unsigned-16, mins::little-unsigned-16>>) do
     date = Date.shift(@datetime, days: days)
      |> Date.shift(mins: mins)
      {{date.year, date.month, date.day},{date.hour, date.minute, date.second}}
@@ -440,40 +437,36 @@
     Float.round money, 4
   end
   
-  def decode_datetime(<<days::little-signed-32, sec::little-unsigned-32,  tail::binary>>) do
+  def decode_datetime(<<days::little-signed-32, sec::little-unsigned-32>>) do
     date = Date.shift(@datetime, days: days)
     date = Date.shift(date, secs: (sec/300))
     {{date.year, date.month, date.day}, {date.hour, date.minute, date.second}}
   end
 
-  def decode_money(<<money_m::little-signed-32, money_l::little-signed-32>>= data) do
-    Logger.debug "Money: #{Tds.Utils.to_hex_string data}"
+  def decode_money(<<_money_m::little-signed-32, money_l::little-signed-32>>) do
     money = pow10(money_l,(4 * -1))
-    #money = money * money_m
     Float.round money, 4
   end
 
-  def decode_time(scale, <<time::binary>>) do
-
+  def decode_time(_scale, <<_time::binary>>) do
+    # TODO
   end
 
   def decode_time_int() do
-
+    # TODO
   end
 
-  def decode_datetime2(scale, <<data::binary>>) do
-
+  def decode_datetime2(_scale, <<_data::binary>>) do
+    # TODO
   end
 
-  def decode_datetimeoffset(scale, <<data::binary>>) do
-
+  def decode_datetimeoffset(_scale, <<_data::binary>>) do
+    # TODO
   end
 
   def decode_date(<<days::little-size(3)-unit(8)>>) do
-    
     date = Date.from {{1, 1, 1}, {0, 0, 0}}
     date = Date.shift(date, days: days)
-    Logger.debug "Days: #{days}"
     {date.year, date.month, date.day}
   end
 
@@ -484,7 +477,6 @@
   def decode_decimal(precision, scale, <<sign::int8, value::binary>>) do
     size = byte_size(value)
     <<value::little-size(size)-unit(8)>> = value
-    IO.inspect value
     d_ctx = Decimal.get_context
     d_ctx = %{d_ctx | precision: precision}
     Decimal.set_context d_ctx
@@ -498,7 +490,7 @@
     end
   end
 
-  def decode_char(collation, <<data::binary>>) do
+  def decode_char(_collation, <<data::binary>>) do
     data
   end
 
@@ -664,7 +656,7 @@
   def encode_param_descriptor(%Parameter{name: name, value: value}) when is_binary(value) do
     length = String.length(value)
     if length <= 0, do: length = 1
-    Logger.debug "#{name} nvarchar(#{length})"
+    #Logger.debug "#{name} nvarchar(#{length})"
     "#{name} nvarchar(#{length})"
   end
 

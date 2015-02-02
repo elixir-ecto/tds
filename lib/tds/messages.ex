@@ -250,7 +250,7 @@ defmodule Tds.Messages do
     
     header = encode_header(0x03, data)
     pak = header <> data
-    Logger.debug "RPC #{Tds.Utils.to_hex_string pak}"
+    #Logger.debug "RPC #{Tds.Utils.to_hex_string pak}"
     pak
   end
 
