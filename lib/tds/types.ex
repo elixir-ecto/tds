@@ -500,6 +500,7 @@
 
   def decode_xml(data_info, <<data::binary>>) do
     # TODO: Decode XML Data
+    nil
   end
 
   def decode_udt(%{} = data_info, <<data::binary>>) do
