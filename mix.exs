@@ -5,7 +5,11 @@ defmodule Tds.Mixfile do
     [app: :tds,
      version: "0.1.0",
      elixir: "~> 1.0.0",
-     deps: deps]
+     deps: deps,
+     source_url: "https://github.com/livehelpnow/tds",
+     description: description,
+     package: package
+     ]
   end
 
   # Configuration for the OTP application
@@ -29,5 +33,15 @@ defmodule Tds.Mixfile do
       {:decimal, "~> 0.2.3"},
       {:timex, "~> 0.12.9"}
     ]
+  end
+
+  defp description do
+    "TDS driver for Elixir."
+  end
+
+  defp package do
+    [contributors: ["Justin Schneck"],
+     licenses: ["Apache 2.0"],
+     links: %{"Github" => "https://github.com/livehelpnow/tds"}]
   end
 end
