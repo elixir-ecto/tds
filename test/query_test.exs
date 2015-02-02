@@ -51,13 +51,13 @@ defmodule QueryTest do
     assert [{<<0x82, 0x25, 0xF2, 0xA9, 0xAF, 0xBA, 0x45, 0xC5, 0xA4, 0x31, 0x86, 0xB9, 0xA8, 0x67, 0xE0, 0xF7>>}] = query("SELECT CAST('8225F2A9-AFBA-45C5-A431-86B9A867E0F7' AS uniqueidentifier)", [])
   end
 
-  # test "Decode NULL", context do
-  #   assert [{nil}] = query("SELECT NULL", [])
-  #   assert [{nil}] = query("SELECT CAST(NULL AS BIT)", [])
-  #   assert [{nil}] = query("SELECT CAST(NULL AS VARCHAR)", [])
-  #   assert [{nil}] = query("SELECT CAST(NULL AS datetime)", [])
-  #   query("SELECT CAST('1' AS VARCHAR)", [])
-  # end
+  test "Decode NULL", context do
+    assert [{nil}] = query("SELECT NULL", [])
+    assert [{nil}] = query("SELECT CAST(NULL AS BIT)", [])
+    assert [{nil}] = query("SELECT CAST(NULL AS VARCHAR)", [])
+    assert [{nil}] = query("SELECT CAST(NULL AS datetime)", [])
+    query("SELECT CAST('1' AS VARCHAR)", [])
+  end
 
   test "Decode Date and Time", context do
     assert [{{{2014, 06, 20}, {10, 21, 42}}}] = query("SELECT CAST('20140620 10:21:42 AM' AS datetime)", [])
@@ -70,36 +70,36 @@ defmodule QueryTest do
 
   # # end
 
-  # test "Create Tables", context do
-  #   query("DROP TABLE MyTable", [])
-  #   assert :ok = query("CREATE TABLE MyTable (TableId int)", [])
-  #   assert :ok = query("DROP TABLE dbo.MyTable", [])
-  # end
+  test "Create Tables", context do
+    query("DROP TABLE MyTable", [])
+    assert :ok = query("CREATE TABLE MyTable (TableId int)", [])
+    assert :ok = query("DROP TABLE dbo.MyTable", [])
+  end
 
-  # test "Large Result Set", context do
-  #   query("DROP TABLE MyTable", [])
-  #   assert :ok = query("CREATE TABLE MyTable (TableId int)", [])
-  #   for n <- 1..100 do
-  #     assert :ok = query("INSERT INTO MyTable VALUES (#{n})", [])
-  #   end
+  test "Large Result Set", context do
+    query("DROP TABLE MyTable", [])
+    assert :ok = query("CREATE TABLE MyTable (TableId int)", [])
+    for n <- 1..100 do
+      assert :ok = query("INSERT INTO MyTable VALUES (#{n})", [])
+    end
 
-  #   assert Enum.count(query("SELECT * FROM MyTable", [])) == 100
-  #   assert :ok = query("DROP TABLE dbo.MyTable", [])
-  # end
+    assert Enum.count(query("SELECT * FROM MyTable", [])) == 100
+    assert :ok = query("DROP TABLE dbo.MyTable", [])
+  end
 
-  # test "Empty Result Set", context do
-  #   query("DROP TABLE MyTable", [])
-  #   query("CREATE TABLE MyTable (TableId int)", [])
-  #   assert :ok = query("SELECT * FROM MyTable", [])
-  # end
+  test "Empty Result Set", context do
+    query("DROP TABLE MyTable", [])
+    query("CREATE TABLE MyTable (TableId int)", [])
+    assert :ok = query("SELECT * FROM MyTable", [])
+  end
 
-  # test "fail for incorrect syntax", context do
-  #   assert %Tds.Error{} = query("busted", [])
-  # end
+  test "fail for incorrect syntax", context do
+    assert %Tds.Error{} = query("busted", [])
+  end
 
-  # test "connection works after failure", context do
-  #   assert %Tds.Error{} = query("busted", [])
-  #   assert [{1}] = query("SELECT 1", [])
-  # end
+  test "connection works after failure", context do
+    assert %Tds.Error{} = query("busted", [])
+    assert [{1}] = query("SELECT 1", [])
+  end
 
 end

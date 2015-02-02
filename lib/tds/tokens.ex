@@ -124,7 +124,7 @@ defmodule Tds.Tokens do
 
     #data_type = Enum.find(Types.data_types, fn(x) -> x[:byte] == <<type>> end)
     #Logger.debug "Decode Data Type: #{Tds.Utils.to_hex_string data}"
-    Logger.debug "Decode Column: #{Tds.Utils.to_hex_string tail}"
+    #Logger.debug "Decode Column: #{Tds.Utils.to_hex_string tail}"
     {info, tail} = Types.decode_info(tail)
     {name, tail} = decode_column_name(tail)
     info
@@ -168,7 +168,7 @@ defmodule Tds.Tokens do
 
   defp decode_row_column(<<tail::binary>>, column) do
     #data_type = column[:data_type_code]
-    Logger.debug "Decode Row Column: #{Tds.Utils.to_hex_string tail}"
+    #Logger.debug "Decode Row Column: #{Tds.Utils.to_hex_string tail}"
     Types.decode_data(column, tail)
   end
 

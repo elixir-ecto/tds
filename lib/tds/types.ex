@@ -280,6 +280,7 @@
       @tds_data_type_null -> 
         nil
       @tds_data_type_bit -> 
+        Logger.debug "Bit: #{Tds.Utils.to_hex_string value_binary}"
         value_binary != <<0x00>>
       @tds_data_type_smalldatetime -> decode_smalldatetime(value_binary)
       @tds_data_type_smallmoney -> decode_smallmoney(value_binary)
@@ -327,7 +328,8 @@
         ] ->
           decode_decimal(data_info[:precision], data_info[:scale], data)
         data_type_code == @tds_data_type_bitn ->
-          data != 0x00
+          Logger.debug "Bitn: #{Tds.Utils.to_hex_string data}"
+          data != <<0x00>>
         data_type_code == @tds_data_type_floatn ->
           data = data <> tail
           case length do
@@ -497,7 +499,7 @@
   end
 
   def decode_char(collation, <<data::binary>>) do
-    
+    data
   end
 
   def decode_nchar(<<data::binary>>) do
