@@ -27,7 +27,7 @@ iex> Tds.Connection.query!(pid, "INSERT INTO MyTable (MyColumn) VALUES (@my_valu
 
 ## Features
 
-  * Automatic decoding and encoding of Elixir values to and from PostgreSQL's binary format
+  * Automatic decoding and encoding of Elixir values to and from MSSQL's binary format
   * Supports TDS Version 7.3, 7.4
 
 ## Connecting to SQL Instances
