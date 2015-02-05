@@ -1,2 +1,2 @@
-%{"decimal": {:hex, :decimal, "0.2.5"},
+%{"decimal": {:hex, :decimal, "1.1.0"},
   "timex": {:hex, :timex, "0.12.9"}}

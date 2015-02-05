@@ -30,7 +30,7 @@ defmodule Tds.Mixfile do
   # Type `mix help deps` for more examples and options
   defp deps do
     [
-      {:decimal, "~> 0.2.3"},
+      {:decimal, "~> 1.0"},
       {:timex, "~> 0.12.9"}
     ]
   end
