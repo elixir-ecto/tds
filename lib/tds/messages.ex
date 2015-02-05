@@ -13,6 +13,7 @@ defmodule Tds.Messages do
   defrecord :msg_login_ack, [:type, :data]
   defrecord :msg_ready, [:status]
   defrecord :msg_sql, [:query]
+  defrecord :msg_trans, [:trans]
   defrecord :msg_sql_result, [:columns, :rows, :done]
   defrecord :msg_sql_empty, []
   defrecord :msg_rpc, [:proc, :query, :params]
@@ -82,10 +83,17 @@ defmodule Tds.Messages do
 
   def parse(:executing, @tds_pack_reply, _header, tail) do
     tokens = []
-    case decode_tokens(tail, tokens) do
+    tokens = decode_tokens(tail, tokens)
+    
+    case tokens do
       [error: error] ->
+        #Logger.info "Process Error"
         msg_error(e: error)
+      [done: %{} = done, trans: <<trans::binary>>] ->
+        #Logger.info "Process Transaction"
+        msg_trans(trans: trans)
       tokens ->
+        #Logger.info "Process SQL Result"
         msg_sql_result(columns: tokens[:columns], rows: tokens[:rows], done: tokens[:done])
     end
   end
@@ -94,11 +102,11 @@ defmodule Tds.Messages do
 
   ## Encoders
 
-  def encode_msg(msg) do
-    encode(msg)
+  def encode_msg(msg, env) do
+    encode(msg, env) 
   end
 
-  defp encode(msg_prelogin(params: _params)) do
+  defp encode(msg_prelogin(params: _params), env) do
     version_data = <<11, 0, 12, 56, 0, 0>>
     version_length = byte_size(version_data)
     version_offset = 0x06
@@ -109,7 +117,7 @@ defmodule Tds.Messages do
     encode_header(0x12, data)<>data
   end
 
-  defp encode(msg_login(params: params)) do
+  defp encode(msg_login(params: params), env) do
     tds_version = <<0x04, 0x00, 0x00, 0x74>>
     message_size = <<0x00, 0x10, 0x00, 0x00>>
     client_prog_ver = <<0x04, 0x00, 0x00, 0x07>>
@@ -211,14 +219,17 @@ defmodule Tds.Messages do
     header <> data
   end
 
-  defp encode(msg_sql(query: q)) do
+  defp encode(msg_sql(query: q), %{trans: trans}) do
     #Logger.debug "Msg SQL"
     #convert query to unicodestream
     q_ucs = to_little_ucs2(q)
-
+    
     #Transaction Descriptor header
     header_type = <<2::little-size(2)-unit(8)>>
-    transaction_descriptor = <<0::(8*8)>>
+    trans_size = byte_size(trans)
+    padding = 8 - trans_size
+    transaction_descriptor = trans <> <<0::size(padding)-unit(8)>>
+    #IO.inspect transaction_descriptor
     outstanding_request_count = <<1::little-size(4)-unit(8)>>
     td_header = header_type <> transaction_descriptor <> outstanding_request_count
     td_header_len = byte_size(td_header) + 4
@@ -232,10 +243,12 @@ defmodule Tds.Messages do
     header <> data
   end
 
-  defp encode(msg_rpc(proc: proc, params: params)) do
+  defp encode(msg_rpc(proc: proc, params: params), %{trans: trans}) do
     #Transaction Descriptor header
     header_type = <<2::little-size(2)-unit(8)>>
-    transaction_descriptor = <<0::(8*8)>>
+    trans_size = byte_size(trans)
+    padding = 8 - trans_size
+    transaction_descriptor = trans <> <<0::size(padding)-unit(8)>>
     outstanding_request_count = <<1::little-size(4)-unit(8)>>
     td_header = header_type <> transaction_descriptor <> outstanding_request_count
     td_header_len = byte_size(td_header) + 4
@@ -250,7 +263,7 @@ defmodule Tds.Messages do
     
     header = encode_header(0x03, data)
     pak = header <> data
-    #Logger.debug "RPC #{Tds.Utils.to_hex_string pak}"
+    #Logger.info "RPC #{Tds.Utils.to_hex_string pak}"
     pak
   end
 

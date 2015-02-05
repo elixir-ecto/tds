@@ -52,7 +52,17 @@ defmodule Tds.Connection do
   ### GEN_SERVER CALLBACKS ###
 
   def init([]) do
-    {:ok, %{sock: nil, opts: nil, state: :ready, tail: "", queue: :queue.new, bootstrap: false, statement: nil, pak_header: "", pak_data: ""}}
+    {:ok, %{
+      sock: nil, 
+      opts: nil, 
+      state: :ready, 
+      tail: "", 
+      queue: :queue.new, 
+      bootstrap: false, 
+      statement: nil, 
+      pak_header: "", 
+      pak_data: "",
+      env: %{trans: <<0x00000000>>}}}
   end
 
   def handle_call(:stop, from, s) do
@@ -61,9 +71,10 @@ defmodule Tds.Connection do
   end
 
   def handle_call({:connect, opts}, from, %{queue: queue} = s) do
-    host      = opts[:hostname] || System.get_env("MSSQLHOST")
+    host      = opts[:hostname] || System.get_env("MSSQL_HOST")
     host      = if is_binary(host), do: String.to_char_list(host), else: host
-    port      = opts[:port] || System.get_env("MSSQLPORT") || 1433
+    port      = opts[:port] || System.get_env("MSSQL_PORT") || 1433
+    if is_binary(port), do: {port, _} = Integer.parse(port)
     timeout   = opts[:connect_timeout] || @timeout
     sock_opts = [{:active, :once}, :binary, {:packet, :raw}, {:delay_send, false}]
 

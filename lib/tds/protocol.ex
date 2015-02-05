@@ -9,7 +9,7 @@ defmodule Tds.Protocol do
   def prelogin(%{sock: sock, opts: opts} = s) do
 
     msg = msg_prelogin(params: opts)
-    case msg_send(msg, sock) do
+    case msg_send(msg, s) do
       :ok ->
         {:noreply,  %{s | state: :prelogin}}
       {:error, reason} ->
@@ -19,7 +19,7 @@ defmodule Tds.Protocol do
 
   def login(%{sock: sock, opts: opts} = s) do
     msg = msg_login(params: opts)
-    case msg_send(msg, sock) do
+    case msg_send(msg, s) do
       :ok ->
         #Logger.debug "Set State: Login"
         {:noreply,  %{s | state: :login}}
@@ -30,6 +30,7 @@ defmodule Tds.Protocol do
 
   def send_query(statement, s) do
     msg = msg_sql(query: statement)
+    Logger.info statement
     case send_to_result(msg, s) do
       {:ok, s} ->
         #Logger.debug "Send Query"
@@ -40,7 +41,22 @@ defmodule Tds.Protocol do
   end
 
   def send_param_query(statement, params, s) do
+    # Check to see if the incoming params are of the %Parameter Type
+
+    params = case params do
+      [%Parameter{}] -> params
+      _ ->
+        {params, _} = Enum.map_reduce(params, 1, fn(param, acc) -> 
+          #Logger.debug "Parameter @#{acc}, VALUE: #{IO.inspect(param)}"
+          {%Parameter{name: "@#{acc}", value: param}, acc+1}
+
+        end)
+        params
+    end
+    Logger.info "#{IO.inspect(statement)}"
+    
     param_desc = params |> Enum.map(fn(%Parameter{} = param) -> 
+      #Logger.debug "Parameter @#{param.name}, VALUE: #{IO.inspect(param.value)}"
       Tds.Types.encode_param_descriptor(param)
     end)
     param_desc = param_desc
@@ -60,7 +76,7 @@ defmodule Tds.Protocol do
     msg = msg_rpc(proc: proc, params: params)
     case send_to_result(msg, s) do
       {:ok, s} ->
-        Logger.debug "Send Query"
+        #Logger.debug "Send Query"
         {:ok, %{s | statement: nil, state: :executing}}
       err ->
         err
@@ -87,19 +103,29 @@ defmodule Tds.Protocol do
 
   ## executing
 
-  def message(:executing, msg_sql_result(columns: columns, rows: rows, done: _done), %{queue: queue} = s) do
+  def message(:executing, msg_sql_result(columns: columns, rows: rows, done: done), %{queue: queue} = s) do
     if columns != nil do
       columns = Enum.reduce(columns, [], fn (col, acc) -> [col[:name]|acc] end) |> Enum.reverse
     end
-    num_rows = 0;
+    num_rows = done.rows;
     if rows != nil do
       rows = Enum.reverse rows
-      num_rows = Enum.count rows
+    end
+    if num_rows == 0 && rows == nil do
+      rows = []
     end
     result = %Tds.Result{columns: columns, rows: rows, num_rows: num_rows}
     reply(result, s)
     queue = :queue.drop(queue)
     {:ok, %{s | queue: queue, statement: "", state: :ready}}
+  end
+
+  def message(:executing, msg_trans(trans: trans), %{queue: queue} = s) do
+    #Logger.info "Protocol Transaction: #{Tds.Utils.to_hex_string trans}"
+    result = %Tds.Result{columns: [], rows: [], num_rows: 0}
+    reply(result, s)
+    queue = :queue.drop(queue)
+    {:ok, %{s | queue: queue, statement: "", state: :ready, env: %{trans: trans}}}
   end
 
   # def message(:executing, msg_empty_query(), s) do
@@ -120,10 +146,9 @@ defmodule Tds.Protocol do
     {:ok, %{s | queue: queue, statement: "", state: :ready}}
   end
 
-  defp msg_send(msg, %{sock: sock}), do: msg_send(msg, sock)
-
-  defp msg_send(msg, {mod, sock}) do
-    data = encode_msg(msg)
+  defp msg_send(msg, %{sock: {mod, sock}, env: env}) do 
+    data = encode_msg(msg, env)
+    Logger.info "MSG: #{Tds.Utils.to_hex_string data}"
     mod.send(sock, data)
   end
 
