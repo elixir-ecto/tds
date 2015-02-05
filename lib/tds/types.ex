@@ -443,6 +443,17 @@
     {{date.year, date.month, date.day}, {date.hour, date.minute, date.second}}
   end
 
+  def encode_datetime({{_,_,_},{_,_,_}} = date), do: encode_datetime(Date.from date)
+  def encode_datetime(%Timex.DateTime{} = date) do
+    #IO.inspect date
+    days = Date.diff @datetime, date, :days
+    d = Date.shift(@datetime, days: days)
+    sec = Date.diff d, date, :secs
+    sec = sec*300
+    #IO.inspect sec
+    <<days::little-signed-32, sec::little-unsigned-32>>
+  end
+
   def decode_money(<<_money_m::little-signed-32, money_l::little-signed-32>>) do
     money = pow10(money_l,(4 * -1))
     Float.round money, 4
@@ -512,7 +523,13 @@
   #  Data Type Encoders
   #
 
+  def encode_data_type(nil) do
+    data_type = %{data_type_code: @tds_data_type_nvarchar}
+    {data_type, <<0xE7, 0xFFFF>>}
+  end
+
   # NVarChar
+
   def encode_data_type(value) when is_binary(value) do
     data_type = %{data_type_code: @tds_data_type_nvarchar} #Enum.find(data_types, fn(x) -> x[:name] == :nvarchar end)
     value = value |> to_little_ucs2
@@ -605,10 +622,11 @@
     {data_type, <<data_type[:data_type_code], value_size, precision, scale>>}
   end
 
-  # # Date Time
-  # def encode_data_type({{month, day, year},{hour, minute, second}}) do
-
-  # end
+  # Date Time
+  def encode_data_type({{_,_,_},{_,_,_}} = date) do
+    data_type = %{data_type_code: @tds_data_type_datetimen}
+    {data_type, <<data_type[:data_type_code], 0x08>>}
+  end
 
   # # Date
   # def encode_data_type({month, day, year}) do
@@ -618,6 +636,14 @@
   #
   #  Param Descriptor Encoders
   #
+
+  def encode_param_descriptor(%Parameter{name: name, value: nil}) do
+    "#{name} nvarchar"
+  end
+
+  def encode_param_descriptor(%Parameter{name: name, value: {{_,_,_},{_,_,_}}}) do
+    "#{name} datetime"
+  end
 
   def encode_param_descriptor(%Parameter{name: name, value: value}) when is_integer(value) and value >= 0 do
     #Logger.debug "Value: #{value}"
@@ -664,6 +690,9 @@
   #
   #  Data Encoders
   #
+  def encode_data(%{data_type_code: @tds_data_type_nvarchar}, nil) do
+    <<0x00::unsigned-64, 0x00::unsigned-32>>
+  end
   def encode_data(%{data_type_code: @tds_data_type_nvarchar}, value) do
     value = value |> to_little_ucs2
     value_size = byte_size(value)
@@ -680,6 +709,8 @@
       |> :binary.encode_unsigned(:little)
     value_size = byte_size(value)
     padding = length - value_size
+    Logger.info "ENCODE INTEGER"
+    IO.inspect value
     <<length>> <> value <> <<0::size(padding)-unit(8)>>
   end
 
@@ -726,6 +757,13 @@
 
   def encode_data(%{data_type_code: @tds_data_type_decimaln} = data_type, value) do
     encode_data(data_type, Decimal.new(value))
+  end
+
+  def encode_data(%{data_type_code: @tds_data_type_datetimen}, value) do
+    #Logger.info "Encode Datetime"
+    data = encode_datetime(value)
+    #Logger.info "DateTime: #{Tds.Utils.to_hex_string data}"
+    <<0x08>> <> data
   end
 
 end 
