@@ -26,7 +26,8 @@ defmodule RPCTest do
       1,
       256,
       65536,
-      4294967296
+      4294967296,
+      20080906120000
     ]
     Enum.each(nums, fn(num) ->  
       assert [{num}] = query("SELECT @n1", [%Parameter{name: "@n1", value: num}])

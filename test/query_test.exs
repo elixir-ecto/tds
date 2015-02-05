@@ -45,6 +45,7 @@ defmodule QueryTest do
     assert [{1, 1}] = query("SELECT 1, 1", [])
     assert [{-1}] = query("SELECT -1", [])
     assert [{10000000000000}] = query("select CAST(10000000000000 AS bigint)", [])
+    
     assert [{"string"}] = query("SELECT 'string'", [])
     assert [{"ẽstring"}] = query("SELECT N'ẽstring'", [])
     assert [{true, false}] = query("SELECT CAST(1 AS BIT), CAST(0 AS BIT)", [])
