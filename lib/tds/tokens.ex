@@ -62,6 +62,7 @@ defmodule Tds.Tokens do
       proc_name: ucs2_to_utf(proc_name),
       line_number: line_number,
     }
+    Logger.info "ERROR MESSAGE: #{e.msg_text}"
     {[error: e], nil}
   end
 
@@ -81,7 +82,7 @@ defmodule Tds.Tokens do
       proc_name: ucs2_to_utf(proc_name),
       line_number: line_number,
     }
-    #Logger.info "INFO MESSAGE: #{i.msg_text}"
+    Logger.info "INFO MESSAGE: #{i.msg_text}"
     {[info: i], tail}
   end
 
@@ -217,7 +218,7 @@ defmodule Tds.Tokens do
 
     #data_type = Enum.find(Types.data_types, fn(x) -> x[:byte] == <<type>> end)
     #Logger.debug "Decode Data Type: #{Tds.Utils.to_hex_string data}"
-    #Logger.debug "Decode Column: #{Tds.Utils.to_hex_string tail}"
+    Logger.debug "Decode Column: #{Tds.Utils.to_hex_string tail}"
     {info, tail} = Types.decode_info(tail)
     {name, tail} = decode_column_name(tail)
     info

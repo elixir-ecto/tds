@@ -230,18 +230,18 @@
           ] do
           <<collation::binary-size(5), tail::binary>> = tail
           col_info = col_info
-              |> Map.put(:collation, collation)
-          if length == 0xFFFF do
-            col_info = col_info
-              |> Map.put(:data_reader, :plp)
-          else
-            col_info = col_info
-          |> Map.put(:data_reader, :shortlen)
-          end
-          col_info = col_info
-              |> Map.put(:length, length)
+            |> Map.put(:collation, collation)
         end
-      @data_type_code in [
+        if length == 0xFFFF do
+          col_info = col_info
+            |> Map.put(:data_reader, :plp)
+        else
+          col_info = col_info
+            |> Map.put(:data_reader, :shortlen)
+        end
+        col_info = col_info
+          |> Map.put(:length, length)
+      data_type_code in [
         @tds_data_type_text,
         @tds_data_type_image,
         @tds_data_type_ntext,
@@ -251,17 +251,28 @@
         col_info = col_info
           |> Map.put(:length, length)
         cond do
-          @data_type_code in [@tds_data_type_text, @tds_data_type_ntext] ->
+          data_type_code in [@tds_data_type_text, @tds_data_type_ntext] ->
             <<collation::binary-size(5), tail::binary>> = tail
             col_info = col_info
               |> Map.put(:collation, collation)
               |> Map.put(:data_reader, :longlen)
             # TODO NumParts Reader
-          @data_type_code == @tds_data_type_image ->
+            <<numparts::signed-8, tail::binary>> = tail
+            Logger.debug "NumPart Tail: #{Tds.Utils.to_hex_string tail}"
+            for n <- 1..numparts do
+              <<tsize::little-unsigned-16, table_name::binary-size(tsize)-unit(16), tail::binary>> = tail
+              <<csize::unsigned-8, column_name::binary-size(csize)-unit(16), tail::binary>> = tail
+            end
+          data_type_code == @tds_data_type_image ->
             # TODO NumBarts Reader
+            <<numparts::signed-8, tail::binary>> = tail
+
+            Enum.each(1..numparts, fn(n) ->  
+              <<size::unsigned-16, str::size(size)-unit(16), tail::binary>> = tail
+            end)
             col_info = col_info
               |> Map.put(:data_reader, :bytelen)
-          @data_type_code == @tds_data_type_variant ->
+          data_type_code == @tds_data_type_variant ->
             col_info = col_info
               |> Map.put(:data_reader, :variant)
           true -> Logger.debug "Not Implemented"
@@ -390,8 +401,9 @@
   # TODO PLP TYpes
   # ShortLength Types
   def decode_data(%{data_reader: :plp}, <<@tds_plp_null, tail::binary>>), do: {nil, tail}
-  def decode_data(%{data_type_code: data_type_code, data_reader: :plp} = data_info, <<_size::little-unsigned-64, tail::binary>>) do
-    #Logger.debug "Decoding PLP Data: #{data_type_code}"
+  def decode_data(%{data_type_code: data_type_code, data_reader: :plp} = data_info, <<_size::little-unsigned-64, tail::binary>> = data) do
+    Logger.debug "Decoding PLP Data Code: #{data_type_code}"
+    Logger.debug "Decoding PLP Data: #{Tds.Utils.to_hex_string data}"
     {data, tail} = decode_plp_chunk(tail, <<>>)    
 
     value = cond do
@@ -421,8 +433,9 @@
     {value, tail}
   end
 
-  def decode_plp_chunk(<<0x00, tail::binary>>, buf), do: {buf, tail}
-  def decode_plp_chunk(<<chunksize::little-unsigned-32, chunk::size(chunksize), tail::binary>>, buf) do
+  def decode_plp_chunk(<<chunksize::little-unsigned-32, tail::binary>>, buf) when chunksize == 0, do: {buf, tail}
+  def decode_plp_chunk(<<chunksize::little-unsigned-32, chunk::binary-size(chunksize)-unit(8), tail::binary>>, buf) do
+    Logger.debug "Chunk Size: #{chunksize}"
     decode_plp_chunk(tail, buf <> chunk)
   end
 
@@ -523,60 +536,94 @@
   #  Data Type Encoders
   #
 
-  def encode_data_type(nil) do
-    data_type = %{data_type_code: @tds_data_type_nvarchar}
-    {data_type, <<0xE7, 0xFFFF>>}
+  def encode_data_type(type, value) when type != nil do
+    case type do
+      :binary -> encode_binary_type(value)
+      :string -> encode_string_type(value)
+      :integer -> encode_integer_type(value)
+      :decimal -> encode_decimal_type(value)
+      :datetime -> encode_datetime_type(value)
+      :uuid -> encode_uuid_type(value)
+      _ -> encode_string_type(value)
+    end
   end
 
-  # NVarChar
+  def encode_binary_type(value) do
+    data_type = %{data_type_code: @tds_data_type_bigvarbinary}
+    if value == nil do
+      length = <<0xFF, 0xFF>>
+    else
+      length = <<byte_size(value)::little-unsigned-16>>
+    end
+    {data_type, <<data_type.data_type_code>> <> length}
+  end
 
-  def encode_data_type(value) when is_binary(value) do
-    data_type = %{data_type_code: @tds_data_type_nvarchar} #Enum.find(data_types, fn(x) -> x[:name] == :nvarchar end)
-    value = value |> to_little_ucs2
-    value_size = byte_size(value)
+  def encode_uuid_type(value) do
+    data_type = %{data_type_code: @tds_data_type_uniqueidentifier}
+    if value == nil do
+      length = 0x00
+    else
+      length = 0x10
+    end
+    {data_type, <<@tds_data_type_uniqueidentifier, length>>}
+  end
+
+  def encode_string_type(value) do
+    data_type = %{data_type_code: @tds_data_type_nvarchar}
     collation = <<0x00, 0x00, 0x00, 0x00, 0x00>>
-    case value_size do
-      0 ->
-        {data_type, <<0xE7, 0xFF, 0xFF>> <> collation}
-      _ ->
-        
-        {data_type, <<0xE7, value_size::little-size(2)-unit(8)>> <> collation}
+    if value != nil do
+       #Enum.find(data_types, fn(x) -> x[:name] == :nvarchar end)
+      value = value |> to_little_ucs2
+      value_size = byte_size(value)
+      
+      case value_size do
+        0 ->
+          {data_type, <<0xE7, 0xFF, 0xFF>> <> collation}
+        _ ->
+          
+          {data_type, <<0xE7, value_size::little-size(2)-unit(8)>> <> collation}
+      end
+    else
+      {data_type, <<0xE7, 0xFF, 0xFF>> <> collation}
     end
     
   end
 
-  #integers
-  def encode_data_type(value) when is_integer(value) and value >= 0 do
-    value = value 
-      |> :binary.encode_unsigned(:little)
-    value_size = byte_size(value)
-    cond do
-      value_size == 1 -> 
-        data_type_code = @tds_data_type_tinyint #Enum.find(data_types, fn(x) -> x[:name] == :tinyint end)
-        length = 1 
-      value_size == 2 -> 
-        data_type_code = @tds_data_type_smallint #Enum.find(data_types, fn(x) -> x[:name] == :smallint end)
-        length = 2 
-      value_size > 2 and value_size <= 4 -> 
-        data_type_code = @tds_data_type_int #Enum.find(data_types, fn(x) -> x[:name] == :int end)
-        length = 4
-      value_size > 4 and value_size <= 8 ->
-        data_type_code = @tds_data_type_bigint #Enum.find(data_types, fn(x) -> x[:name] == :bigint end)
-        length = 8
+  def encode_integer_type(value) do
+    if value == nil do
+      {%{data_type_code: @tds_data_type_tinyint, length: 1}, <<0x26>> <> <<0x01::int8>>}
+    else 
+      if value >= 0 do
+        value = value 
+          |> :binary.encode_unsigned(:little)
+        value_size = byte_size(value)
+        cond do
+          value_size == 1 -> 
+            data_type_code = @tds_data_type_tinyint #Enum.find(data_types, fn(x) -> x[:name] == :tinyint end)
+            length = 1 
+          value_size == 2 -> 
+            data_type_code = @tds_data_type_smallint #Enum.find(data_types, fn(x) -> x[:name] == :smallint end)
+            length = 2 
+          value_size > 2 and value_size <= 4 -> 
+            data_type_code = @tds_data_type_int #Enum.find(data_types, fn(x) -> x[:name] == :int end)
+            length = 4
+          value_size > 4 and value_size <= 8 ->
+            data_type_code = @tds_data_type_bigint #Enum.find(data_types, fn(x) -> x[:name] == :bigint end)
+            length = 8
+        end
+        {%{data_type_code: data_type_code, length: length}, <<0x26>> <> <<length::int8>>}
+      else
+        encode_decimal_type(value)
+      end
     end
-    {%{data_type_code: data_type_code, length: length}, <<0x26>> <> <<length::int8>>}
   end
 
-  def encode_data_type(value) when is_float(value) or (is_integer(value) and value < 0) do
-    encode_data_type(Decimal.new(value))
-  end
-
-  def encode_data_type(%Decimal{} = dec) do
+  def encode_decimal_type(value) do
     data_type = %{data_type_code: @tds_data_type_decimaln} #Enum.find(data_types, fn(x) -> x[:name] == :decimaln end)
     d_ctx = Decimal.get_context
     d_ctx = %{d_ctx | precision: 38}
     Decimal.set_context d_ctx
-    value_list = dec
+    value_list = value
       |> Decimal.abs
       |> Decimal.to_string(:normal)
       |> String.split(".")
@@ -592,7 +639,7 @@
 
     #Logger.debug "Precision: #{precision}"
 
-    dec_abs = dec 
+    dec_abs = value 
       |> Decimal.abs 
     value = dec_abs.coef  
       |> :binary.encode_unsigned(:little)
@@ -622,45 +669,65 @@
     {data_type, <<data_type[:data_type_code], value_size, precision, scale>>}
   end
 
-  # Date Time
-  def encode_data_type({{_,_,_},{_,_,_}} = date) do
+  def encode_datetime_type(value) do
     data_type = %{data_type_code: @tds_data_type_datetimen}
     {data_type, <<data_type[:data_type_code], 0x08>>}
   end
 
-  # # Date
-  # def encode_data_type({month, day, year}) do
-
-  # end
+  def encode_data_type(_, value) when is_binary(value), do: encode_string_type(value)
+  def encode_data_type(_, value) when is_integer(value) and value >= 0, do: encode_integer_type(value)
+  def encode_data_type(_, value) when is_float(value) or (is_integer(value) and value < 0), do: encode_decimal_type(Decimal.new(value))
+  def encode_data_type(_, %Decimal{} = dec), do: encode_decimal_type(dec)
+  def encode_data_type(_, {{_,_,_},{_,_,_}} = date), do: encode_datetime_type(date)
 
   #
   #  Param Descriptor Encoders
   #
+  def encode_param_descriptor(%Parameter{name: name, value: value, type: type} = param) when type != nil do
+    IO.inspect "Param Descriptor"
+    IO.inspect value
+    desc = case type do
+      :uuid -> "uniqueidentifier"
+      :datetime -> "datetime"
+      :binary -> 
+        if value == nil do
+          size = 1
+        else 
+          size = byte_size(value)
+        end
+        "varbinary(#{size})"
+      :string -> 
+        if value == nil do
+          length = 0
+        else
+          length = String.length(value)
+        end
+        if length <= 0, do: length = 1
+        "nvarchar(#{length})"
+      :integer -> 
+        if value >= 0 do
+          "bigint"
+        else
+          precision = value 
+            |> Integer.to_string
+            |> String.length
+          "decimal(#{precision-1}, 0)"
+        end 
+      :decimal -> encode_decimal_descriptor(param)
+      _ -> 
+        if value == nil do
+          length = 0
+        else
+          length = String.length(value)
+        end
+        if length <= 0, do: length = 1
+        "nvarchar(#{length})"
+    end
 
-  def encode_param_descriptor(%Parameter{name: name, value: nil}) do
-    "#{name} nvarchar"
+    "#{name} #{desc}"
   end
 
-  def encode_param_descriptor(%Parameter{name: name, value: {{_,_,_},{_,_,_}}}) do
-    "#{name} datetime"
-  end
-
-  def encode_param_descriptor(%Parameter{name: name, value: value}) when is_integer(value) and value >= 0 do
-    #Logger.debug "Value: #{value}"
-    {data_type, _} = encode_data_type(value)
-    #"#{name} #{Atom.to_string(data_type[:name])}"
-    "#{name} bigint"
-  end
-
-  def encode_param_descriptor(%Parameter{name: name, value: value}) when is_integer(value) and value < 0 do
-    #Logger.debug "Value: #{value}"
-    precision = value 
-      |> Integer.to_string
-      |> String.length
-    "#{name} decimal(#{precision-1}, 0)"
-  end
-
-  def encode_param_descriptor(%Parameter{name: name, value: %Decimal{} = dec}) do
+  def encode_decimal_descriptor(%Parameter{name: name, value: %Decimal{} = dec}) do
     d_ctx = Decimal.get_context
     d_ctx = %{d_ctx | precision: 38}
     Decimal.set_context d_ctx
@@ -680,6 +747,30 @@
     "#{name} decimal(#{precision}, #{scale})"
   end
 
+  def encode_param_descriptor(%Parameter{name: name, value: nil}) do
+    "#{name} bit"
+  end
+
+  def encode_param_descriptor(%Parameter{name: name, value: {{_,_,_},{_,_,_}}}) do
+    "#{name} datetime"
+  end
+
+  def encode_param_descriptor(%Parameter{name: name, value: value}) when is_integer(value) and value >= 0 do
+    "#{name} bigint"
+  end
+
+  def encode_param_descriptor(%Parameter{name: name, value: value}) when is_integer(value) and value < 0 do
+    #Logger.debug "Value: #{value}"
+    precision = value 
+      |> Integer.to_string
+      |> String.length
+    "#{name} decimal(#{precision-1}, 0)"
+  end
+
+  def encode_param_descriptor(%Parameter{name: name, value: %Decimal{}} = param) do
+    encode_decimal_descriptor(param)
+  end
+
   def encode_param_descriptor(%Parameter{name: name, value: value}) when is_binary(value) do
     length = String.length(value)
     if length <= 0, do: length = 1
@@ -690,17 +781,29 @@
   #
   #  Data Encoders
   #
-  def encode_data(%{data_type_code: @tds_data_type_nvarchar}, nil) do
-    <<0x00::unsigned-64, 0x00::unsigned-32>>
+
+
+  def encode_data(%{data_type_code: @tds_data_type_bigvarbinary}, value) do
+    if value != nil do
+      <<byte_size(value)::little-unsigned-16>> <> value
+    else
+      <<@tds_plp_null::little-unsigned-64>>
+    end
   end
+
   def encode_data(%{data_type_code: @tds_data_type_nvarchar}, value) do
-    value = value |> to_little_ucs2
-    value_size = byte_size(value)
-    case value_size do
-      0 ->
-        <<0x00::unsigned-64, 0x00::unsigned-32>>
-      _ ->
-        <<value_size::little-size(2)-unit(8)>> <> value
+    if value == nil do
+      <<0x00::unsigned-64, 0x00::unsigned-32>>
+    else
+      value = value |> to_little_ucs2
+      value_size = byte_size(value)
+      
+      case value_size do
+        0 ->
+          <<0x00::unsigned-64, 0x00::unsigned-32>>
+        _ ->
+          <<value_size::little-size(2)-unit(8)>> <> value
+      end
     end
   end
 
@@ -709,9 +812,12 @@
       |> :binary.encode_unsigned(:little)
     value_size = byte_size(value)
     padding = length - value_size
-    Logger.info "ENCODE INTEGER"
     IO.inspect value
     <<length>> <> value <> <<0::size(padding)-unit(8)>>
+  end
+
+  def encode_data(%{data_type_code: @tds_data_type_tinyint, length: length}, value) when value == nil do
+    <<0>>
   end
 
   def encode_data(%{data_type_code: @tds_data_type_decimaln, precision: precision, scale: _scale}, %Decimal{} = value) do
@@ -764,6 +870,40 @@
     data = encode_datetime(value)
     #Logger.info "DateTime: #{Tds.Utils.to_hex_string data}"
     <<0x08>> <> data
+  end
+
+  def encode_data(%{data_type_code: @tds_data_type_uniqueidentifier}, value) do
+    if value != nil do
+      <<
+       p1::binary-size(1),
+       p2::binary-size(1), 
+       p3::binary-size(1), 
+       p4::binary-size(1), 
+       p5::binary-size(1), 
+       p6::binary-size(1), 
+       p7::binary-size(1), 
+       p8::binary-size(1), 
+       p9::binary-size(1), 
+       p10::binary-size(1), 
+       p11::binary-size(1), 
+       p12::binary-size(1), 
+       p13::binary-size(1), 
+       p14::binary-size(1), 
+       p15::binary-size(1), 
+       p16::binary-size(1)>> = value
+
+      # <<v1::little-signed-32>> = p4 <> p3 <> p2 <>p1
+      # <<v2::little-signed-16>> = p6 <> p5
+      # <<v3::little-signed-16>> = p8 <> p7
+      # <<v4::signed-16>> = p10 <> p9
+      # <<v5::signed-48>> = p11 <> p12 <> p13 <> p14 <> p15 <> p16
+      # v1 <> v2 <> v3 <> v4 <> v5
+      <<0x10>> <> p4 <> p3 <> p2 <>p1 <> p6 <> p5 <> p8 <> p7 <> p9 <> p10 <> p11 <> p12 <> p13 <> p14 <> p15 <> p16
+
+    else
+      <<0x00>>
+    end
+    
   end
 
 end 

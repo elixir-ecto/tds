@@ -3,7 +3,7 @@ defmodule Tds.Parameter do
     name:       String.t | nil,
     direction:  Atom | :input
   }
-  defstruct [name: "", direction: :input, value: ""]
+  defstruct [name: "", direction: :input, value: "", type: nil]
 
   def option_flags(%__MODULE__{direction: direction, value: value}) do
     

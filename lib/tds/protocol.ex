@@ -41,20 +41,9 @@ defmodule Tds.Protocol do
   end
 
   def send_param_query(statement, params, s) do
-    # Check to see if the incoming params are of the %Parameter Type
-
-    params = case params do
-      [%Parameter{}] -> params
-      _ ->
-        {params, _} = Enum.map_reduce(params, 1, fn(param, acc) -> 
-          #Logger.debug "Parameter @#{acc}, VALUE: #{IO.inspect(param)}"
-          {%Parameter{name: "@#{acc}", value: param}, acc+1}
-
-        end)
-        params
-    end
-    Logger.info "#{IO.inspect(statement)}"
     
+    Logger.info "#{IO.inspect(statement)}"
+    IO.inspect params
     param_desc = params |> Enum.map(fn(%Parameter{} = param) -> 
       #Logger.debug "Parameter @#{param.name}, VALUE: #{IO.inspect(param.value)}"
       Tds.Types.encode_param_descriptor(param)

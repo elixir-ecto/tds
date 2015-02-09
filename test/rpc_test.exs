@@ -72,6 +72,74 @@ defmodule RPCTest do
     
   end
 
+  test "NULL Types", context do
+    query("DROP TABLE TestTable", [])
+    assert :ok = query("CREATE TABLE TestTable (bin varbinary(1) NULL, uuid uniqueidentifier NULL, char nvarchar(1) NULL)", [])
+    sql = """
+      INSERT INTO TestTable (bin) VALUES(@1)
+    """
+    params = [
+      %Tds.Parameter{name: "@1", value: nil, type: :binary}
+    ] 
+    assert :ok = query(sql, params)
+    params = [
+      %Tds.Parameter{name: "@1", value: nil, type: :uuid}
+    ] 
+    assert :ok = query(sql, params)
+    sql = """
+      INSERT INTO TestTable (char) VALUES(@1)
+    """
+    params = [
+      %Tds.Parameter{name: "@1", value: nil, type: :string}
+    ] 
+    assert :ok = query(sql, params)
+    assert :ok = query("DROP TABLE dbo.TestTable", [])
+  end
+
+  # test "Common Types Null", context do
+  #   query("DROP TABLE posts", [])
+  #   assert :ok = query("""
+  #     CREATE TABLE posts (
+  #       id bigint NOT NULL PRIMARY KEY IDENTITY, 
+  #       title varchar(100) NULL, 
+  #       counter integer DEFAULT 10 NULL, 
+  #       text varchar(255) NULL, 
+  #       tags nvarchar(max) NULL, 
+  #       bin varbinary(255) NULL, 
+  #       uuid uniqueidentifier NULL,   
+  #       cost decimal(2,2) NULL, 
+  #       inserted_at datetime NOT NULL, 
+  #       updated_at datetime NOT NULL)
+  #     """, [])
+  #   sql = """
+  #     INSERT INTO posts (
+  #       bin, 
+  #       counter, 
+  #       inserted_at,
+  #       tags,
+  #       updated_at)  OUTPUT INSERTED.id , INSERTED.counter VALUES (
+  #       @1, 
+  #       @2,
+  #       @3,
+  #       @4,
+  #       @7
+  #       )
+  #   """
+    
+  #   params = [
+  #     %Tds.Parameter{direction: :input, name: "@1", type: :binary, value: nil},
+  #     %Tds.Parameter{direction: :input, name: "@2", type: :integer, value: nil},
+  #     %Tds.Parameter{direction: :input, name: "@3", type: :datetime, value: {{2015, 2, 6}, {20, 30, 50}}},
+  #     %Tds.Parameter{direction: :input, name: "@4", type: {:array, :string}, value: nil},
+  #     # %Tds.Parameter{direction: :input, name: "@5", type: :string, value: nil},
+  #     # %Tds.Parameter{direction: :input, name: "@6", type: :string, value: nil},
+  #     %Tds.Parameter{direction: :input, name: "@7", type: :datetime, value: {{2015, 2, 6}, {20, 30, 50}}},
+  #     # %Tds.Parameter{direction: :input, name: "@8", type: :uuid, value: nil}]
+  #   ] 
+  #   assert [{1, nil}] = query(sql, params)
+  #   assert :ok = query("DROP TABLE dbo.TestTable", [])
+  # end
+
   # test "Inserting into params", context do
   #   query("DROP TABLE TestTable", [])
   #   assert :ok = query("CREATE TABLE TestTable (TableId int, TableP1 varchar(20))", [])
