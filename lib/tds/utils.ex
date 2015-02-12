@@ -39,16 +39,13 @@ defmodule Tds.Utils do
   end
 
   def error(error, s) do
-    if reply(error, s) do
-      {:stop, :normal, s}
-    else
-      {:stop, error, s}
-    end
+    reply(error, s)
+    {:stop, error, s}
   end
 
   def reply(reply, %{queue: queue}) do
     case :queue.out(queue) do
-      {{:value, {_command, from, _timer}}, _queue} ->
+      {{:value, {_command, from}}, _queue} ->
         GenServer.reply(from, reply)
         true
       {:empty, _queue} ->

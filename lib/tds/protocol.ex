@@ -12,7 +12,7 @@ defmodule Tds.Protocol do
       :ok ->
         {:noreply,  %{s | state: :prelogin}}
       {:error, reason} ->
-        {:stop, :normal, %Tds.Error{message: "tcp send: #{reason}"}, s}
+        error(%Tds.Error{message: "tcp send: #{reason}"}, s)
     end
   end
 
@@ -22,7 +22,7 @@ defmodule Tds.Protocol do
       :ok ->
         {:noreply,  %{s | state: :login}}
       {:error, reason} ->
-        {:stop, :normal, %Tds.Error{message: "tcp send: #{reason}"}, s}
+        error(%Tds.Error{message: "tcp send: #{reason}"}, s)
     end
   end
 
@@ -70,8 +70,8 @@ defmodule Tds.Protocol do
 
   def message(:login, msg_login_ack(), %{opts: opts, tail: _tail, queue: queue, opts: opts} = s) do
     opts = clean_opts(opts)
-    queue = :queue.drop(queue)
     reply(:ok, s)
+    queue = :queue.drop(queue)
     {:ok, %{s | state: :ready, opts: opts, queue: queue}}
   end
 
@@ -110,6 +110,7 @@ defmodule Tds.Protocol do
   end
 
   defp msg_send(msg, %{sock: {mod, sock}, env: env}) do 
+
     data = encode_msg(msg, env)
     mod.send(sock, data)
   end

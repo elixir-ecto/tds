@@ -11,6 +11,11 @@ defmodule Tds.Connection do
   ### PUBLIC API ###
 
   def start_link(opts) do
+    opts = opts
+      |> Keyword.put_new(:username, System.get_env("MSSQLUSER") || System.get_env("USER"))
+      |> Keyword.put_new(:password, System.get_env("MSSQLPASSWORD"))
+      |> Keyword.put_new(:hostname, System.get_env("MSSQLHOST") || "localhost")
+      |> Enum.reject(fn {_k,v} -> is_nil(v) end)
     case GenServer.start_link(__MODULE__, []) do
       {:ok, pid} ->
         timeout = opts[:connect_timeout] || @timeout
@@ -68,33 +73,27 @@ defmodule Tds.Connection do
   end
 
   def handle_call({:connect, opts}, from, %{queue: queue} = s) do
-    host      = opts[:hostname] || System.get_env("MSSQL_HOST")
+    host      = Keyword.fetch!(opts, :hostname)
     host      = if is_binary(host), do: String.to_char_list(host), else: host
     port      = opts[:port] || System.get_env("MSSQL_PORT") || 1433
     if is_binary(port), do: {port, _} = Integer.parse(port)
-    timeout   = opts[:connect_timeout] || @timeout
+    timeout   = opts[:timeout] || @timeout
     sock_opts = [{:active, :once}, :binary, {:packet, :raw}, {:delay_send, false}]
+
+    queue = :queue.in({{:connect, opts}, from}, queue)
+    s = %{s | opts: opts, queue: queue}
 
     case :gen_tcp.connect(host, port, sock_opts, timeout) do
       {:ok, sock} ->
-        queue = :queue.in({{:connect, opts}, from, nil}, queue)
-        s = %{s | opts: opts, sock: {:gen_tcp, sock}, queue: queue}
-        #Protocol.prelogin(s)
+        s = put_in s.sock, {:gen_tcp, sock}
         Protocol.login(%{s | opts: opts, sock: {:gen_tcp, sock}})
       {:error, reason} ->
-        {:stop, :normal, %Tds.Error{message: "tcp connect: #{reason}"}, s}
+        error(%Tds.Error{message: "tcp connect: #{reason}"}, s)
     end
   end
 
   def handle_call(command, from, %{state: state, queue: queue} = s) do
-    # Assume last element in tuple is the options
-    timeout = elem(command, tuple_size(command)-1)[:timeout] || @timeout
-    unless timeout == :infinity do
-      timer_ref = :erlang.start_timer(timeout, self(), :command)
-    end
-
-    queue = :queue.in({command, from, timer_ref}, queue)
-    s = %{s | queue: queue}
+    s = update_in s.queue, &:queue.in({command, from}, &1)
     if state == :ready do
       case next(s) do
         {:ok, s} -> {:noreply, s}
@@ -115,7 +114,6 @@ defmodule Tds.Connection do
 
   def handle_info({tag, _, data}, %{sock: {mod, sock}, tail: tail} = s)
       when tag in [:tcp, :ssl] do
-
     case new_data(tail <> data, %{s | tail: ""}) do
       {:ok, s} ->
         case mod do
@@ -138,14 +136,14 @@ defmodule Tds.Connection do
 
   def new_query(statement, params, %{queue: queue} = s) do
     command = {:query, statement, params, []}
-    {{:value, {_command, from, timer}}, queue} = :queue.out(queue)
-    queue = :queue.in_r({command, from, timer}, queue)
+    {{:value, {_command, from}}, queue} = :queue.out(queue)
+    queue = :queue.in_r({command, from}, queue)
     command(command, %{s | queue: queue})
   end
 
   def next(%{queue: queue} = s) do
     case :queue.out(queue) do
-      {{:value, {command, _from, _timer}}, _queue} ->
+      {{:value, {command, _from}}, _queue} ->
         command(command, s)
       {:empty, _queue} ->
         {:ok, s}

@@ -1,3 +1,8 @@
+# v0.1.3
+* Bug Fixes
+  * Removed Timer from queued commands.
+  * Changed error handling to error func
+
 # v0.1.2
 * Bug Fixes
   * Adding missing date time decoders
