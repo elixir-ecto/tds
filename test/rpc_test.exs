@@ -19,81 +19,100 @@ defmodule RPCTest do
     {:ok, [pid: pid]}
   end
 
-  test "Parameterized Queries", context do
-    # Integers
-    nums = [
-      0,
-      1,
-      256,
-      65536,
-      4294967296,
-      20080906120000
-    ]
-    Enum.each(nums, fn(num) ->  
-      assert [{num}] = query("SELECT @n1", [%Parameter{name: "@n1", value: num}])
-    end)
+  # test "Parameterized Queries", context do
+  #   # Integers
+  #   nums = [
+  #     0,
+  #     1,
+  #     256,
+  #     65536,
+  #     4294967296,
+  #     20080906120000
+  #   ]
+  #   Enum.each(nums, fn(num) ->  
+  #     assert [{num}] = query("SELECT @n1", [%Parameter{name: "@n1", value: num}])
+  #   end)
 
-    # Negative Numbers
-    nums = [
-      -111111111,
-      -1111111111111111111,
-      -1111111111111111111111111111,
-      -11111111111111111111111111111111111111
-    ]
-    Enum.each(nums, fn(num) ->  
-      assert [{num}] = query("SELECT @n1", [%Parameter{name: "@n1", value: num}])
-    end)
+  #   # Negative Numbers
+  #   nums = [
+  #     -111111111,
+  #     -1111111111111111111,
+  #     -1111111111111111111111111111,
+  #     -11111111111111111111111111111111111111
+  #   ]
+  #   Enum.each(nums, fn(num) ->  
+  #     assert [{num}] = query("SELECT @n1", [%Parameter{name: "@n1", value: num}])
+  #   end)
 
-    # Decimals
-    nums = [
-      Decimal.new("1.11111111"),
-      Decimal.new("1.111111111111111111"),
-      Decimal.new("1.111111111111111111111111111"),
-      Decimal.new("1.1111111111111111111111111111111111111")
-    ]
-    Enum.each(nums, fn(num) ->  
-      assert [{num}] = query("SELECT @n1", [%Parameter{name: "@n1", value: num}])
-    end)
+  #   # Decimals
+  #   nums = [
+  #     Decimal.new("1.11111111"),
+  #     Decimal.new("1.111111111111111111"),
+  #     Decimal.new("1.111111111111111111111111111"),
+  #     Decimal.new("1.1111111111111111111111111111111111111")
+  #   ]
+  #   Enum.each(nums, fn(num) ->  
+  #     assert [{num}] = query("SELECT @n1", [%Parameter{name: "@n1", value: num}])
+  #   end)
 
-    # Strings
-    strs = [
-      "hello",
-      "'",
-      "!@#$%^&*()",
-      "Знакомства",
-      ""
-    ]
-    Enum.each(strs, fn(str) ->  
-      assert [{str}] = query("SELECT @n1", [%Parameter{name: "@n1", value: str}])
-    end)
+  #   # Strings
+  #   strs = [
+  #     "hello",
+  #     "'",
+  #     "!@#$%^&*()",
+  #     "Знакомства",
+  #     ""
+  #   ]
+  #   Enum.each(strs, fn(str) ->  
+  #     assert [{str}] = query("SELECT @n1", [%Parameter{name: "@n1", value: str}])
+  #   end)
     
-    # Dates and Times
-    #assert [{{{2014, 06, 20}, {10, 21, 42}}}] = query("SELECT @n1", [%Parameter{name: "@n", value: {{2014, 06, 20}, {10, 21, 42}}])
+  #   # Dates and Times
+  #   #assert [{{{2014, 06, 20}, {10, 21, 42}}}] = query("SELECT @n1", [%Parameter{name: "@n", value: {{2014, 06, 20}, {10, 21, 42}}])
     
-  end
+  # end
 
-  test "NULL Types", context do
-    query("DROP TABLE TestTable", [])
-    assert :ok = query("CREATE TABLE TestTable (bin varbinary(1) NULL, uuid uniqueidentifier NULL, char nvarchar(1) NULL)", [])
-    sql = """
-      INSERT INTO TestTable (bin) VALUES(@1)
-    """
-    params = [
-      %Tds.Parameter{name: "@1", value: nil, type: :binary}
-    ] 
-    assert :ok = query(sql, params)
-    params = [
-      %Tds.Parameter{name: "@1", value: nil, type: :uuid}
-    ] 
-    assert :ok = query(sql, params)
-    sql = """
-      INSERT INTO TestTable (char) VALUES(@1)
-    """
-    params = [
-      %Tds.Parameter{name: "@1", value: nil, type: :string}
-    ] 
-    assert :ok = query(sql, params)
-    assert :ok = query("DROP TABLE dbo.TestTable", [])
+  # test "NULL Types", context do
+  #   query("DROP TABLE TestTable", [])
+  #   assert :ok = query("CREATE TABLE TestTable (bin varbinary(1) NULL, uuid uniqueidentifier NULL, char nvarchar(1) NULL, nchar nvarchar(255) NULL)", [])
+  #   sql = """
+  #     INSERT INTO TestTable (bin) VALUES(@1)
+  #   """
+  #   params = [
+  #     %Tds.Parameter{name: "@1", value: nil, type: :binary}
+  #   ] 
+  #   assert :ok = query(sql, params)
+  #   params = [
+  #     %Tds.Parameter{name: "@1", value: nil, type: :uuid}
+  #   ] 
+  #   assert :ok = query(sql, params)
+  #   sql = """
+  #     INSERT INTO TestTable (char) VALUES(@1)
+  #   """
+  #   params = [
+  #     %Tds.Parameter{name: "@1", value: nil, type: :string}
+  #   ] 
+  #   assert :ok = query(sql, params)
+  #   sql = """
+  #     INSERT INTO TestTable (nchar) VALUES(@1)
+  #   """
+  #   params = [
+  #     %Tds.Parameter{name: "@1", value: nil, type: :string}
+  #   ] 
+  #   assert :ok = query(sql, params)
+  #   #assert [{nil}, {nil}, {nil}] = query("SELECT nchar FROM TestTable WHERE nchar IS NULL ORDER BY nchar", [])
+  #   assert :ok = query("DROP TABLE dbo.TestTable", [])
+  # end
+
+  # test "Descriptors", context do
+  #   assert [{1.0}] = query("SELECT @1", [%Parameter{name: "@1", value: 1.0}])
+  # end
+
+  test "Char to binary encoding", context do
+    query("DROP TABLE dbo.TestTable", [])
+    assert :ok = query("CREATE TABLE TestTable (text varbinary(max) NULL)", [])
+    query("INSERT INTO TestTable VALUES (@1)",[%Parameter{name: "@1", value: "hello", type: :binary}])
+    assert [{"hello"}] = query("SELECT * FROM TestTable WHERE text IN ('x', 'y', @1)", [%Parameter{name: "@1", value: "hello"}])
   end
 
   # test "Common Types Null", context do

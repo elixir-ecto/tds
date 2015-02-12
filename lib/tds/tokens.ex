@@ -44,6 +44,15 @@ defmodule Tds.Tokens do
     {[columns: columns]++tokens, tail}
   end
 
+  # ORDER
+  defp decode_token(<<@tds_token_order, length::little-unsigned-16, tail::binary>>, tokens) do
+    Logger.info "Order: #{Tds.Utils.to_hex_string tail}"
+    Logger.info "Length: #{length}"
+    length = trunc(length / 2)
+    {columns, tail} = decode_column_order(tail, length, [])
+    {[order: columns]++tokens, tail}
+  end
+
   # ERROR
   defp decode_token(<<@tds_token_error, length::little-size(16), number::little-size(32), state, class,
       msg_len::little-size(16), msg::binary-size(msg_len)-unit(16),
@@ -193,6 +202,14 @@ defmodule Tds.Tokens do
     end
   end
 
+  defp decode_column_order(<<tail::binary>>, n, columns) when n == 0 do 
+    #Logger.info "Decode Column Order Tail: #{Tds.Utils.to_hex_string tail}"
+    {columns, tail}
+  end
+  defp decode_column_order(<<col_id::little-unsigned-16, tail::binary>>, n, columns) do
+    #Logger.info "Decode Column Order"
+    decode_column_order(tail, n-1, [col_id|columns])
+  end
 
   ## Row and Column Decoders
 
@@ -214,20 +231,22 @@ defmodule Tds.Tokens do
   end
 
   defp decode_column(<<_usertype::int32, _flags::int16, tail::binary>> = data) do
-
+    
+    #Logger.info "DECODE COLUMN!!!!!"
 
     #data_type = Enum.find(Types.data_types, fn(x) -> x[:byte] == <<type>> end)
     #Logger.debug "Decode Data Type: #{Tds.Utils.to_hex_string data}"
-    Logger.debug "Decode Column: #{Tds.Utils.to_hex_string tail}"
+    #Logger.info "Decode Column: #{Tds.Utils.to_hex_string tail}"
     {info, tail} = Types.decode_info(tail)
     {name, tail} = decode_column_name(tail)
-    info
+    info = info
       |> Map.put(:name, name)
     {info, tail}
   end
 
   defp decode_column_name(<<name_length::int8, name::unicode(name_length), tail::binary>>) do
     name = name |> :unicode.characters_to_binary({:utf16, :little}, :utf8)
+    Logger.info "Column Name: #{name}"
     {name, tail}
   end
 
@@ -262,7 +281,7 @@ defmodule Tds.Tokens do
 
   defp decode_row_column(<<tail::binary>>, column) do
     #data_type = column[:data_type_code]
-    #Logger.debug "Decode Row Column: #{Tds.Utils.to_hex_string tail}"
+    #Logger.info "Decode Row Column: #{Tds.Utils.to_hex_string tail}"
     Types.decode_data(column, tail)
   end
 

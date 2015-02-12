@@ -31,6 +31,7 @@ defmodule Tds.Connection do
     #Logger.debug "Query: #{statement}"
     message = {:query, statement, params, opts}
     timeout = opts[:timeout] || @timeout
+    IO.inspect "QUERY TIMEOUT #{timeout}"
     call_proc(pid, message, timeout)
   end
 
@@ -62,7 +63,7 @@ defmodule Tds.Connection do
       statement: nil, 
       pak_header: "", 
       pak_data: "",
-      env: %{trans: <<0x00000000>>}}}
+      env: %{trans: <<0x00>>}}}
   end
 
   def handle_call(:stop, from, s) do
@@ -90,10 +91,11 @@ defmodule Tds.Connection do
   end
 
   def handle_call(command, from, %{state: state, queue: queue} = s) do
-    #Logger.debug "Handle Call Command"
-    #Logger.debug "State: #{state}"
+    Logger.debug "Handle Call Command"
+    #Logger.debug "State: #{IO.inspect(s)}"
     # Assume last element in tuple is the options
-    timeout = elem(command, tuple_size(command)-1)[:timeout] || @timeout
+    timeout = @timeout
+    #timeout = elem(command, tuple_size(command)-1)[:timeout] || @timeout
     unless timeout == :infinity do
       timer_ref = :erlang.start_timer(timeout, self(), :command)
     end
@@ -122,7 +124,7 @@ defmodule Tds.Connection do
 
   def handle_info({tag, _, data}, %{sock: {mod, sock}, tail: tail} = s)
       when tag in [:tcp, :ssl] do
-    #Logger.debug "Data In"
+    Logger.info "Data In"
 
     case new_data(tail <> data, %{s | tail: ""}) do
       {:ok, s} ->
@@ -137,12 +139,12 @@ defmodule Tds.Connection do
   end
 
   def handle_info({tag, _}, s) when tag in [:tcp_closed, :ssl_closed] do
-    #Logger.debug "TCP Closed: #{IO.inspect tag}"
+    Logger.debug "TCP Closed: #{IO.inspect tag}"
     error(%Tds.Error{message: "tcp closed"}, s)
   end
 
   def handle_info({tag, _, reason}, s) when tag in [:tcp_error, :ssl_error] do
-    #Logger.debug "TCP Error: #{IO.inspect reason}"
+    Logger.debug "TCP Error: #{IO.inspect reason}"
     error(%Tds.Error{message: "tcp error: #{reason}"}, s)
   end
 

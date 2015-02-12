@@ -103,4 +103,8 @@ defmodule QueryTest do
     assert [{1}] = query("SELECT 1", [])
   end
 
+  test "char nulls", context do
+    assert [{nil}] = query("SELECT CAST(NULL as nvarchar(255))",[])
+  end
+
 end

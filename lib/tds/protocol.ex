@@ -29,6 +29,7 @@ defmodule Tds.Protocol do
   end
 
   def send_query(statement, s) do
+    Logger.info "#{IO.inspect(statement)}"
     msg = msg_sql(query: statement)
     Logger.info statement
     case send_to_result(msg, s) do
@@ -45,13 +46,14 @@ defmodule Tds.Protocol do
     Logger.info "#{IO.inspect(statement)}"
     IO.inspect params
     param_desc = params |> Enum.map(fn(%Parameter{} = param) -> 
-      #Logger.debug "Parameter @#{param.name}, VALUE: #{IO.inspect(param.value)}"
+      #Logger.debug "Parameter #{param.name}, VALUE: #{IO.inspect(param.value)}"
       Tds.Types.encode_param_descriptor(param)
     end)
+    #Logger.debug "Params: #{param_desc}"
     param_desc = param_desc
       |> Enum.join(", ")
 
-    msg = msg_rpc(proc: :sp_executesql, params: [%Parameter{value: statement}, %Parameter{value: param_desc}] ++ params)
+    msg = msg_rpc(proc: :sp_executesql, params: [%Parameter{value: statement, type: :string}, %Parameter{value: param_desc, type: :string}] ++ params)
     case send_to_result(msg, s) do
       {:ok, s} ->
         #Logger.debug "Send Query"
@@ -142,6 +144,7 @@ defmodule Tds.Protocol do
   end
 
   defp send_to_result(msg, s) do
+    Logger.info "TDS Send to result"
     case msg_send(msg, s) do
       :ok ->
         {:ok, s}

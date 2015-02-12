@@ -229,7 +229,7 @@ defmodule Tds.Messages do
     trans_size = byte_size(trans)
     padding = 8 - trans_size
     transaction_descriptor = trans <> <<0::size(padding)-unit(8)>>
-    Logger.info "Transaction: #{Tds.Utils.to_hex_string transaction_descriptor}"
+    #Logger.info "Transaction: #{Tds.Utils.to_hex_string transaction_descriptor}"
     outstanding_request_count = <<1::little-size(4)-unit(8)>>
     td_header = header_type <> transaction_descriptor <> outstanding_request_count
     td_header_len = byte_size(td_header) + 4
@@ -249,7 +249,7 @@ defmodule Tds.Messages do
     trans_size = byte_size(trans)
     padding = 8 - trans_size
     transaction_descriptor = trans <> <<0::size(padding)-unit(8)>>
-    Logger.info "Transaction: #{Tds.Utils.to_hex_string transaction_descriptor}"
+    #Logger.info "Transaction: #{Tds.Utils.to_hex_string transaction_descriptor}"
     outstanding_request_count = <<1::little-size(4)-unit(8)>>
     td_header = header_type <> transaction_descriptor <> outstanding_request_count
     td_header_len = byte_size(td_header) + 4
@@ -281,7 +281,7 @@ defmodule Tds.Messages do
 
   defp encode_rpc_param(%Tds.Parameter{name: name, value: value, direction: _direction, type: type} = param) do
     #Logger.debug "RPC Param name:#{name}, value:#{value}"
-    Logger.info "RPC Name: #{name}"
+    #Logger.info "RPC Name: #{name}"
     p_name = to_little_ucs2(name)
     p_flags = param |> Tds.Parameter.option_flags
     {p_data_type, p_data_type_value} = Types.encode_data_type(type, value)
