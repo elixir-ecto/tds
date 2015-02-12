@@ -4,8 +4,6 @@ defmodule Tds.Tokens do
 
   alias Tds.Types
 
-  require Logger
-
   @tds_token_returnstatus   0x79 # 0x79
   @tds_token_colmetadata    0x81 # 0x81
   @tds_token_order          0xA9 # 0xA9
@@ -46,8 +44,6 @@ defmodule Tds.Tokens do
 
   # ORDER
   defp decode_token(<<@tds_token_order, length::little-unsigned-16, tail::binary>>, tokens) do
-    Logger.info "Order: #{Tds.Utils.to_hex_string tail}"
-    Logger.info "Length: #{length}"
     length = trunc(length / 2)
     {columns, tail} = decode_column_order(tail, length, [])
     {[order: columns]++tokens, tail}
@@ -71,7 +67,6 @@ defmodule Tds.Tokens do
       proc_name: ucs2_to_utf(proc_name),
       line_number: line_number,
     }
-    Logger.info "ERROR MESSAGE: #{e.msg_text}"
     {[error: e], nil}
   end
 
@@ -91,7 +86,6 @@ defmodule Tds.Tokens do
       proc_name: ucs2_to_utf(proc_name),
       line_number: line_number,
     }
-    Logger.info "INFO MESSAGE: #{i.msg_text}"
     {[info: i], tail}
   end
 
@@ -123,7 +117,6 @@ defmodule Tds.Tokens do
   end
 
   defp decode_token(<<@tds_token_envchange, length::little-unsigned-16, env_type::unsigned-8, tail::binary>> = data, tokens) do
-    #Logger.info "EnvChange: #{Tds.Utils.to_hex_string data}"
     token = case env_type do
       @tds_envtype_database ->
         <<new_value_size::unsigned-8, 
@@ -150,14 +143,11 @@ defmodule Tds.Tokens do
         #Logger.info "Rollback Transaction"
         [trans: <<0x00>>]
     end
-    #IO.inspect token ++ tokens
     {token ++ tokens, tail}
   end
 
   ## DONE
   defp decode_token(<<@tds_token_done, status::int16, cur_cmd::binary(2), row_count::little-size(8)-unit(8), _tail::binary>>, tokens) do
-    #Logger.info "Done Row Count: #{row_count}"
-    #IO.inspect tokens
     case tokens do
       [done: done] -> 
         
@@ -172,11 +162,8 @@ defmodule Tds.Tokens do
 
   ## DONEPROC
   defp decode_token(<<@tds_token_doneproc, status::int16, cur_cmd::binary(2), row_count::little-size(8)-unit(8), tail::binary>>, tokens) do
-    #Logger.info "Done Proc Row Count: #{row_count}"
-    #IO.inspect tokens
     case tokens do
       [done: done] -> 
-        #Logger.info "Matched"
         cond do
           row_count > done.rows -> {[done: %{status: status, cmd: cur_cmd, rows: row_count}] ++ tokens, nil}
           true -> {tokens, nil}
@@ -188,11 +175,8 @@ defmodule Tds.Tokens do
 
   ## DONEINPROC
   defp decode_token(<<@tds_token_doneinproc, status::int16, cur_cmd::binary(2), row_count::little-size(8)-unit(8), _something::binary-size(5), tail::binary>>, tokens) do
-    #Logger.info "Done In Proc Count: #{row_count}"
-    #IO.inspect tokens
     case tokens do
       [done: done] -> 
-        #Logger.info "Matched"
         cond do
           row_count > done.rows -> {[done: %{status: status, cmd: cur_cmd, rows: row_count}] ++ tokens, nil}
           true -> {tokens, nil}
@@ -203,11 +187,9 @@ defmodule Tds.Tokens do
   end
 
   defp decode_column_order(<<tail::binary>>, n, columns) when n == 0 do 
-    #Logger.info "Decode Column Order Tail: #{Tds.Utils.to_hex_string tail}"
     {columns, tail}
   end
   defp decode_column_order(<<col_id::little-unsigned-16, tail::binary>>, n, columns) do
-    #Logger.info "Decode Column Order"
     decode_column_order(tail, n-1, [col_id|columns])
   end
 
@@ -231,12 +213,6 @@ defmodule Tds.Tokens do
   end
 
   defp decode_column(<<_usertype::int32, _flags::int16, tail::binary>> = data) do
-    
-    #Logger.info "DECODE COLUMN!!!!!"
-
-    #data_type = Enum.find(Types.data_types, fn(x) -> x[:byte] == <<type>> end)
-    #Logger.debug "Decode Data Type: #{Tds.Utils.to_hex_string data}"
-    #Logger.info "Decode Column: #{Tds.Utils.to_hex_string tail}"
     {info, tail} = Types.decode_info(tail)
     {name, tail} = decode_column_name(tail)
     info = info
@@ -246,7 +222,6 @@ defmodule Tds.Tokens do
 
   defp decode_column_name(<<name_length::int8, name::unicode(name_length), tail::binary>>) do
     name = name |> :unicode.characters_to_binary({:utf16, :little}, :utf8)
-    Logger.info "Column Name: #{name}"
     {name, tail}
   end
 
@@ -280,8 +255,6 @@ defmodule Tds.Tokens do
   end
 
   defp decode_row_column(<<tail::binary>>, column) do
-    #data_type = column[:data_type_code]
-    #Logger.info "Decode Row Column: #{Tds.Utils.to_hex_string tail}"
     Types.decode_data(column, tail)
   end
 

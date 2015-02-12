@@ -1,5 +1,4 @@
 defmodule Tds.Protocol do
-  require Logger
 
   import Tds.Utils
   import Tds.Messages
@@ -21,7 +20,6 @@ defmodule Tds.Protocol do
     msg = msg_login(params: opts)
     case msg_send(msg, s) do
       :ok ->
-        #Logger.debug "Set State: Login"
         {:noreply,  %{s | state: :login}}
       {:error, reason} ->
         {:stop, :normal, %Tds.Error{message: "tcp send: #{reason}"}, s}
@@ -29,12 +27,9 @@ defmodule Tds.Protocol do
   end
 
   def send_query(statement, s) do
-    Logger.info "#{IO.inspect(statement)}"
     msg = msg_sql(query: statement)
-    Logger.info statement
     case send_to_result(msg, s) do
       {:ok, s} ->
-        #Logger.debug "Send Query"
         {:ok, %{s | statement: nil, state: :executing}}
       err ->
         err
@@ -42,21 +37,15 @@ defmodule Tds.Protocol do
   end
 
   def send_param_query(statement, params, s) do
-    
-    Logger.info "#{IO.inspect(statement)}"
-    IO.inspect params
     param_desc = params |> Enum.map(fn(%Parameter{} = param) -> 
-      #Logger.debug "Parameter #{param.name}, VALUE: #{IO.inspect(param.value)}"
       Tds.Types.encode_param_descriptor(param)
     end)
-    #Logger.debug "Params: #{param_desc}"
     param_desc = param_desc
       |> Enum.join(", ")
 
     msg = msg_rpc(proc: :sp_executesql, params: [%Parameter{value: statement, type: :string}, %Parameter{value: param_desc, type: :string}] ++ params)
     case send_to_result(msg, s) do
       {:ok, s} ->
-        #Logger.debug "Send Query"
         {:ok, %{s | statement: nil, state: :executing}}
       err ->
         err
@@ -67,7 +56,6 @@ defmodule Tds.Protocol do
     msg = msg_rpc(proc: proc, params: params)
     case send_to_result(msg, s) do
       {:ok, s} ->
-        #Logger.debug "Send Query"
         {:ok, %{s | statement: nil, state: :executing}}
       err ->
         err
@@ -81,13 +69,8 @@ defmodule Tds.Protocol do
   end
 
   def message(:login, msg_login_ack(), %{opts: opts, tail: _tail, queue: queue, opts: opts} = s) do
-    #Logger.debug "Protocol Message"
     opts = clean_opts(opts)
     queue = :queue.drop(queue)
-
-    #TODO: Bootstrap Query
-    #s = %{s | bootstrap: true, opts: opts}
-    #Connection.new_query(Types.bootstrap_query, [], s)
     reply(:ok, s)
     {:ok, %{s | state: :ready, opts: opts, queue: queue}}
   end
@@ -112,23 +95,12 @@ defmodule Tds.Protocol do
   end
 
   def message(:executing, msg_trans(trans: trans), %{queue: queue} = s) do
-    #Logger.info "Protocol Transaction: #{Tds.Utils.to_hex_string trans}"
     result = %Tds.Result{columns: [], rows: [], num_rows: 0}
     reply(result, s)
     queue = :queue.drop(queue)
     {:ok, %{s | queue: queue, statement: "", state: :ready, env: %{trans: trans}}}
   end
 
-  # def message(:executing, msg_empty_query(), s) do
-  #   reply(%Postgrex.Result{}, s)
-  #   {:ok, s}
-  # end
-
-  # ## Async
-  # def message(_, msg_ready(), %{queue: queue} = s) do
-  #   queue = :queue.drop(queue)
-  #   Connection.next(%{s | queue: queue, state: :ready})
-  # end
 
   ## Error
   def message(_, msg_error(e: e), %{queue: queue} = s) do
@@ -139,12 +111,10 @@ defmodule Tds.Protocol do
 
   defp msg_send(msg, %{sock: {mod, sock}, env: env}) do 
     data = encode_msg(msg, env)
-    Logger.info "MSG: #{Tds.Utils.to_hex_string data}"
     mod.send(sock, data)
   end
 
   defp send_to_result(msg, s) do
-    Logger.info "TDS Send to result"
     case msg_send(msg, s) do
       :ok ->
         {:ok, s}

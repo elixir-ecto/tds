@@ -6,8 +6,6 @@
   alias Timex.Date
   alias Tds.Parameter
 
-  require Logger
-
   @gd_epoch :calendar.date_to_gregorian_days({2000, 1, 1})
   @gs_epoch :calendar.datetime_to_gregorian_seconds({{2000, 1, 1}, {0, 0, 0}})
   @datetime Date.from {{1900, 1, 1}, {0, 0, 0}}
@@ -161,7 +159,7 @@
           scale in [5, 6, 7] ->
             length = 5
           true -> 
-            Logger.debug "Invalid Scale"
+            #Logger.debug "Invalid Scale"
         end
         col_info = col_info
           |> Map.put(:scale, scale)
@@ -240,7 +238,6 @@
           col_info = col_info
             |> Map.put(:data_reader, :shortlen)
         end
-        Logger.debug "Char Data Reader: #{Atom.to_string(col_info.data_reader)}"
         col_info = col_info
           |> Map.put(:length, length)
       data_type_code in [
@@ -260,7 +257,6 @@
               |> Map.put(:data_reader, :longlen)
             # TODO NumParts Reader
             <<numparts::signed-8, tail::binary>> = tail
-            #Logger.debug "NumPart Tail: #{Tds.Utils.to_hex_string tail}"
             for n <- 1..numparts do
               <<tsize::little-unsigned-16, table_name::binary-size(tsize)-unit(16), tail::binary>> = tail
               <<csize::unsigned-8, column_name::binary-size(csize)-unit(16), tail::binary>> = tail
@@ -277,7 +273,7 @@
           data_type_code == @tds_data_type_variant ->
             col_info = col_info
               |> Map.put(:data_reader, :variant)
-          true -> Logger.debug "Not Implemented"
+          true -> #Logger.debug "Not Implemented"
         end
 
 
@@ -290,7 +286,6 @@
   #
 
   def decode_data(%{data_type: :fixed, data_type_code: data_type_code, length: length}, <<tail::binary>>) do
-    #Logger.debug "Decoding Fixed Length Data: #{data_type_code}"
     <<value_binary::binary-size(length)-unit(8), tail::binary>> = tail
     value = case data_type_code do
       @tds_data_type_null -> 
@@ -316,7 +311,6 @@
   # ByteLength Types
   def decode_data(%{data_reader: :bytelen}, <<0x00, tail::binary>>), do: {nil, tail}
   def decode_data(%{data_type_code: data_type_code, data_reader: :bytelen, length: length} = data_info, <<size::unsigned-8, data::binary-size(size), tail::binary>>) do
-      #Logger.debug "Decoding Byte Length Data: #{data_type_code}"
       value = cond do
         data_type_code == @tds_data_type_daten -> decode_date(data)
         data_type_code == @tds_data_type_timen -> decode_time(data_info[:scale], data)
@@ -373,8 +367,6 @@
   # ShortLength Types
   def decode_data(%{data_reader: :shortlen}, <<0xFF, 0xFF, tail::binary>>), do: {nil, tail}
   def decode_data(%{data_type_code: data_type_code, data_reader: :shortlen} = data_info, <<size::little-unsigned-16, data::binary-size(size), tail::binary>> = pak) do
-    Logger.info "SortLen Data: #{data_info.name}"
-    Logger.info "Pak: #{Tds.Utils.to_hex_string pak}"
     value = cond do
       data_type_code in [
         @tds_data_type_bigvarchar,
@@ -405,8 +397,6 @@
   # ShortLength Types
   def decode_data(%{data_reader: :plp}, <<@tds_plp_null, tail::binary>>), do: {nil, tail}
   def decode_data(%{data_type_code: data_type_code, data_reader: :plp} = data_info, <<_size::little-unsigned-64, tail::binary>> = data) do
-    #Logger.debug "Decoding PLP Data Code: #{data_type_code}"
-    #Logger.debug "Decoding PLP Data: #{Tds.Utils.to_hex_string data}"
     {data, tail} = decode_plp_chunk(tail, <<>>)    
 
     value = cond do
@@ -438,7 +428,6 @@
 
   def decode_plp_chunk(<<chunksize::little-unsigned-32, tail::binary>>, buf) when chunksize == 0, do: {buf, tail}
   def decode_plp_chunk(<<chunksize::little-unsigned-32, chunk::binary-size(chunksize)-unit(8), tail::binary>>, buf) do
-    #Logger.debug "Chunk Size: #{chunksize}"
     decode_plp_chunk(tail, buf <> chunk)
   end
 
@@ -461,12 +450,10 @@
 
   def encode_datetime({{_,_,_},{_,_,_}} = date), do: encode_datetime(Date.from date)
   def encode_datetime(%Timex.DateTime{} = date) do
-    #IO.inspect date
     days = Date.diff @datetime, date, :days
     d = Date.shift(@datetime, days: days)
     sec = Date.diff d, date, :secs
     sec = sec*300
-    #IO.inspect sec
     <<days::little-signed-32, sec::little-unsigned-32>>
   end
   def encode_datetime(nil) do
@@ -526,7 +513,6 @@
   end
 
   def decode_nchar(<<data::binary>>) do
-    #Logger.info "Decode NVarChar: #{Tds.Utils.to_hex_string data}"
     data |> :unicode.characters_to_binary({:utf16, :little}, :utf8)
   end
 
@@ -563,7 +549,6 @@
     if value == nil do
       length = <<0xFF, 0xFF>>
     else
-      #Logger.info "Bin Val: #{value}"
       length = <<byte_size(value)::little-unsigned-16>>
     end
     {data_type, <<data_type.data_type_code>> <> length}
@@ -588,7 +573,6 @@
     data_type = %{data_type_code: @tds_data_type_nvarchar}
     collation = <<0x00, 0x00, 0x00, 0x00, 0x00>>
     if value != nil do
-       #Enum.find(data_types, fn(x) -> x[:name] == :nvarchar end)
       value = value |> to_little_ucs2
       value_size = byte_size(value)
       
@@ -645,17 +629,12 @@
       |> Decimal.abs
       |> Decimal.to_string(:normal)
       |> String.split(".")
-      #IO.inspect value_list
     case value_list do
       [p,s] -> 
-        #Logger.debug "p,s"
         precision = String.length(p) + String.length(s); scale = String.length(s)
       [p] -> 
-        #Logger.debug "p"
         precision = String.length(p); scale = 0
     end
-
-    #Logger.debug "Precision: #{precision}"
 
     dec_abs = value 
       |> Decimal.abs 
@@ -703,17 +682,12 @@
       |> Decimal.abs
       |> Decimal.to_string(:normal)
       |> String.split(".")
-      #IO.inspect value_list
     case value_list do
       [p,s] -> 
-        #Logger.debug "p,s"
         precision = String.length(p) + String.length(s); scale = String.length(s)
       [p] -> 
-        #Logger.debug "p"
         precision = String.length(p); scale = 0
     end
-
-    #Logger.debug "Precision: #{precision}"
 
     dec_abs = value 
       |> Decimal.abs 
@@ -755,8 +729,6 @@
   #  Param Descriptor Encoders
   #
   def encode_param_descriptor(%Parameter{name: name, value: value, type: type} = param) when type != nil do
-    #IO.inspect "Param Descriptor"
-    #IO.inspect value
     desc = case type do
       :uuid -> "uniqueidentifier"
       :datetime -> "datetime"
@@ -810,13 +782,10 @@
       |> String.split(".")
     case value_list do
       [p,s] -> 
-        #Logger.debug "p,s"
         precision = String.length(p) + String.length(s); scale = String.length(s)
       [p] -> 
-        #Logger.debug "p"
         precision = String.length(p); scale = 0
     end
-    Logger.info "DECIMAL NAME: #{name}"
     "decimal(#{precision}, #{scale})"
   end
   def encode_float_descriptor(%Parameter{value: nil}), do: "decimal(1,0)"
@@ -835,10 +804,8 @@
       |> String.split(".")
     case value_list do
       [p,s] -> 
-        #Logger.debug "p,s"
         precision = String.length(p) + String.length(s); scale = String.length(s)
       [p] -> 
-        #Logger.debug "p"
         precision = String.length(p); scale = 0
     end
     "float(#{precision})"
@@ -873,7 +840,6 @@
   end
 
   def encode_param_descriptor(%Parameter{name: name, value: value}) when is_integer(value) and value < 0 do
-    #Logger.debug "Value: #{value}"
     precision = value 
       |> Integer.to_string
       |> String.length
@@ -881,7 +847,6 @@
   end
 
   def encode_param_descriptor(%Parameter{name: name, value: %Decimal{}} = param) do
-    Logger.debug "Encode Param Decimal"
     param = param
       |> Map.put(:type, :decimal)
     encode_param_descriptor(param)
@@ -890,7 +855,6 @@
   def encode_param_descriptor(%Parameter{name: name, value: value}) when is_binary(value) do
     length = String.length(value)
     if length <= 0, do: length = 1
-    #Logger.debug "#{name} nvarchar(#{length})"
     "#{name} varbinary(#{length})"
   end
 
@@ -930,7 +894,6 @@
       |> :binary.encode_unsigned(:little)
     value_size = byte_size(value)
     padding = length - value_size
-    #IO.inspect value
     <<length>> <> value <> <<0::size(padding)-unit(8)>>
   end
 
@@ -955,15 +918,11 @@
     
     d_abs = Decimal.abs d
 
-    #Logger.debug "Value to be Encoded: #{value}"
     value = d_abs.coef
-    #Logger.debug "Value to be Encoded: #{value}"
 
     value_binary = value  
       |> :binary.encode_unsigned(:little)
     value_size = byte_size(value_binary)
-    #Logger.debug "Value Bin: #{Tds.Utils.to_hex_string(value_binary)}"
-    #Logger.debug "Value Size: #{value_size}"
     padding = cond do
       precision <= 9 ->
         byte_len = 4 
@@ -991,14 +950,12 @@
   end
 
   def encode_data(%{data_type_code: @tds_data_type_datetimen}, value) do
-    #Logger.info "Encode Datetime"
     data = encode_datetime(value)
     if data == nil do
       <<0x00>>
     else
       <<0x08>> <> data
     end
-    #Logger.info "DateTime: #{Tds.Utils.to_hex_string data}"
     
   end
 

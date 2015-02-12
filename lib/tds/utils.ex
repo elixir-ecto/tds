@@ -1,5 +1,5 @@
 defmodule Tds.Utils do
-  require Logger
+
   def to_hex_list(x) when is_list(x) do
     Enum.map x, &( Base.encode16(<<&1>>))
   end
@@ -40,10 +40,8 @@ defmodule Tds.Utils do
 
   def error(error, s) do
     if reply(error, s) do
-      Logger.debug "Error Normal"
       {:stop, :normal, s}
     else
-      Logger.debug "Error Exiting"
       {:stop, error, s}
     end
   end

@@ -2,7 +2,6 @@ defmodule Tds.Connection do
   use GenServer
   alias Tds.Protocol
   alias Tds.Messages
-  require Logger
 
   import Tds.BinaryUtils
   import Tds.Utils
@@ -28,10 +27,8 @@ defmodule Tds.Connection do
   end
 
   def query(pid, statement, params, opts \\ []) do
-    #Logger.debug "Query: #{statement}"
     message = {:query, statement, params, opts}
     timeout = opts[:timeout] || @timeout
-    IO.inspect "QUERY TIMEOUT #{timeout}"
     call_proc(pid, message, timeout)
   end
 
@@ -45,7 +42,6 @@ defmodule Tds.Connection do
     case GenServer.call(pid, message, timeout) do
       %Tds.Result{} = res -> {:ok, res}
       %Tds.Error{} = err  ->
-        #Logger.debug "Query Error"
         {:error, err}
     end
   end
@@ -91,11 +87,8 @@ defmodule Tds.Connection do
   end
 
   def handle_call(command, from, %{state: state, queue: queue} = s) do
-    Logger.debug "Handle Call Command"
-    #Logger.debug "State: #{IO.inspect(s)}"
     # Assume last element in tuple is the options
-    timeout = @timeout
-    #timeout = elem(command, tuple_size(command)-1)[:timeout] || @timeout
+    timeout = elem(command, tuple_size(command)-1)[:timeout] || @timeout
     unless timeout == :infinity do
       timer_ref = :erlang.start_timer(timeout, self(), :command)
     end
@@ -113,8 +106,6 @@ defmodule Tds.Connection do
   end
 
   def handle_info({:tcp, _, _data}, %{sock: {mod, sock}, opts: opts, state: :prelogin} = s) do
-    #Logger.debug "PreLogin"
-
     case mod do
       :gen_tcp -> :inet.setopts(sock, active: :once)
       :ssl     -> :ssl.setopts(sock, active: :once)
@@ -124,7 +115,6 @@ defmodule Tds.Connection do
 
   def handle_info({tag, _, data}, %{sock: {mod, sock}, tail: tail} = s)
       when tag in [:tcp, :ssl] do
-    Logger.info "Data In"
 
     case new_data(tail <> data, %{s | tail: ""}) do
       {:ok, s} ->
@@ -139,12 +129,10 @@ defmodule Tds.Connection do
   end
 
   def handle_info({tag, _}, s) when tag in [:tcp_closed, :ssl_closed] do
-    Logger.debug "TCP Closed: #{IO.inspect tag}"
     error(%Tds.Error{message: "tcp closed"}, s)
   end
 
   def handle_info({tag, _, reason}, s) when tag in [:tcp_error, :ssl_error] do
-    Logger.debug "TCP Error: #{IO.inspect reason}"
     error(%Tds.Error{message: "tcp error: #{reason}"}, s)
   end
 
@@ -158,7 +146,6 @@ defmodule Tds.Connection do
   def next(%{queue: queue} = s) do
     case :queue.out(queue) do
       {{:value, {command, _from, _timer}}, _queue} ->
-        #Logger.debug "Calling Command"
         command(command, s)
       {:empty, _queue} ->
         {:ok, s}
@@ -195,26 +182,17 @@ defmodule Tds.Connection do
       <<data :: binary(size), tail :: binary>> ->
         case status do
           1 ->
-            #Logger.debug "Final Packet"
-            #Logger.debug "#{Tds.Utils.to_hex_string buf_header<>data}"
             msg = Messages.parse(state, type, buf_header, buf_data<>data)
             case Protocol.message(state, msg, s) do
               {:ok, s} -> new_data(tail, %{s | pak_header: "", pak_data: "", tail: tail})
               {:error, _, _} = err -> err
             end
           _ ->
-            #Logger.debug "Continuing Packet"
-            #Logger.debug "Data: #{Tds.Utils.to_hex_string data}"
             {:ok, %{s | pak_data: buf_data <> data, pak_header: "", tail: tail}}
         end
       _ ->
         {:ok, %{s | tail: tail <> data, pak_header: buf_header}}
     end
   end
-
-  # defp new_data(data, %{tail: tail, pak_header: ""} = s) do
-  #   Logger.debug "Data to Tail"
-  #   {:ok, %{s | tail: tail <> data}}
-  # end
 
 end

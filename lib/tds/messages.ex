@@ -5,7 +5,6 @@ defmodule Tds.Messages do
 
   alias Tds.Types
 
-  require Logger
   require Bitwise
 
   defrecord :msg_prelogin, [:params]
@@ -87,13 +86,10 @@ defmodule Tds.Messages do
     
     case tokens do
       [error: error] ->
-        #Logger.info "Process Error"
         msg_error(e: error)
       [done: %{} = done, trans: <<trans::binary>>] ->
-        #Logger.info "Process Transaction"
         msg_trans(trans: trans)
       tokens ->
-        #Logger.info "Process SQL Result"
         msg_sql_result(columns: tokens[:columns], rows: tokens[:rows], done: tokens[:done])
     end
   end
@@ -151,7 +147,6 @@ defmodule Tds.Messages do
     database_ucs = to_little_ucs2(database)
 
     login_data = username_ucs <> password_ucs_xor <> clt_int_name_ucs <> database_ucs
-    #IO.inspect Utils.to_hex_string(login_data)
 
     curr_offset = offset_start + 58
     ibHostName = <<curr_offset::little-size(16)>>
@@ -208,9 +203,7 @@ defmodule Tds.Messages do
       ibLanguage <> cchLanguage <> ibDatabase <> cchDatabase <> clientID <> ibSSPI <> cbSSPI <>
       ibAtchDBFile <> cchAtchDBFile <> ibChangePassword <> cchChangePassword <> cbSSPILong
 
-    #IO.inspect Utils.to_hex_string(offset)
     login7 =  login_a <> offset <> login_data
-    #IO.inspect Utils.to_hex_string(login7)
 
     login7_len = byte_size(login7) + 4
     data = <<login7_len::little-size(32)>> <> login7
@@ -220,7 +213,6 @@ defmodule Tds.Messages do
   end
 
   defp encode(msg_sql(query: q), %{trans: trans}) do
-    #Logger.debug "Msg SQL"
     #convert query to unicodestream
     q_ucs = to_little_ucs2(q)
     
@@ -229,7 +221,6 @@ defmodule Tds.Messages do
     trans_size = byte_size(trans)
     padding = 8 - trans_size
     transaction_descriptor = trans <> <<0::size(padding)-unit(8)>>
-    #Logger.info "Transaction: #{Tds.Utils.to_hex_string transaction_descriptor}"
     outstanding_request_count = <<1::little-size(4)-unit(8)>>
     td_header = header_type <> transaction_descriptor <> outstanding_request_count
     td_header_len = byte_size(td_header) + 4
@@ -249,7 +240,6 @@ defmodule Tds.Messages do
     trans_size = byte_size(trans)
     padding = 8 - trans_size
     transaction_descriptor = trans <> <<0::size(padding)-unit(8)>>
-    #Logger.info "Transaction: #{Tds.Utils.to_hex_string transaction_descriptor}"
     outstanding_request_count = <<1::little-size(4)-unit(8)>>
     td_header = header_type <> transaction_descriptor <> outstanding_request_count
     td_header_len = byte_size(td_header) + 4
@@ -264,7 +254,6 @@ defmodule Tds.Messages do
     
     header = encode_header(0x03, data)
     pak = header <> data
-    #Logger.info "RPC #{Tds.Utils.to_hex_string pak}"
     pak
   end
 
@@ -280,8 +269,6 @@ defmodule Tds.Messages do
   end
 
   defp encode_rpc_param(%Tds.Parameter{name: name, value: value, direction: _direction, type: type} = param) do
-    #Logger.debug "RPC Param name:#{name}, value:#{value}"
-    #Logger.info "RPC Name: #{name}"
     p_name = to_little_ucs2(name)
     p_flags = param |> Tds.Parameter.option_flags
     {p_data_type, p_data_type_value} = Types.encode_data_type(type, value)
@@ -306,12 +293,9 @@ defmodule Tds.Messages do
   end
 
   defp encode_tdspassword(list) do
-    #IO.inspect list
     for <<b::size(8) <- list>> do
-      #IO.puts b
       <<x::size(4), y::size(4)>> = <<b>> #swap 4 bits
       <<c>> = <<y::size(4), x::size(4)>>
-      #IO.puts c
       Bitwise.bxor(c, 0xA5)
     end
     |> Enum.map_join(&(<<&1>>)) #TODO UGLY!!!
