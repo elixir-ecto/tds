@@ -3,7 +3,7 @@ defmodule Tds.Mixfile do
 
   def project do
     [app: :tds,
-     version: "0.1.2",
+     version: "0.1.3-dev",
      elixir: "~> 1.0.0",
      deps: deps,
      source_url: "https://github.com/livehelpnow/tds",
