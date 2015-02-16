@@ -50,7 +50,7 @@ In order to connect to a SQL instance, you must assign a static port to the TCP 
     numeric         #Decimal<42.0> *
     date            {2013, 10, 12}
     time            {0, 37, 14}
-    datetime	    {{2013, 10, 12}, {0, 37, 14}}
+    datetime	      {{2013, 10, 12}, {0, 37, 14}}
     uuid            <<160,238,188,153,156,11,78,248,187,109,107,185,189,56,10,17>>
 
 All data types will be supported, unsupported types currently are udt, xml

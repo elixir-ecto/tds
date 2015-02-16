@@ -1,5 +1,7 @@
 defmodule Tds.Protocol do
 
+  require Logger
+
   import Tds.Utils
   import Tds.Messages
 
@@ -42,7 +44,6 @@ defmodule Tds.Protocol do
     end)
     param_desc = param_desc
       |> Enum.join(", ")
-
     msg = msg_rpc(proc: :sp_executesql, params: [%Parameter{value: statement, type: :string}, %Parameter{value: param_desc, type: :string}] ++ params)
     case send_to_result(msg, s) do
       {:ok, s} ->
@@ -112,6 +113,7 @@ defmodule Tds.Protocol do
   defp msg_send(msg, %{sock: {mod, sock}, env: env}) do 
 
     data = encode_msg(msg, env)
+    Logger.debug "MSG: #{Tds.Utils.to_hex_string data}"
     mod.send(sock, data)
   end
 

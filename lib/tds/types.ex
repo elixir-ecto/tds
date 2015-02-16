@@ -594,24 +594,19 @@
       {%{data_type_code: @tds_data_type_tinyint, length: 1}, <<0x26>> <> <<0x01::int8>>}
     else 
       if value >= 0 do
-        value = value 
-          |> :binary.encode_unsigned(:little)
-        value_size = byte_size(value)
+        value_size = int_type_size(value)
         cond do
           value_size == 1 -> 
             data_type_code = @tds_data_type_tinyint #Enum.find(data_types, fn(x) -> x[:name] == :tinyint end)
-            length = 1 
           value_size == 2 -> 
             data_type_code = @tds_data_type_smallint #Enum.find(data_types, fn(x) -> x[:name] == :smallint end)
-            length = 2 
           value_size > 2 and value_size <= 4 -> 
             data_type_code = @tds_data_type_int #Enum.find(data_types, fn(x) -> x[:name] == :int end)
-            length = 4
           value_size > 4 and value_size <= 8 ->
             data_type_code = @tds_data_type_bigint #Enum.find(data_types, fn(x) -> x[:name] == :bigint end)
-            length = 8
         end
-        {%{data_type_code: data_type_code, length: length}, <<0x26>> <> <<length::int8>>}
+        
+        {%{data_type_code: data_type_code, length: value_size}, <<0x26>> <> <<value_size>>}
       else
         encode_decimal_type(value)
       end
@@ -890,11 +885,8 @@
   end
 
   def encode_data(%{data_type_code: data_type_code, length: length}, value) when is_integer(value) and value >= 0 do
-    value = value
-      |> :binary.encode_unsigned(:little)
-    value_size = byte_size(value)
-    padding = length - value_size
-    <<length>> <> value <> <<0::size(padding)-unit(8)>>
+    size = int_type_size(value)
+    <<size>> <> <<value::little-signed-size(size)-unit(8)>>
   end
 
   def encode_data(%{data_type_code: @tds_data_type_tinyint, length: length}, value) when value == nil do
@@ -993,4 +985,9 @@
     
   end
 
-end 
+  defp int_type_size(int) when int in 0..255, do: 1
+  defp int_type_size(int) when int in -32768..32767, do: 2
+  defp int_type_size(int) when int in -2147483648..2147483647, do: 4
+  defp int_type_size(int) when int in -9223372036854775808..9223372036854775807, do: 8
+
+end

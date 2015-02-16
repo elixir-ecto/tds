@@ -1,3 +1,7 @@
+# v0.1.4
+* Bug Fixes
+  * Fixed encoding for integers
+
 # v0.1.3
 * Bug Fixes
   * Removed Timer from queued commands.
