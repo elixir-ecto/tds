@@ -1,7 +1,4 @@
 defmodule Tds.Protocol do
-
-  require Logger
-
   import Tds.Utils
   import Tds.Messages
 
@@ -113,7 +110,6 @@ defmodule Tds.Protocol do
   defp msg_send(msg, %{sock: {mod, sock}, env: env}) do 
 
     data = encode_msg(msg, env)
-    Logger.debug "MSG: #{Tds.Utils.to_hex_string data}"
     mod.send(sock, data)
   end
 
