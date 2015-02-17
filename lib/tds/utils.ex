@@ -23,7 +23,7 @@ defmodule Tds.Utils do
   end
 
   def ucs2_to_utf(s) do
-    to_char_list(s) |> Enum.reject(&(&1 == 0)) |> to_string
+    :binary.bin_to_list(s) |> Enum.reject(&(&1 == 0)) |> to_string
   end
 
   def to_boolean(<<1>>) do
