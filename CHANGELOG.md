@@ -1,6 +1,7 @@
 # v0.1.5
 * Bug Fixes
   * Fixed issue where driver would not call Connection.next when setting the state to :ready
+  * Fixed UCS2 Encoding
 
 # v0.1.4
 * Bug Fixes
