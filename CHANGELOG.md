@@ -1,3 +1,7 @@
+# v0.1.5
+* Bug Fixes
+  * Fixed issue where driver would not call Connection.next when setting the state to :ready
+
 # v0.1.4
 * Bug Fixes
   * Fixed encoding for integers

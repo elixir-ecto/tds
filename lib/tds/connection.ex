@@ -18,7 +18,7 @@ defmodule Tds.Connection do
       |> Enum.reject(fn {_k,v} -> is_nil(v) end)
     case GenServer.start_link(__MODULE__, []) do
       {:ok, pid} ->
-        timeout = opts[:connect_timeout] || @timeout
+        timeout = opts[:timeout] || @timeout
         case GenServer.call(pid, {:connect, opts}, timeout) do
           :ok -> {:ok, pid}
           err -> {:error, err}

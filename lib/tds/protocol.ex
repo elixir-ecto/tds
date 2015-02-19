@@ -1,7 +1,9 @@
 defmodule Tds.Protocol do
+
   import Tds.Utils
   import Tds.Messages
 
+  alias Tds.Connection
   alias Tds.Parameter
 
   def prelogin(%{sock: sock, opts: opts} = s) do
@@ -26,7 +28,9 @@ defmodule Tds.Protocol do
   end
 
   def send_query(statement, s) do
+    #IO.inspect statement
     msg = msg_sql(query: statement)
+
     case send_to_result(msg, s) do
       {:ok, s} ->
         {:ok, %{s | statement: nil, state: :executing}}
@@ -75,7 +79,7 @@ defmodule Tds.Protocol do
 
   ## executing
 
-  def message(:executing, msg_sql_result(columns: columns, rows: rows, done: done), %{queue: queue} = s) do
+  def message(:executing, msg_sql_result(columns: columns, rows: rows, done: done), %{} = s) do
     if columns != nil do
       columns = Enum.reduce(columns, [], fn (col, acc) -> [col[:name]|acc] end) |> Enum.reverse
     end
@@ -88,23 +92,22 @@ defmodule Tds.Protocol do
     end
     result = %Tds.Result{columns: columns, rows: rows, num_rows: num_rows}
     reply(result, s)
-    queue = :queue.drop(queue)
-    {:ok, %{s | queue: queue, statement: "", state: :ready}}
+    queue = :queue.drop(s.queue)
+    Connection.next(%{s | queue: queue, state: :ready})
   end
 
-  def message(:executing, msg_trans(trans: trans), %{queue: queue} = s) do
+  def message(:executing, msg_trans(trans: trans), %{} = s) do
     result = %Tds.Result{columns: [], rows: [], num_rows: 0}
     reply(result, s)
-    queue = :queue.drop(queue)
-    {:ok, %{s | queue: queue, statement: "", state: :ready, env: %{trans: trans}}}
+    queue = :queue.drop(s.queue)
+    Connection.next(%{s | statement: "", queue: queue, state: :ready, env: %{trans: trans}})
   end
 
-
   ## Error
-  def message(_, msg_error(e: e), %{queue: queue} = s) do
+  def message(_, msg_error(e: e), %{} = s) do
     reply(%Tds.Error{mssql: e}, s)
-    queue = :queue.drop(queue)
-    {:ok, %{s | queue: queue, statement: "", state: :ready}}
+    queue = :queue.drop(s.queue)
+    Connection.next(%{s | statement: "", queue: queue, state: :ready})
   end
 
   defp msg_send(msg, %{sock: {mod, sock}, env: env}) do 
