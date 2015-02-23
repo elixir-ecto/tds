@@ -110,7 +110,8 @@ defmodule Tds.Connection do
         {:error, error, s} -> error(error, s)
       end
     else
-      Logger.error "TDS-State: #{inspect state}"
+      Logger.error "TDS-State: #{inspect s}"
+      Logger.error "TDS-PID: #{inspect self}"
       Logger.error "Query Queued: #{inspect command}"
       {:noreply, s}
     end
