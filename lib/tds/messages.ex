@@ -5,6 +5,7 @@ defmodule Tds.Messages do
 
   alias Tds.Types
 
+  require Logger
   require Bitwise
 
   defrecord :msg_prelogin, [:params]

@@ -4,6 +4,8 @@ defmodule Tds.Tokens do
 
   alias Tds.Types
 
+  require Logger
+
   @tds_token_returnstatus   0x79 # 0x79
   @tds_token_colmetadata    0x81 # 0x81
   @tds_token_order          0xA9 # 0xA9
@@ -67,6 +69,7 @@ defmodule Tds.Tokens do
       proc_name: ucs2_to_utf(proc_name),
       line_number: line_number,
     }
+    Logger.debug "TDS-Error: #{inspect e}"
     {[error: e], nil}
   end
 
@@ -86,6 +89,7 @@ defmodule Tds.Tokens do
       proc_name: ucs2_to_utf(proc_name),
       line_number: line_number,
     }
+    Logger.debug "TDS-Info: #{inspect i}"
     {[info: i], tail}
   end
 

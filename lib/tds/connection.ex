@@ -6,6 +6,8 @@ defmodule Tds.Connection do
   import Tds.BinaryUtils
   import Tds.Utils
 
+  require Logger
+
   @timeout :infinity
 
   ### PUBLIC API ###
@@ -100,6 +102,8 @@ defmodule Tds.Connection do
         {:error, error, s} -> error(error, s)
       end
     else
+      Logger.error "TDS-State: #{inspect state}"
+      Logger.error "Query Queued: #{inspect command}"
       {:noreply, s}
     end
   end
