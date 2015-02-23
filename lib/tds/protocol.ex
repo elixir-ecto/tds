@@ -73,11 +73,9 @@ defmodule Tds.Protocol do
   end
 
   def message(:login, msg_login_ack(), %{opts: opts, tail: _tail, queue: queue, opts: opts} = s) do
-    Logger.debug "TDS-Login Complete"
     opts = clean_opts(opts)
     reply(:ok, s)
-    queue = :queue.drop(queue)
-    Connection.next(%{s | queue: queue, state: :ready})
+    ready(s)
   end
 
   ## executing
@@ -96,24 +94,21 @@ defmodule Tds.Protocol do
     end
     result = %Tds.Result{columns: columns, rows: rows, num_rows: num_rows}
     reply(result, s)
-    queue = :queue.drop(s.queue)
-    Connection.next(%{s | queue: queue, state: :ready})
+    ready(s)
   end
 
   def message(:executing, msg_trans(trans: trans), %{} = s) do
     Logger.debug "TDS-Transaction Change"
     result = %Tds.Result{columns: [], rows: [], num_rows: 0}
     reply(result, s)
-    queue = :queue.drop(s.queue)
-    Connection.next(%{s | statement: "", queue: queue, state: :ready, env: %{trans: trans}})
+    ready(%{s |env: %{trans: trans}})
   end
 
   ## Error
   def message(_, msg_error(e: e), %{} = s) do
     Logger.debug "TDS-Error Delivered"
     reply(%Tds.Error{mssql: e}, s)
-    queue = :queue.drop(s.queue)
-    Connection.next(%{s | statement: "", queue: queue, state: :ready})
+    ready(s)
   end
 
   defp msg_send(msg, %{sock: {mod, sock}, env: env}) do 

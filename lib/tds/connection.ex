@@ -8,7 +8,7 @@ defmodule Tds.Connection do
 
   require Logger
 
-  @timeout :infinity
+  @timeout 5000
 
   ### PUBLIC API ###
 
@@ -81,8 +81,13 @@ defmodule Tds.Connection do
     if is_binary(port), do: {port, _} = Integer.parse(port)
     timeout   = opts[:timeout] || @timeout
     sock_opts = [{:active, :once}, :binary, {:packet, :raw}, {:delay_send, false}]
+    
+    Logger.debug "Connect Timeout: #{inspect timeout}"
 
-    queue = :queue.in({{:connect, opts}, from}, queue)
+    {caller, _} = from
+    ref = Process.monitor(caller)
+
+    queue = :queue.in({{:connect, opts}, from, ref}, queue)
     s = %{s | opts: opts, queue: queue}
 
     case :gen_tcp.connect(host, port, sock_opts, timeout) do
@@ -94,8 +99,11 @@ defmodule Tds.Connection do
     end
   end
 
-  def handle_call(command, from, %{state: state, queue: queue} = s) do
-    s = update_in s.queue, &:queue.in({command, from}, &1)
+  def handle_call(command, from, %{state: state} = s) do
+    {caller, _} = from
+    ref = Process.monitor(caller)
+    s = update_in s.queue, &:queue.in({command, from, ref}, &1)
+
     if state == :ready do
       case next(s) do
         {:ok, s} -> {:noreply, s}
@@ -105,6 +113,23 @@ defmodule Tds.Connection do
       Logger.error "TDS-State: #{inspect state}"
       Logger.error "Query Queued: #{inspect command}"
       {:noreply, s}
+    end
+  end
+
+  def handle_info({:DOWN, ref, :process, _, _}, s) do
+    Logger.debug "Caller Down"
+    case :queue.out(s.queue) do
+      {{:value, {_,_,^ref}}, queue} ->
+        ready(s)
+      {:empty, _} -> 
+        {:noreply, s}
+      {_, _queue} ->
+        queue = s.queue
+          |> :queue.to_list
+          |> Enum.reject(fn({_, _, r}) -> r == ref end)
+          |> :queue.from_list
+        s = %{s | queue: queue}
+        {:noreply, s}
     end
   end
 
@@ -138,16 +163,9 @@ defmodule Tds.Connection do
     error(%Tds.Error{message: "tcp error: #{reason}"}, s)
   end
 
-  def new_query(statement, params, %{queue: queue} = s) do
-    command = {:query, statement, params, []}
-    {{:value, {_command, from}}, queue} = :queue.out(queue)
-    queue = :queue.in_r({command, from}, queue)
-    command(command, %{s | queue: queue})
-  end
-
   def next(%{queue: queue} = s) do
     case :queue.out(queue) do
-      {{:value, {command, _from}}, _queue} ->
+      {{:value, {command, _from, _ref}}, _queue} ->
         command(command, s)
       {:empty, _queue} ->
         {:ok, s}

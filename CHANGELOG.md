@@ -1,3 +1,8 @@
+# v0.1.6-dev
+* Bug Fixes
+  * Changed default connection timeout to 5000 from :infinity
+  * Added caller pid monitoring to cancel query if caller dies
+
 # v0.1.5
 * Bug Fixes
   * Fixed issue where driver would not call Connection.next when setting the state to :ready

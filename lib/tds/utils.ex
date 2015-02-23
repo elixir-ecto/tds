@@ -1,5 +1,7 @@
 defmodule Tds.Utils do
 
+  alias Tds.Connection
+
   def to_hex_list(x) when is_list(x) do
     Enum.map x, &( Base.encode16(<<&1>>))
   end
@@ -45,7 +47,7 @@ defmodule Tds.Utils do
 
   def reply(reply, %{queue: queue}) do
     case :queue.out(queue) do
-      {{:value, {_command, from}}, _queue} ->
+      {{:value, {_command, from, _ref}}, _queue} ->
         GenServer.reply(from, reply)
         true
       {:empty, _queue} ->
@@ -56,6 +58,18 @@ defmodule Tds.Utils do
   def reply(reply, {_, _} = from) do
     GenServer.reply(from, reply)
     true
+  end
+
+  def ready(%{queue: queue} = s) do
+    queue = 
+      case :queue.out(queue) do
+      {{:value, {_command, from, ref}}, q} ->
+        Process.demonitor(ref)
+        q
+      {:empty, q} ->
+        q
+    end
+    Connection.next(%{s | statement: "", queue: queue, state: :ready})
   end
 
   def pow10(num,0), do: num
