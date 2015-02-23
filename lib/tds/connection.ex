@@ -121,16 +121,15 @@ defmodule Tds.Connection do
     case :queue.out(s.queue) do
       {{:value, {_,_,^ref}}, queue} ->
         ready(s)
-      {:empty, _} -> 
-        {:noreply, s}
+      {:empty, _} -> nil
       {_, _queue} ->
         queue = s.queue
           |> :queue.to_list
           |> Enum.reject(fn({_, _, r}) -> r == ref end)
           |> :queue.from_list
         s = %{s | queue: queue}
-        {:noreply, s}
     end
+    {:noreply, s}
   end
 
   def handle_info({:tcp, _, _data}, %{sock: {mod, sock}, opts: opts, state: :prelogin} = s) do
