@@ -121,7 +121,7 @@ defmodule Tds.Connection do
     Logger.debug "Caller Down"
     case :queue.out(s.queue) do
       {{:value, {_,_,^ref}}, queue} ->
-        ready(s)
+        {_, s} = ready(s)
       {:empty, _} -> nil
       {_, _queue} ->
         queue = s.queue
