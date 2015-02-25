@@ -18,6 +18,7 @@ defmodule Tds.Messages do
   defrecord :msg_sql_empty, []
   defrecord :msg_rpc, [:proc, :query, :params]
   defrecord :msg_error, [:e]
+  defrecord :msg_attn, []
 
   ## TDS Versions
   @tds_ver_70     0x70000000
@@ -211,6 +212,10 @@ defmodule Tds.Messages do
     header = encode_header(0x10, data)
 
     header <> data
+  end
+
+  defp encode(msg_attn(), s) do
+    encode_header(@tds_pack_cancel, <<>>)
   end
 
   defp encode(msg_sql(query: q), %{trans: trans}) do

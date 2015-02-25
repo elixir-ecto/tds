@@ -53,6 +53,16 @@ defmodule Tds.Connection do
     end
   end
 
+  def attn(pid, opts \\ []) do
+    Logger.debug "ATTN PID: #{inspect pid}"
+    timeout = opts[:timeout] || @timeout
+    case GenServer.call(pid, :attn, timeout) do
+      %Tds.Result{} = res -> {:ok, res}
+      %Tds.Error{} = err  ->
+        {:error, err}
+    end
+  end
+
   ### GEN_SERVER CALLBACKS ###
 
   def init([]) do
@@ -61,8 +71,8 @@ defmodule Tds.Connection do
       opts: nil, 
       state: :ready, 
       tail: "", 
-      queue: :queue.new, 
-      bootstrap: false, 
+      queue: :queue.new,
+      attn_timer: nil,
       statement: nil, 
       pak_header: "", 
       pak_data: "",
@@ -99,29 +109,36 @@ defmodule Tds.Connection do
     end
   end
 
+  def handle_call(:attn, from, s) do
+    command(:attn, s)
+  end
+
   def handle_call(command, from, %{state: state} = s) do
     {caller, _} = from
     ref = Process.monitor(caller)
     s = update_in s.queue, &:queue.in({command, from, ref}, &1)
 
-    if state == :ready do
-      case next(s) do
-        {:ok, s} -> {:noreply, s}
-        {:error, error, s} -> error(error, s)
-      end
-    else
-      Logger.error "TDS-State: #{inspect s}"
-      Logger.error "TDS-PID: #{inspect self}"
-      Logger.error "Query Queued: #{inspect command}"
-      {:noreply, s}
+    case state do
+      :ready ->
+        case next(s) do
+          {:ok, s} -> {:noreply, s}
+          {:error, error, s} -> error(error, s)
+        end
+      _ ->
+        Logger.error "TDS-State: #{inspect s}"
+        Logger.error "TDS-PID: #{inspect self}"
+        Logger.error "Query Queued: #{inspect command}"
+        {:noreply, s}
     end
   end
 
+
+
   def handle_info({:DOWN, ref, :process, _, _}, s) do
-    Logger.debug "Caller Down"
+    Logger.error "Caller Down"
     case :queue.out(s.queue) do
       {{:value, {_,_,^ref}}, queue} ->
-        {_, s} = ready(s)
+        {_, s} = command(:attn, s)
       {:empty, _} -> nil
       {_, _queue} ->
         queue = s.queue
@@ -183,10 +200,22 @@ defmodule Tds.Connection do
   defp command({:proc, proc, params, _opts}, s) do
     Protocol.send_proc(proc, params, s)
   end
-  
-  defp new_data(<<_data::0>>, s), do: {:ok, s}
-  defp new_data(<<packet::binary>>, %{state: state, pak_data: buf_data, pak_header: buf_header, tail: tail} = s) do
 
+  defp command(:attn, s) do
+    Logger.error "Command Attn"
+    timeout = s.opts[:timeout] || @timeout
+    attn_timer_ref = :erlang.start_timer(timeout, self(), :command)
+    Protocol.send_attn(%{s |attn_timer: attn_timer_ref, pak_header: "", pak_data: "", tail: "", state: :attn})
+  end
+
+  defp new_data(<<_data::0>>, s), do: {:ok, s}
+  defp new_data(<<0xFD, 0x20, cur_cmd::binary(2), 0::size(8)-unit(8), tail::binary>>, %{state: :attn} = s) do
+    s = %{s | pak_header: "", pak_data: "", tail: ""}
+    Protocol.message(:attn, :attn, s)
+  end
+  defp new_data(<<_b::size(1)-unit(8), tail::binary>>, %{state: :attn} = s), do: new_data(tail, s)
+
+  defp new_data(<<packet::binary>>, %{state: state, pak_data: buf_data, pak_header: buf_header, tail: tail} = s) do
     <<type::int8, status::int8, size::int16, head_rem::int32, data::binary>> = tail <> packet
     if buf_header == "" do
 

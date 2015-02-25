@@ -66,6 +66,17 @@ defmodule Tds.Protocol do
     end
   end
 
+  def send_attn(s) do
+    msg = msg_attn()
+    case send_to_result(msg, s) do
+      {:ok, s} ->
+        Logger.debug "Sent Attn: #{inspect s}"
+        {:ok, %{s | statement: nil, state: :attn}}
+      err ->
+        err
+    end
+  end
+
   ## SERVER Packet Responses
 
   def message(:prelogin, _state) do
@@ -108,6 +119,14 @@ defmodule Tds.Protocol do
   def message(_, msg_error(e: e), %{} = s) do
     Logger.debug "TDS-Error Delivered"
     reply(%Tds.Error{mssql: e}, s)
+    ready(s)
+  end
+
+  def message(:attn, _, %{} = s) do
+    Logger.error "Attn Acknowledged"
+    :erlang.cancel_timer(s.attn_timer)
+    result = %Tds.Result{columns: [], rows: [], num_rows: 0}
+    reply(result, s)
     ready(s)
   end
 
