@@ -1,7 +1,11 @@
-# v0.1.6-dev
+# v0.1.6
 * Bug Fixes
   * Changed default connection timeout to 5000 from :infinity
   * Added caller pid monitoring to cancel query if caller dies
+  * Call ATTN if the caller who dies is the currently executing query
+
+* Enhancements
+  * Added API for ATTN call
 
 # v0.1.5
 * Bug Fixes
