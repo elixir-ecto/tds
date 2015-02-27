@@ -2,13 +2,10 @@ defmodule Tds.Protocol do
 
   import Tds.Utils
   import Tds.Messages
-
-  alias Tds.Connection
+  
   alias Tds.Parameter
 
-  require Logger
-
-  def prelogin(%{sock: sock, opts: opts} = s) do
+  def prelogin(%{opts: opts} = s) do
 
     msg = msg_prelogin(params: opts)
     case msg_send(msg, s) do
@@ -19,7 +16,7 @@ defmodule Tds.Protocol do
     end
   end
 
-  def login(%{sock: sock, opts: opts} = s) do
+  def login(%{opts: opts} = s) do
     msg = msg_login(params: opts)
     case msg_send(msg, s) do
       :ok ->
@@ -47,6 +44,7 @@ defmodule Tds.Protocol do
     end)
     param_desc = param_desc
       |> Enum.join(", ")
+
     msg = msg_rpc(proc: :sp_executesql, params: [%Parameter{value: statement, type: :string}, %Parameter{value: param_desc, type: :string}] ++ params)
     case send_to_result(msg, s) do
       {:ok, s} ->
@@ -70,7 +68,6 @@ defmodule Tds.Protocol do
     msg = msg_attn()
     case send_to_result(msg, s) do
       {:ok, s} ->
-        Logger.debug "Sent Attn: #{inspect s}"
         {:ok, %{s | statement: nil, state: :attn}}
       err ->
         err
@@ -83,8 +80,8 @@ defmodule Tds.Protocol do
 
   end
 
-  def message(:login, msg_login_ack(), %{opts: opts, tail: _tail, queue: queue, opts: opts} = s) do
-    opts = clean_opts(opts)
+  def message(:login, msg_login_ack(), %{opts: opts, tail: _tail, opts: opts} = s) do
+    s = %{s | opts: clean_opts(opts)}
     reply(:ok, s)
     ready(s)
   end
@@ -92,7 +89,6 @@ defmodule Tds.Protocol do
   ## executing
 
   def message(:executing, msg_sql_result(columns: columns, rows: rows, done: done), %{} = s) do
-    Logger.debug "TDS-Returned Result"
     if columns != nil do
       columns = Enum.reduce(columns, [], fn (col, acc) -> [col[:name]|acc] end) |> Enum.reverse
     end
@@ -109,7 +105,6 @@ defmodule Tds.Protocol do
   end
 
   def message(:executing, msg_trans(trans: trans), %{} = s) do
-    Logger.debug "TDS-Transaction Change"
     result = %Tds.Result{columns: [], rows: [], num_rows: 0}
     reply(result, s)
     ready(%{s |env: %{trans: trans}})
@@ -117,13 +112,11 @@ defmodule Tds.Protocol do
 
   ## Error
   def message(_, msg_error(e: e), %{} = s) do
-    Logger.debug "TDS-Error Delivered"
     reply(%Tds.Error{mssql: e}, s)
     ready(s)
   end
 
   def message(:attn, _, %{} = s) do
-    Logger.error "Attn Acknowledged"
     :erlang.cancel_timer(s.attn_timer)
     result = %Tds.Result{columns: [], rows: [], num_rows: 0}
     reply(result, s)
@@ -132,7 +125,6 @@ defmodule Tds.Protocol do
 
   defp msg_send(msg, %{sock: {mod, sock}, env: env}) do 
     data = encode_msg(msg, env)
-    Logger.debug "TDS-Message Sent"
     mod.send(sock, data)
   end
 

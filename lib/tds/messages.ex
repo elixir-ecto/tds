@@ -89,7 +89,7 @@ defmodule Tds.Messages do
     case tokens do
       [error: error] ->
         msg_error(e: error)
-      [done: %{} = done, trans: <<trans::binary>>] ->
+      [done: %{}, trans: <<trans::binary>>] ->
         msg_trans(trans: trans)
       tokens ->
         msg_sql_result(columns: tokens[:columns], rows: tokens[:rows], done: tokens[:done])
@@ -104,7 +104,7 @@ defmodule Tds.Messages do
     encode(msg, env) 
   end
 
-  defp encode(msg_prelogin(params: _params), env) do
+  defp encode(msg_prelogin(params: _params), _env) do
     version_data = <<11, 0, 12, 56, 0, 0>>
     version_length = byte_size(version_data)
     version_offset = 0x06
@@ -115,7 +115,7 @@ defmodule Tds.Messages do
     encode_header(0x12, data)<>data
   end
 
-  defp encode(msg_login(params: params), env) do
+  defp encode(msg_login(params: params), _env) do
     tds_version = <<0x04, 0x00, 0x00, 0x74>>
     message_size = <<0x00, 0x10, 0x00, 0x00>>
     client_prog_ver = <<0x04, 0x00, 0x00, 0x07>>
@@ -214,7 +214,7 @@ defmodule Tds.Messages do
     header <> data
   end
 
-  defp encode(msg_attn(), s) do
+  defp encode(msg_attn(), _s) do
     encode_header(@tds_pack_cancel, <<>>)
   end
 

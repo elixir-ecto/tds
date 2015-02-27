@@ -36,7 +36,7 @@ defmodule Tds.Utils do
     false
   end
 
-  def collation_to_charset(<<collation::binary>>) do
+  def collation_to_charset(<<_collation::binary>>) do
     
   end
 
@@ -63,7 +63,7 @@ defmodule Tds.Utils do
   def ready(%{queue: queue} = s) do
     queue = 
       case :queue.out(queue) do
-      {{:value, {_command, from, ref}}, q} ->
+      {{:value, {_, _, ref}}, q} ->
         Process.demonitor(ref)
         q
       {:empty, q} ->

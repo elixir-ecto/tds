@@ -4,8 +4,6 @@ defmodule Tds.Tokens do
 
   alias Tds.Types
 
-  require Logger
-
   @tds_token_returnstatus   0x79 # 0x79
   @tds_token_colmetadata    0x81 # 0x81
   @tds_token_order          0xA9 # 0xA9
@@ -69,7 +67,6 @@ defmodule Tds.Tokens do
       proc_name: ucs2_to_utf(proc_name),
       line_number: line_number,
     }
-    Logger.debug "TDS-Error: #{inspect e}"
     {[error: e], nil}
   end
 
@@ -89,7 +86,6 @@ defmodule Tds.Tokens do
       proc_name: ucs2_to_utf(proc_name),
       line_number: line_number,
     }
-    Logger.debug "TDS-Info: #{inspect i}"
     {[info: i], tail}
   end
 
@@ -120,7 +116,7 @@ defmodule Tds.Tokens do
     {tokens, tail}
   end
 
-  defp decode_token(<<@tds_token_envchange, length::little-unsigned-16, env_type::unsigned-8, tail::binary>> = data, tokens) do
+  defp decode_token(<<@tds_token_envchange, _length::little-unsigned-16, env_type::unsigned-8, tail::binary>>, tokens) do
     token = case env_type do
       @tds_envtype_database ->
         <<new_value_size::unsigned-8, 
@@ -139,11 +135,11 @@ defmodule Tds.Tokens do
         #Logger.info "Begin Transaction: #{Tds.Utils.to_hex_string new_value}"
         [trans: new_value]
       @tds_envtype_committrans ->
-        <<0x00, value_size::unsigned-8, old_value::binary-little-size(value_size)-unit(8), tail::binary>> = tail
+        <<0x00, value_size::unsigned-8, _old_value::binary-little-size(value_size)-unit(8), tail::binary>> = tail
         #Logger.info "Commit Transaction"
         [trans: <<0x00>>]
       @tds_envtype_rollbacktrans ->
-        <<0x00, value_size::unsigned-8, old_value::binary-little-size(value_size)-unit(8), tail::binary>> = tail
+        <<0x00, value_size::unsigned-8, _old_value::binary-little-size(value_size)-unit(8), tail::binary>> = tail
         #Logger.info "Rollback Transaction"
         [trans: <<0x00>>]
     end
@@ -165,7 +161,7 @@ defmodule Tds.Tokens do
   end
 
   ## DONEPROC
-  defp decode_token(<<@tds_token_doneproc, status::int16, cur_cmd::binary(2), row_count::little-size(8)-unit(8), tail::binary>>, tokens) do
+  defp decode_token(<<@tds_token_doneproc, status::int16, cur_cmd::binary(2), row_count::little-size(8)-unit(8), _tail::binary>>, tokens) do
     case tokens do
       [done: done] -> 
         cond do
@@ -178,7 +174,7 @@ defmodule Tds.Tokens do
   end
 
   ## DONEINPROC
-  defp decode_token(<<@tds_token_doneinproc, status::int16, cur_cmd::binary(2), row_count::little-size(8)-unit(8), _something::binary-size(5), tail::binary>>, tokens) do
+  defp decode_token(<<@tds_token_doneinproc, status::int16, cur_cmd::binary(2), row_count::little-size(8)-unit(8), _something::binary-size(5), _tail::binary>>, tokens) do
     case tokens do
       [done: done] -> 
         cond do
@@ -216,7 +212,7 @@ defmodule Tds.Tokens do
     decode_columns(tail, [column | columns], n - 1)
   end
 
-  defp decode_column(<<_usertype::int32, _flags::int16, tail::binary>> = data) do
+  defp decode_column(<<_usertype::int32, _flags::int16, tail::binary>>) do
     {info, tail} = Types.decode_info(tail)
     {name, tail} = decode_column_name(tail)
     info = info

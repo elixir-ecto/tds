@@ -158,8 +158,7 @@
             length = 4
           scale in [5, 6, 7] ->
             length = 5
-          true -> 
-            #Logger.debug "Invalid Scale"
+          true -> nil
         end
         col_info = col_info
           |> Map.put(:scale, scale)
@@ -257,23 +256,23 @@
               |> Map.put(:data_reader, :longlen)
             # TODO NumParts Reader
             <<numparts::signed-8, tail::binary>> = tail
-            for n <- 1..numparts do
-              <<tsize::little-unsigned-16, table_name::binary-size(tsize)-unit(16), tail::binary>> = tail
-              <<csize::unsigned-8, column_name::binary-size(csize)-unit(16), tail::binary>> = tail
+            for _n <- 1..numparts do
+              <<tsize::little-unsigned-16, _table_name::binary-size(tsize)-unit(16), tail::binary>> = tail
+              <<csize::unsigned-8, _column_name::binary-size(csize)-unit(16), tail::binary>> = tail
             end
           data_type_code == @tds_data_type_image ->
             # TODO NumBarts Reader
             <<numparts::signed-8, tail::binary>> = tail
 
-            Enum.each(1..numparts, fn(n) ->  
-              <<size::unsigned-16, str::size(size)-unit(16), tail::binary>> = tail
+            Enum.each(1..numparts, fn(_n) ->  
+              <<size::unsigned-16, _str::size(size)-unit(16), tail::binary>> = tail
             end)
             col_info = col_info
               |> Map.put(:data_reader, :bytelen)
           data_type_code == @tds_data_type_variant ->
             col_info = col_info
               |> Map.put(:data_reader, :variant)
-          true -> #Logger.debug "Not Implemented"
+          true -> nil
         end
 
 
@@ -366,7 +365,7 @@
 
   # ShortLength Types
   def decode_data(%{data_reader: :shortlen}, <<0xFF, 0xFF, tail::binary>>), do: {nil, tail}
-  def decode_data(%{data_type_code: data_type_code, data_reader: :shortlen} = data_info, <<size::little-unsigned-16, data::binary-size(size), tail::binary>> = pak) do
+  def decode_data(%{data_type_code: data_type_code, data_reader: :shortlen} = data_info, <<size::little-unsigned-16, data::binary-size(size), tail::binary>>) do
     value = cond do
       data_type_code in [
         @tds_data_type_bigvarchar,
@@ -396,7 +395,7 @@
   # TODO PLP TYpes
   # ShortLength Types
   def decode_data(%{data_reader: :plp}, <<@tds_plp_null, tail::binary>>), do: {nil, tail}
-  def decode_data(%{data_type_code: data_type_code, data_reader: :plp} = data_info, <<_size::little-unsigned-64, tail::binary>> = data) do
+  def decode_data(%{data_type_code: data_type_code, data_reader: :plp} = data_info, <<_size::little-unsigned-64, tail::binary>>) do
     {data, tail} = decode_plp_chunk(tail, <<>>)    
 
     value = cond do
@@ -516,12 +515,12 @@
     data |> :unicode.characters_to_binary({:utf16, :little}, :utf8)
   end
 
-  def decode_xml(data_info, <<data::binary>>) do
+  def decode_xml(_data_info, <<_data::binary>>) do
     # TODO: Decode XML Data
     nil
   end
 
-  def decode_udt(%{} = data_info, <<data::binary>>) do
+  def decode_udt(%{}, <<_data::binary>>) do
     # TODO: Decode UDT Data 
     nil
   end
@@ -554,7 +553,7 @@
     {data_type, <<data_type.data_type_code>> <> length}
   end
 
-  def encode_bit_type(value) do
+  def encode_bit_type(_value) do
     data_type = %{data_type_code: @tds_data_type_bigvarbinary}
     {data_type, <<@tds_data_type_bigvarbinary, 0x01>>}
   end
@@ -708,11 +707,12 @@
     {data_type, <<data_type[:data_type_code], value_size>>}
   end
 
-  def encode_datetime_type(value) do
+  def encode_datetime_type(_value) do
     data_type = %{data_type_code: @tds_data_type_datetimen}
     {data_type, <<data_type[:data_type_code], 0x08>>}
   end
 
+  def encode_data_type(_, value) when value == true or value == false, do: encode_binary_type(value)
   def encode_data_type(_, value) when is_binary(value), do: encode_binary_type(value)
   def encode_data_type(_, value) when is_integer(value) and value >= 0, do: encode_integer_type(value)
   def encode_data_type(_, value) when is_float(value), do: encode_float_type(value) 
@@ -767,7 +767,7 @@
      |> Map.put(:value, Decimal.new(value))
     encode_decimal_descriptor(param)
   end
-  def encode_decimal_descriptor(%Parameter{name: name, value: %Decimal{} = dec}) do
+  def encode_decimal_descriptor(%Parameter{value: %Decimal{} = dec}) do
     d_ctx = Decimal.get_context
     d_ctx = %{d_ctx | precision: 38}
     Decimal.set_context d_ctx
@@ -789,7 +789,7 @@
      |> Map.put(:value, Decimal.new(value))
      encode_float_descriptor(param)
   end 
-  def encode_float_descriptor(%Parameter{name: name, value: %Decimal{} = dec}) do
+  def encode_float_descriptor(%Parameter{value: %Decimal{} = dec}) do
     d_ctx = Decimal.get_context
     d_ctx = %{d_ctx | precision: 38}
     Decimal.set_context d_ctx
@@ -801,7 +801,7 @@
       [p,s] -> 
         precision = String.length(p) + String.length(s); scale = String.length(s)
       [p] -> 
-        precision = String.length(p); scale = 0
+        precision = String.length(p)
     end
     "float(#{precision})"
   end
@@ -841,7 +841,7 @@
     "#{name} decimal(#{precision-1}, 0)"
   end
 
-  def encode_param_descriptor(%Parameter{name: name, value: %Decimal{}} = param) do
+  def encode_param_descriptor(%Parameter{value: %Decimal{}} = param) do
     param = param
       |> Map.put(:type, :decimal)
     encode_param_descriptor(param)
@@ -884,18 +884,18 @@
     end
   end
 
-  def encode_data(%{data_type_code: data_type_code, length: length}, value) when is_integer(value) and value >= 0 do
+  def encode_data(_, value) when is_integer(value) and value >= 0 do
     size = int_type_size(value)
     <<size>> <> <<value::little-signed-size(size)-unit(8)>>
   end
 
-  def encode_data(%{data_type_code: @tds_data_type_tinyint, length: length}, value) when value == nil do
+  def encode_data(%{data_type_code: @tds_data_type_tinyint}, value) when value == nil do
     <<0>>
   end
   def encode_data(%{data_type_code: @tds_data_type_floatn}, nil) do
     <<0>>
   end
-  def encode_data(%{data_type_code: @tds_data_type_floatn, precision: precision, scale: _scale}, value) do
+  def encode_data(%{data_type_code: @tds_data_type_floatn, scale: _scale}, value) do
     <<0x04, value::little-float-size(32)>>
   end
   def encode_data(%{data_type_code: @tds_data_type_decimaln, precision: precision, scale: _scale}, %Decimal{} = value) do
@@ -934,7 +934,7 @@
     value_binary = value_binary <> <<0::size(padding)-unit(8)>>
     <<byte_len>> <> <<sign>> <> value_binary
   end
-  def encode_data(%{data_type_code: @tds_data_type_decimaln} = data_type, nil) do
+  def encode_data(%{data_type_code: @tds_data_type_decimaln}, nil) do
     <<0x00, 0x00, 0x00, 0x00>>
   end
   def encode_data(%{data_type_code: @tds_data_type_decimaln} = data_type, value) do

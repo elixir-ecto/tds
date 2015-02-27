@@ -109,7 +109,7 @@ defmodule Tds.Connection do
     end
   end
 
-  def handle_call(:attn, from, s) do
+  def handle_call(:attn, _from, s) do
     command(:attn, s)
   end
 
@@ -137,7 +137,7 @@ defmodule Tds.Connection do
   def handle_info({:DOWN, ref, :process, _, _}, s) do
     Logger.error "Caller Down"
     case :queue.out(s.queue) do
-      {{:value, {_,_,^ref}}, queue} ->
+      {{:value, {_,_,^ref}}, _queue} ->
         {_, s} = command(:attn, s)
       {:empty, _} -> nil
       {_, _queue} ->
@@ -209,7 +209,7 @@ defmodule Tds.Connection do
   end
 
   defp new_data(<<_data::0>>, s), do: {:ok, s}
-  defp new_data(<<0xFD, 0x20, cur_cmd::binary(2), 0::size(8)-unit(8), tail::binary>>, %{state: :attn} = s) do
+  defp new_data(<<0xFD, 0x20, _cur_cmd::binary(2), 0::size(8)-unit(8), _tail::binary>>, %{state: :attn} = s) do
     s = %{s | pak_header: "", pak_data: "", tail: ""}
     Protocol.message(:attn, :attn, s)
   end
