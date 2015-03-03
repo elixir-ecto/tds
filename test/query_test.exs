@@ -1,7 +1,7 @@
 defmodule QueryTest do
   import Tds.TestHelper
   require Logger
-  use ExUnit.Case, async: true
+  use ExUnit.Case
   alias Tds.Connection, as: Conn
 
   @tag timeout: 50000

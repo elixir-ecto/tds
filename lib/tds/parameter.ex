@@ -19,5 +19,4 @@ defmodule Tds.Parameter do
 
     <<0::size(6), fByRefValue::size(1), fDefaultValue::size(1)>>
   end
-
 end

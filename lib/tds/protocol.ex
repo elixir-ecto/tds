@@ -3,6 +3,8 @@ defmodule Tds.Protocol do
   import Tds.Utils
   import Tds.Messages
   
+  require Logger
+
   alias Tds.Parameter
 
   def prelogin(%{opts: opts} = s) do
@@ -116,6 +118,7 @@ defmodule Tds.Protocol do
     ready(s)
   end
 
+  ## ATTN Ack
   def message(:attn, _, %{} = s) do
     :erlang.cancel_timer(s.attn_timer)
     result = %Tds.Result{columns: [], rows: [], num_rows: 0}
@@ -125,6 +128,7 @@ defmodule Tds.Protocol do
 
   defp msg_send(msg, %{sock: {mod, sock}, env: env}) do 
     data = encode_msg(msg, env)
+    Logger.debug "MSG: #{Tds.Utils.to_hex_string data}"
     mod.send(sock, data)
   end
 
