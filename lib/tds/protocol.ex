@@ -2,8 +2,6 @@ defmodule Tds.Protocol do
 
   import Tds.Utils
   import Tds.Messages
-  
-  require Logger
 
   alias Tds.Parameter
 
@@ -29,7 +27,7 @@ defmodule Tds.Protocol do
   end
 
   def send_query(statement, s) do
-    #IO.inspect statement
+    #Logger.debug "SQL: #{inspect statement}"
     msg = msg_sql(query: statement)
 
     case send_to_result(msg, s) do

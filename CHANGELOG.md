@@ -1,3 +1,13 @@
+# v0.2.0-dev
+* Bug Fixes
+  * Fixed issue with empty strings and binaries being converted to nil
+
+* Enhancements
+  * datetime2 with 0 usec's will be transmitted as datetime
+
+* Backwards incompatable changes
+  * Changed datetime to be passed back as {{year, month, day} ,{hour, min, sec, microsec}}
+
 # v0.1.6
 * Bug Fixes
   * Changed default connection timeout to 5000 from :infinity

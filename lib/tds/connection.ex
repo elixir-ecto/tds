@@ -6,8 +6,6 @@ defmodule Tds.Connection do
   import Tds.BinaryUtils
   import Tds.Utils
 
-  require Logger
-
   @timeout 5000
 
   ### PUBLIC API ###
@@ -54,7 +52,7 @@ defmodule Tds.Connection do
   end
 
   def attn(pid, opts \\ []) do
-    Logger.debug "ATTN PID: #{inspect pid}"
+    #Logger.debug "ATTN PID: #{inspect pid}"
     timeout = opts[:timeout] || @timeout
     case GenServer.call(pid, :attn, timeout) do
       %Tds.Result{} = res -> {:ok, res}
@@ -92,7 +90,7 @@ defmodule Tds.Connection do
     timeout   = opts[:timeout] || @timeout
     sock_opts = [{:active, :once}, :binary, {:packet, :raw}, {:delay_send, false}]
     
-    Logger.debug "Connect Timeout: #{inspect timeout}"
+    #Logger.debug "Connect Timeout: #{inspect timeout}"
 
     {caller, _} = from
     ref = Process.monitor(caller)
@@ -125,9 +123,9 @@ defmodule Tds.Connection do
           {:error, error, s} -> error(error, s)
         end
       _ ->
-        Logger.error "TDS-State: #{inspect s}"
-        Logger.error "TDS-PID: #{inspect self}"
-        Logger.error "Query Queued: #{inspect command}"
+        #Logger.error "TDS-State: #{inspect s}"
+        #Logger.error "TDS-PID: #{inspect self}"
+        #Logger.error "Query Queued: #{inspect command}"
         {:noreply, s}
     end
   end
@@ -135,7 +133,7 @@ defmodule Tds.Connection do
 
 
   def handle_info({:DOWN, ref, :process, _, _}, s) do
-    Logger.error "Caller Down"
+    #Logger.error "Caller Down"
     case :queue.out(s.queue) do
       {{:value, {_,_,^ref}}, _queue} ->
         {_, s} = command(:attn, s)
@@ -202,7 +200,7 @@ defmodule Tds.Connection do
   end
 
   defp command(:attn, s) do
-    Logger.error "Command Attn"
+    #Logger.error "Command Attn"
     timeout = s.opts[:timeout] || @timeout
     attn_timer_ref = :erlang.start_timer(timeout, self(), :command)
     Protocol.send_attn(%{s |attn_timer: attn_timer_ref, pak_header: "", pak_data: "", tail: "", state: :attn})

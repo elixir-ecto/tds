@@ -3,8 +3,6 @@ defmodule Tds.Types do
   import Tds.BinaryUtils
   import Tds.Utils
 
-  require Logger
-
   alias Timex.Date
   alias Tds.Parameter
   alias Tds.DateTime
@@ -437,7 +435,7 @@ defmodule Tds.Types do
   def decode_smalldatetime(<<days::little-unsigned-16, mins::little-unsigned-16>>) do
     date = Date.shift(@datetime, days: days)
      |> Date.shift(mins: mins)
-     {{date.year, date.month, date.day},{date.hour, date.minute, date.second}}
+     {{date.year, date.month, date.day},{date.hour, date.minute, date.second, 0}}
   end
 
   def decode_smallmoney(<<money::little-signed-32>>) do
@@ -448,9 +446,10 @@ defmodule Tds.Types do
   def decode_datetime(<<days::little-signed-32, sec::little-unsigned-32>>) do
     date = Date.shift(@datetime, days: days)
     date = Date.shift(date, secs: (sec/300))
-    {{date.year, date.month, date.day}, {date.hour, date.minute, date.second}}
+    {{date.year, date.month, date.day}, {date.hour, date.minute, date.second, 0}}
   end
 
+  def encode_datetime({{y,m,d},{h,mm,s,0}} = date), do: encode_datetime(Date.from {{y,m,d},{h,mm,s}})
   def encode_datetime({{_,_,_},{_,_,_}} = date), do: encode_datetime(Date.from date)
   def encode_datetime(%Timex.DateTime{} = date) do
     days = Date.diff @datetime, date, :days
@@ -739,6 +738,13 @@ defmodule Tds.Types do
     {type, data, []}
   end
 
+  def encode_datetime2_type(%Parameter{} = param) do
+    # TODO
+    type = @tds_data_type_datetime2n
+    data = <<type, 0x08>>
+    {type, data, []}
+  end
+
   def encode_data_type(%Parameter{value: value} = param) 
   when value == true or value == false do 
     encode_data_type(%{param | type: :boolean})
@@ -777,8 +783,20 @@ defmodule Tds.Types do
     encode_data_type(%{param | type: :datetime})
   end
 
+  def encode_data_type(%Parameter{value: %DateTime2{}} = param) do
+    encode_data_type(%{param | type: :datetime2})
+  end
+
   def encode_data_type(%Parameter{value: {{_,_,_},{_,_,_}}} = param) do
     encode_data_type(%{param | type: :datetime})
+  end
+
+  def encode_data_type(%Parameter{value: {{_,_,_},{_,_,_,0}}} = param) do
+    encode_data_type(%{param | type: :datetime})
+  end
+
+  def encode_data_type(%Parameter{value: {{_,_,_},{_,_,_,_}}} = param) do
+    encode_data_type(%{param | type: :datetime2})
   end
 
   @doc """

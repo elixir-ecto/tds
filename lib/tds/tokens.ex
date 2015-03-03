@@ -67,6 +67,7 @@ defmodule Tds.Tokens do
       proc_name: ucs2_to_utf(proc_name),
       line_number: line_number,
     }
+    #Logger.debug "TDS Error: #{inspect e}"
     {[error: e], nil}
   end
 
