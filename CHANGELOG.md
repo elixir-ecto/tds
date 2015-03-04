@@ -1,4 +1,4 @@
-# v0.2.0-dev
+# v0.2.0
 * Enhancements
   * Added SET defaults upon connection of
     SET ANSI_NULLS ON;
