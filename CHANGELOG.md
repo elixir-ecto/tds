@@ -1,4 +1,15 @@
 # v0.2.0-dev
+* Enhancements
+  * Added SET defaults upon connection of
+    SET ANSI_NULLS ON;
+    SET QUOTED_IDENTIFIER ON;
+    SET CURSOR_CLOSE_ON_COMMIT OFF;
+    SET ANSI_NULL_DFLT_ON ON;
+    SET IMPLICIT_TRANSACTIONS OFF;
+    SET ANSI_PADDING ON;
+    SET ANSI_WARNINGS ON;
+    SET CONCAT_NULL_YIELDS_NULL ON;
+
 * Bug Fixes
   * Fixed issue with empty strings and binaries being converted to nil
 

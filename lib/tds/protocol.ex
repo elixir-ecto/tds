@@ -83,7 +83,16 @@ defmodule Tds.Protocol do
   def message(:login, msg_login_ack(), %{opts: opts, tail: _tail, opts: opts} = s) do
     s = %{s | opts: clean_opts(opts)}
     reply(:ok, s)
-    ready(s)
+    send_query("""
+      SET ANSI_NULLS ON;
+      SET QUOTED_IDENTIFIER ON;
+      SET CURSOR_CLOSE_ON_COMMIT OFF;
+      SET ANSI_NULL_DFLT_ON ON;
+      SET IMPLICIT_TRANSACTIONS OFF;
+      SET ANSI_PADDING ON;
+      SET ANSI_WARNINGS ON;
+      SET CONCAT_NULL_YIELDS_NULL ON;
+    """, s)
   end
 
   ## executing
