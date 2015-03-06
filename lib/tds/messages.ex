@@ -111,7 +111,8 @@ defmodule Tds.Messages do
     terminator = <<0xFF>>
     prelogin_data = version_data
     data = version <> terminator <> prelogin_data
-    encode_header(0x12, data)<>data
+    encode_packets(0x12, data, [])
+    # encode_header(0x12, data)<>data
   end
 
   defp encode(msg_login(params: params), _env) do
@@ -208,9 +209,10 @@ defmodule Tds.Messages do
 
     login7_len = byte_size(login7) + 4
     data = <<login7_len::little-size(32)>> <> login7
-    header = encode_header(0x10, data)
+    encode_packets(0x10, data, [])
+    # header = encode_header(0x10, data)
 
-    header <> data
+    # header <> data
   end
 
   defp encode(msg_attn(), _s) do
@@ -235,8 +237,9 @@ defmodule Tds.Messages do
     total_length = byte_size(headers) + 4
     all_headers = <<total_length::little-size(32)>> <> headers
     data = all_headers <> q_ucs
-    header = encode_header(0x01, data)
-    header <> data
+    encode_packets(0x01, data, [])
+    # header = encode_header(0x01, data)
+    # header <> data
   end
 
   defp encode(msg_rpc(proc: proc, params: params), %{trans: trans}) do
@@ -256,10 +259,10 @@ defmodule Tds.Messages do
 
     data = all_headers <> encode_rpc(proc, params)
     #layout Data
-    
-    header = encode_header(0x03, data)
-    pak = header <> data
-    pak
+    encode_packets(0x03, data, [])
+    # header = encode_header(0x03, data)
+    # pak = header <> data
+    # pak
   end
 
   defp encode_rpc(:sp_executesql, params) do
@@ -282,18 +285,35 @@ defmodule Tds.Messages do
     p_meta_data <> Types.encode_data(type_code, param.value, type_attr)
   end
 
-  defp encode_header(type, data) do
-    status = 0x01
+  defp encode_header(type, data, opts \\ []) do
+    status = opts[:status] || 1
+
+    id = opts[:id] || 1
+
     length = byte_size(data) + 8
-    message = 0x01
     <<
       type,
       status,
       length::size(16),
       0::size(16),
-      message,
+      id,
       0
     >>
+  end
+
+  defp encode_packets(type, <<>>, paks) do 
+    # Logger.debug "Paks: #{inspect paks}"
+    Enum.reverse paks
+  end
+  defp encode_packets(type, <<data::binary-size(4088)-unit(8), tail::binary>>, paks) do
+    status = 
+    if byte_size(tail) > 0, do: 0, else: 1
+    header = encode_header(type, data, id: length(paks)+1, status: status)
+    encode_packets(type, tail, [header <> data | paks])
+  end
+  defp encode_packets(type, <<data::binary>>, paks) do
+    header = encode_header(type, data, id: length(paks)+1, status: 1)
+    encode_packets(type, <<>>, [header <> data | paks])
   end
 
   defp encode_tdspassword(list) do

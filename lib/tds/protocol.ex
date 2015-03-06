@@ -134,8 +134,10 @@ defmodule Tds.Protocol do
   end
 
   defp msg_send(msg, %{sock: {mod, sock}, env: env}) do 
-    data = encode_msg(msg, env)
-    mod.send(sock, data)
+    paks = encode_msg(msg, env)
+    Enum.each(paks, fn(pak) ->
+      mod.send(sock, pak)
+    end)
   end
 
   defp send_to_result(msg, s) do

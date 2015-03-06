@@ -1,3 +1,7 @@
+# v0.2.1-dev
+* Bug Fixes
+  * Fixed: Packets sent to the server which exceed the negotiated packet size would cause the connection to close  
+
 # v0.2.0
 * Enhancements
   * Added SET defaults upon connection of
