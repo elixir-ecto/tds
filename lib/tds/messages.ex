@@ -50,6 +50,11 @@ defmodule Tds.Messages do
   @fByRefValue 1
   @fDefaultValue 2
 
+  ## Packet Size
+  @tds_pack_data_size 4088
+  @tds_pack_header_size 8
+  @tds_pack_size (@tds_pack_header_size + @tds_pack_data_size)
+
   ## Packet Types
   @tds_pack_sqlbatch    1
   @tds_pack_rpcRequest  3
@@ -117,7 +122,7 @@ defmodule Tds.Messages do
 
   defp encode(msg_login(params: params), _env) do
     tds_version = <<0x04, 0x00, 0x00, 0x74>>
-    message_size = <<0x00, 0x10, 0x00, 0x00>>
+    message_size = <<@tds_pack_size::little-size(4)-unit(8)>>
     client_prog_ver = <<0x04, 0x00, 0x00, 0x07>>
     client_pid = <<0x00, 0x10, 0x00, 0x00>>
     connection_id = <<0x00::size(32)>>
@@ -301,11 +306,10 @@ defmodule Tds.Messages do
     >>
   end
 
-  defp encode_packets(type, <<>>, paks) do 
-    # Logger.debug "Paks: #{inspect paks}"
+  defp encode_packets(type, <<>>, paks) do
     Enum.reverse paks
   end
-  defp encode_packets(type, <<data::binary-size(4088)-unit(8), tail::binary>>, paks) do
+  defp encode_packets(type, <<data::binary-size(@tds_pack_data_size)-unit(8), tail::binary>>, paks) do
     status = 
     if byte_size(tail) > 0, do: 0, else: 1
     header = encode_header(type, data, id: length(paks)+1, status: status)

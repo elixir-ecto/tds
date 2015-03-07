@@ -34,8 +34,8 @@ defmodule QueryTest do
         SmallMoney smallmoney, 
         BitInt bigint)
       """, [])
-    query("INSERT INTO FixedLength VALUES(1, 0, 12, 100, '2014-01-10 12:30:00', 5.2, '$-40,532.5367', '2014-01-11 11:34:25', 5.6, '$6.3452', 1000)", []);
-    assert [{1, false, 12, 100, {{2014, 01, 10},{12, 30, 00}}, 5.2, -40532.5367, {{2014, 01, 11},{11, 34, 25}}, 5.6, 6.3452 , 1000}] = query("SELECT TOP(1) * FROM FixedLength", [])
+    query("INSERT INTO FixedLength VALUES(1, 0, 12, 100, '2014-01-10 12:30:00', 0.5, '$-40,532.5367', '2014-01-11 11:34:25', 5.6, '$6.3452', 1000)", []);
+    assert [{1, false, 12, 100, {{2014, 01, 10},{12, 30, 00, 0}}, 0.5, -40532.5367, {{2014, 01, 11},{11, 34, 25, 0}}, 5.6, 6.3452 , 1000}] = query("SELECT TOP(1) * FROM FixedLength", [])
     query("DROP TABLE FixedLength", [])
   end
 
@@ -61,8 +61,8 @@ defmodule QueryTest do
   end
 
   test "Decode Date and Time", context do
-    assert [{{{2014, 06, 20}, {10, 21, 42}}}] = query("SELECT CAST('20140620 10:21:42 AM' AS datetime)", [])
-    assert [{{{2014, 06, 20}, {10, 40, 00}}}] = query("SELECT CAST('20140620 10:40 AM' AS smalldatetime)", [])
+    assert [{{{2014, 06, 20}, {10, 21, 42, 0}}}] = query("SELECT CAST('20140620 10:21:42 AM' AS datetime)", [])
+    assert [{{{2014, 06, 20}, {10, 40, 00, 0}}}] = query("SELECT CAST('20140620 10:40 AM' AS smalldatetime)", [])
     assert [{{2014, 06, 20}}] = query("SELECT CAST('20140620' AS date)", [])
     assert [{nil}] = query("SELECT CAST(NULL AS date)", [])
   end

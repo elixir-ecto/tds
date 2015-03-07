@@ -3,6 +3,8 @@ defmodule Tds.Types do
   import Tds.BinaryUtils
   import Tds.Utils
 
+  require Logger
+
   alias Timex.Date
   alias Tds.Parameter
   alias Tds.DateTime
@@ -339,8 +341,10 @@ defmodule Tds.Types do
         data_type_code == @tds_data_type_floatn ->
           data = data <> tail
           case length do
-            4 -> <<value::little-float-size(32), tail::binary>> = data
-            8 -> <<value::little-float-size(64), tail::binary>> = data
+            4 -> 
+              <<value::little-float-32, tail::binary>> = data
+            8 -> 
+              <<value::little-float-64, tail::binary>> = data
           end
           value
         data_type_code == @tds_data_type_moneyn ->

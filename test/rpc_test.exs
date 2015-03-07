@@ -158,11 +158,11 @@ defmodule RPCTest do
     params = [
       %Tds.Parameter{direction: :input, name: "@1", type: :binary, value: nil},
       %Tds.Parameter{direction: :input, name: "@2", type: :integer, value: nil},
-      %Tds.Parameter{direction: :input, name: "@3", type: :datetime, value: {{2015, 2, 6}, {20, 30, 50}}},
+      %Tds.Parameter{direction: :input, name: "@3", type: :datetime, value: {{2015, 2, 6}, {20, 30, 50, 0}}},
       %Tds.Parameter{direction: :input, name: "@4", type: {:array, :string}, value: nil},
       # %Tds.Parameter{direction: :input, name: "@5", type: :string, value: nil},
       # %Tds.Parameter{direction: :input, name: "@6", type: :string, value: nil},
-      %Tds.Parameter{direction: :input, name: "@7", type: :datetime, value: {{2015, 2, 6}, {20, 30, 50}}},
+      %Tds.Parameter{direction: :input, name: "@7", type: :datetime, value: {{2015, 2, 6}, {20, 30, 50, 0}}},
       # %Tds.Parameter{direction: :input, name: "@8", type: :uuid, value: nil}]
     ] 
     assert [{1, nil}] = query(sql, params)
