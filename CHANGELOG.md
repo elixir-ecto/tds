@@ -1,6 +1,8 @@
 # v0.2.1-dev
 * Bug Fixes
   * Fixed: Packets sent to the server which exceed the negotiated packet size would cause the connection to close  
+* Enhancements
+  * Added support for decoding Time(n) and DateTime2
 
 # v0.2.0
 * Enhancements
