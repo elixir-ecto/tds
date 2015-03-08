@@ -36,10 +36,6 @@ defmodule Tds.Utils do
     false
   end
 
-  def collation_to_charset(<<_collation::binary>>) do
-    
-  end
-
   def error(error, s) do
     reply(error, s)
     {:stop, error, s}

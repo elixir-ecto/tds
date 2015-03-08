@@ -230,7 +230,7 @@ defmodule Tds.Types do
           @tds_data_type_nvarchar,
           @tds_data_type_nchar
           ] do
-          <<collation::binary-size(5), tail::binary>> = tail
+          <<collation::binary-5, tail::binary>> = tail
           col_info = col_info
             |> Map.put(:collation, collation)
         end
@@ -254,7 +254,7 @@ defmodule Tds.Types do
           |> Map.put(:length, length)
         cond do
           data_type_code in [@tds_data_type_text, @tds_data_type_ntext] ->
-            <<collation::binary-size(5), tail::binary>> = tail
+            <<collation::binary-5, tail::binary>> = tail
             col_info = col_info
               |> Map.put(:collation, collation)
               |> Map.put(:data_reader, :longlen)
@@ -298,11 +298,11 @@ defmodule Tds.Types do
       @tds_data_type_smalldatetime -> decode_smalldatetime(value_binary)
       @tds_data_type_smallmoney -> decode_smallmoney(value_binary)
       @tds_data_type_real ->
-        <<value::little-float-size(32)>> = value_binary
+        <<value::little-float-32>> = value_binary
         Float.round value, 4
       @tds_data_type_datetime -> decode_datetime(value_binary)
       @tds_data_type_float -> 
-        <<value::little-float-size(64)>> = value_binary
+        <<value::little-float-64>> = value_binary
         Float.round value, 8
       @tds_data_type_money -> decode_money(value_binary)
       _ -> <<value::little-signed-size(length)-unit(8)>> = value_binary
@@ -471,16 +471,42 @@ defmodule Tds.Types do
     Float.round money, 4
   end
 
-  def decode_time(_scale, <<_time::binary>>) do
-    # TODO
+  def decode_time(scale, <<time::binary>>) do
+    cond do
+      scale in [1, 2] ->
+        <<time::little-unsigned-24>> = time
+      scale in [3, 4] ->
+        <<time::little-unsigned-32>> = time
+      scale in [5, 6, 7] ->
+        <<time::little-unsigned-40>> = time
+    end
+
+    usec = time
+      |> pow10(7-scale)
+    hour = Float.floor(usec / 10000000 / 60 / 60)
+      |> trunc
+    usec = usec - (hour * 60 * 60 * 10000000)
+    min = Float.floor(usec / 10000000 / 60)
+      |> trunc
+    usec = usec - (min * 60 * 10000000)
+    sec = Float.floor(usec / 10000000)
+      |> trunc
+    usec = usec - (sec * 10000000)
+
+    {hour, min, sec, usec}
   end
 
-  def decode_time_int() do
-    # TODO
+  def decode_datetime2(scale, <<time::binary-3, date::binary-3>>) 
+    when scale in [1, 2] do
+    {decode_date(date), decode_time(scale, time)}
   end
-
-  def decode_datetime2(_scale, <<_data::binary>>) do
-    # TODO
+  def decode_datetime2(scale, <<time::binary-4, date::binary-3>>) 
+    when scale in [3, 4] do
+    {decode_date(date), decode_time(scale, time)}
+  end
+  def decode_datetime2(scale, <<time::binary-5, date::binary-3>>) 
+    when scale in [5, 6, 7] do
+    {decode_date(date), decode_time(scale, time)}
   end
 
   def decode_datetimeoffset(_scale, <<_data::binary>>) do
@@ -602,7 +628,7 @@ defmodule Tds.Types do
         0 ->
           <<0xFF, 0xFF>>
         _ ->
-          <<value_size::little-size(2)-unit(8)>>
+          <<value_size::little-2*8>>
       end
     else
       <<0xFF, 0xFF>>
@@ -743,7 +769,6 @@ defmodule Tds.Types do
   end
 
   def encode_datetime2_type(%Parameter{} = param) do
-    # TODO
     type = @tds_data_type_datetime2n
     data = <<type, 0x08>>
     {type, data, []}
