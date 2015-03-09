@@ -5,7 +5,6 @@ defmodule LoginTest do
   test "Login with sql server authentication" do
     opts = [
       hostname: "sqlserver.local",
-      port: 4000,
       username: "test_user",
       password: "passw0rd!",
       database: "test_db"

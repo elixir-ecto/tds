@@ -3,6 +3,8 @@ defmodule Tds.Connection do
   alias Tds.Protocol
   alias Tds.Messages
 
+  require Logger
+
   import Tds.BinaryUtils
   import Tds.Utils
 
@@ -14,14 +16,31 @@ defmodule Tds.Connection do
     opts = opts
       |> Keyword.put_new(:username, System.get_env("MSSQLUSER") || System.get_env("USER"))
       |> Keyword.put_new(:password, System.get_env("MSSQLPASSWORD"))
+      |> Keyword.put_new(:instance, System.get_env("MSSQLINSTANCE"))
       |> Keyword.put_new(:hostname, System.get_env("MSSQLHOST") || "localhost")
       |> Enum.reject(fn {_k,v} -> is_nil(v) end)
+    
     case GenServer.start_link(__MODULE__, []) do
       {:ok, pid} ->
         timeout = opts[:timeout] || @timeout
-        case GenServer.call(pid, {:connect, opts}, timeout) do
-          :ok -> {:ok, pid}
-          err -> {:error, err}
+        case opts[:instance] do
+          nil -> 
+            case GenServer.call(pid, {:connect, opts}, timeout) do
+              :ok -> {:ok, pid}
+              err -> {:error, err}
+            end
+          instance ->
+            case GenServer.call(pid, {:instance, opts}, timeout) do
+              :ok -> 
+                Logger.debug "Resolved Instance"
+                case GenServer.call(pid, {:connect, opts}, timeout) do
+                  :ok -> {:ok, pid}
+                  err -> {:error, err}
+                end
+              err -> 
+                Logger.debug "Instance Error: #{inspect err}"
+                {:error, err}
+            end
         end
       err -> err
     end
@@ -65,7 +84,8 @@ defmodule Tds.Connection do
 
   def init([]) do
     {:ok, %{
-      sock: nil, 
+      sock: nil,
+      ireq: nil,
       opts: nil, 
       state: :ready, 
       tail: "", 
@@ -82,7 +102,23 @@ defmodule Tds.Connection do
     {:stop, :normal, s}
   end
 
+  def handle_call({:instance, opts}, from, s) do
+    host      = Keyword.fetch!(opts, :hostname)
+    host      = if is_binary(host), do: String.to_char_list(host), else: host
+    timeout   = opts[:timeout] || @timeout
+
+    case :gen_udp.open(1434, [:binary, {:active, true}]) do
+      {:ok, sock} ->
+        :gen_udp.send(sock, host, 1434, <<3>>)
+        Logger.debug "From: #{inspect from}"
+        {:noreply, %{s | opts: opts, ireq: from}}
+      {:error, error} ->
+         error(%Tds.Error{message: "udp connect: #{error}"}, s)
+    end
+  end
+
   def handle_call({:connect, opts}, from, %{queue: queue} = s) do
+    opts = s[:opts] || opts
     host      = Keyword.fetch!(opts, :hostname)
     host      = if is_binary(host), do: String.to_char_list(host), else: host
     port      = opts[:port] || System.get_env("MSSQL_PORT") || 1433
@@ -90,7 +126,7 @@ defmodule Tds.Connection do
     timeout   = opts[:timeout] || @timeout
     sock_opts = [{:active, :once}, :binary, {:packet, :raw}, {:delay_send, false}]
     
-    #Logger.debug "Connect Timeout: #{inspect timeout}"
+    Logger.debug "Connect Options: #{inspect opts}"
 
     {caller, _} = from
     ref = Process.monitor(caller)
@@ -102,8 +138,8 @@ defmodule Tds.Connection do
       {:ok, sock} ->
         s = put_in s.sock, {:gen_tcp, sock}
         Protocol.login(%{s | opts: opts, sock: {:gen_tcp, sock}})
-      {:error, reason} ->
-        error(%Tds.Error{message: "tcp connect: #{reason}"}, s)
+      {:error, error} ->
+        error(%Tds.Error{message: "tcp connect: #{error}"}, s)
     end
   end
 
@@ -123,9 +159,6 @@ defmodule Tds.Connection do
           {:error, error, s} -> error(error, s)
         end
       _ ->
-        #Logger.error "TDS-State: #{inspect s}"
-        #Logger.error "TDS-PID: #{inspect self}"
-        #Logger.error "Query Queued: #{inspect command}"
         {:noreply, s}
     end
   end
@@ -133,7 +166,6 @@ defmodule Tds.Connection do
 
 
   def handle_info({:DOWN, ref, :process, _, _}, s) do
-    #Logger.error "Caller Down"
     case :queue.out(s.queue) do
       {{:value, {_,_,^ref}}, _queue} ->
         {_, s} = command(:attn, s)
@@ -146,6 +178,40 @@ defmodule Tds.Connection do
         s = %{s | queue: queue}
     end
     {:noreply, s}
+  end
+
+  def handle_info({:udp, _, _, _, <<head::binary-3, data::binary>>}, %{opts: opts, ireq: pid} = s) do
+    Logger.debug "UDP Data: #{inspect data, limit: 10_000_000}"
+    server = String.split(data, ";;")
+      |> Enum.slice(0..-2)
+      |> Enum.reduce([], fn(str, acc) ->  
+        server = String.split(str, ";")
+          |> Enum.chunk(2) 
+          |> Enum.reduce([], fn ([k,v], acc) ->
+            k = k
+              |> String.downcase
+              |> String.to_atom
+            Keyword.put_new(acc, k, v) 
+          end)
+        [server | acc]
+      end)
+      |> Enum.find(fn(s) -> 
+        Logger.debug "Server: #{inspect s}"
+        String.downcase(s[:instancename]) == String.downcase(opts[:instance])
+      end)
+    case server do
+      nil -> 
+        error(%Tds.Error{message: "Instance #{opts.instance} not found"}, s)
+      serv -> 
+        timeout = opts[:timeout] || @timeout
+        {port, _} = Integer.parse(serv[:tcp])
+        opts = Keyword.put(opts, :port, port)
+        Logger.debug "Reply OK"
+        GenServer.reply(pid, :ok)
+        {:noreply, %{s | opts: opts}}
+        #GenServer.call(self, {:connect, %{port: s[:tcp], instance: nil}}, timeout)
+    end
+
   end
 
   def handle_info({:tcp, _, _data}, %{sock: {mod, sock}, opts: opts, state: :prelogin} = s) do
