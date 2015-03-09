@@ -1,4 +1,4 @@
-# v0.2.1-dev
+# v0.2.1
 * Bug Fixes
   * Fixed: Packets sent to the server which exceed the negotiated packet size would cause the connection to close  
 * Enhancements
