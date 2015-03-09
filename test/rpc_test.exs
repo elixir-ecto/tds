@@ -165,7 +165,7 @@ defmodule RPCTest do
       # %Tds.Parameter{direction: :input, name: "@8", type: :uuid, value: nil}]
     ] 
     assert [{1, nil}] = query(sql, params)
-    assert :ok = query("DROP TABLE dbo.TestTable", [])
+    assert :ok = query("DROP TABLE posts", [])
   end
 
   test "Inserting into params", context do
