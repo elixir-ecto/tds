@@ -174,7 +174,7 @@ defmodule Tds.Connection do
     {:noreply, s}
   end
 
-  def handle_info({:udp, _, _, _, <<head::binary-3, data::binary>>}, %{opts: opts, ireq: pid, usock: sock} = s) do
+  def handle_info({:udp, _, _, 1434, <<head::binary-3, data::binary>>}, %{opts: opts, ireq: pid, usock: sock} = s) do
     :gen_udp.close(sock)
     server = String.split(data, ";;")
       |> Enum.slice(0..-2)
