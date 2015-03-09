@@ -82,6 +82,7 @@ defmodule Tds.Connection do
     {:ok, %{
       sock: nil,
       usock: nil,
+      itcp: nil,
       ireq: nil,
       opts: nil, 
       state: :ready, 
@@ -114,10 +115,9 @@ defmodule Tds.Connection do
   end
 
   def handle_call({:connect, opts}, from, %{queue: queue} = s) do
-    opts = s[:opts] || opts
     host      = Keyword.fetch!(opts, :hostname)
     host      = if is_binary(host), do: String.to_char_list(host), else: host
-    port      = opts[:port] || System.get_env("MSSQL_PORT") || 1433
+    port      = s[:itcp] || opts[:port] || System.get_env("MSSQLPORT") || 1433
     if is_binary(port), do: {port, _} = Integer.parse(port)
     timeout   = opts[:timeout] || @timeout
     sock_opts = [{:active, :once}, :binary, {:packet, :raw}, {:delay_send, false}]
@@ -198,10 +198,10 @@ defmodule Tds.Connection do
       serv -> 
         timeout = opts[:timeout] || @timeout
         {port, _} = Integer.parse(serv[:tcp])
-        opts = Keyword.put(opts, :port, port)
+        #opts = Keyword.put(opts, :port, port)
         GenServer.reply(pid, :ok)
         
-        {:noreply, %{s | opts: opts}}
+        {:noreply, %{s | opts: opts, itcp: port}}
         #GenServer.call(self, {:connect, %{port: s[:tcp], instance: nil}}, timeout)
     end
 
