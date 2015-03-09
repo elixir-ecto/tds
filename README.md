@@ -69,7 +69,7 @@ The tests require an addition to your hosts file to connect to your sql server d
 
 <IP OF SQL SERVER>	sqlserver.local
 
-Additionally SQL authentication needs to be used for connecting and testing. Add the user test_user with access to the database test_db. See one of the test files for the connection information and port number.
+Additionally SQL authentication needs to be used for connecting and testing. Add the user test_user as owner to the database test_db. See one of the test files for the connection information and port number.
 
 ##Special Thanks 
 
