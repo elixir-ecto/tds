@@ -3,8 +3,6 @@ defmodule Tds.Types do
   import Tds.BinaryUtils
   import Tds.Utils
 
-  require Logger
-
   alias Timex.Date
   alias Tds.Parameter
   alias Tds.DateTime

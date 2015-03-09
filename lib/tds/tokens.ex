@@ -2,8 +2,6 @@ defmodule Tds.Tokens do
   import Tds.BinaryUtils
   import Tds.Utils
 
-  require Logger
-
   alias Tds.Types
 
   @tds_token_returnstatus   0x79 # 0x79
@@ -70,7 +68,6 @@ defmodule Tds.Tokens do
       line_number: line_number,
     }
     # TODO Need to concat errors for delivery
-    Logger.debug "TDS Error: #{inspect e}"
     {[error: e], nil}
   end
 

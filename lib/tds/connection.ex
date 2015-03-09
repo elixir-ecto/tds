@@ -3,8 +3,6 @@ defmodule Tds.Connection do
   alias Tds.Protocol
   alias Tds.Messages
 
-  require Logger
-
   import Tds.BinaryUtils
   import Tds.Utils
 
@@ -32,13 +30,11 @@ defmodule Tds.Connection do
           instance ->
             case GenServer.call(pid, {:instance, opts}, timeout) do
               :ok -> 
-                Logger.debug "Resolved Instance"
                 case GenServer.call(pid, {:connect, opts}, timeout) do
                   :ok -> {:ok, pid}
                   err -> {:error, err}
                 end
               err -> 
-                Logger.debug "Instance Error: #{inspect err}"
                 {:error, err}
             end
         end
@@ -111,7 +107,6 @@ defmodule Tds.Connection do
     case :gen_udp.open(0, [:binary, {:active, true}, {:reuseaddr, true}]) do
       {:ok, sock} ->
         :gen_udp.send(sock, host, 1434, <<3>>)
-        Logger.debug "From: #{inspect from}"
         {:noreply, %{s | opts: opts, ireq: from, usock: sock}}
       {:error, error} ->
          error(%Tds.Error{message: "udp connect: #{error}"}, s)
@@ -126,8 +121,6 @@ defmodule Tds.Connection do
     if is_binary(port), do: {port, _} = Integer.parse(port)
     timeout   = opts[:timeout] || @timeout
     sock_opts = [{:active, :once}, :binary, {:packet, :raw}, {:delay_send, false}]
-    
-    Logger.debug "Connect Options: #{inspect opts}"
 
     {caller, _} = from
     ref = Process.monitor(caller)
@@ -197,7 +190,6 @@ defmodule Tds.Connection do
         [server | acc]
       end)
       |> Enum.find(fn(s) -> 
-        Logger.debug "Server: #{inspect s}"
         String.downcase(s[:instancename]) == String.downcase(opts[:instance])
       end)
     case server do
@@ -207,7 +199,6 @@ defmodule Tds.Connection do
         timeout = opts[:timeout] || @timeout
         {port, _} = Integer.parse(serv[:tcp])
         opts = Keyword.put(opts, :port, port)
-        Logger.debug "Reply OK"
         GenServer.reply(pid, :ok)
         
         {:noreply, %{s | opts: opts}}
