@@ -31,8 +31,7 @@ iex> Tds.Connection.query!(pid, "INSERT INTO MyTable (MyColumn) VALUES (@my_valu
   * Supports TDS Version 7.3, 7.4
 
 ## Connecting to SQL Instances
-
-In order to connect to a SQL instance, you must assign a static port to the TCP adaptor of the instance in the SQL Configuration Manager. You can then use this port as part of the connection options.
+Tds Supports sql instances by passing ```instance: "instancename"``` to the connection options. 
 
 
 
