@@ -2,8 +2,6 @@
 
 MSSQL / TDS Database driver for Elixir.
 
-Work in Progress... 
-
 ## Usage
 
 Add Tds as a dependency in your `mix.exs` file.

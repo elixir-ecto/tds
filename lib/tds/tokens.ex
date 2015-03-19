@@ -2,6 +2,8 @@ defmodule Tds.Tokens do
   import Tds.BinaryUtils
   import Tds.Utils
 
+  require Logger
+
   alias Tds.Types
 
   @tds_token_returnstatus   0x79 # 0x79
@@ -30,6 +32,7 @@ defmodule Tds.Tokens do
   ## Decode Token Stream
   def decode_tokens(tail, tokens) when tail == "" or tail == nil, do: tokens
   def decode_tokens(<<tail::binary>>, tokens) do
+    Logger.debug "Token Tail: #{to_hex_string tail}"
     {tokens, tail} = decode_token(tail, tokens)
     decode_tokens(tail, tokens)
   end
@@ -213,7 +216,8 @@ defmodule Tds.Tokens do
     decode_columns(tail, [column | columns], n - 1)
   end
 
-  defp decode_column(<<_usertype::int32, _flags::int16, tail::binary>>) do
+  defp decode_column(<<_usertype::int32, _flags::int16, tail::binary>> = data) do
+    Logger.debug "Decode Column: #{to_hex_string data}"
     {info, tail} = Types.decode_info(tail)
     {name, tail} = decode_column_name(tail)
     info = info

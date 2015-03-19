@@ -3,6 +3,8 @@ defmodule Tds.Types do
   import Tds.BinaryUtils
   import Tds.Utils
 
+  require Logger
+
   alias Timex.Date
   alias Tds.Parameter
   alias Tds.DateTime
@@ -252,16 +254,17 @@ defmodule Tds.Types do
           |> Map.put(:length, length)
         cond do
           data_type_code in [@tds_data_type_text, @tds_data_type_ntext] ->
+
             <<collation::binary-5, tail::binary>> = tail
             col_info = col_info
               |> Map.put(:collation, collation)
               |> Map.put(:data_reader, :longlen)
-            # TODO NumParts Reader
             <<numparts::signed-8, tail::binary>> = tail
-            for _n <- 1..numparts do
-              <<tsize::little-unsigned-16, _table_name::binary-size(tsize)-unit(16), tail::binary>> = tail
-              <<csize::unsigned-8, _column_name::binary-size(csize)-unit(16), tail::binary>> = tail
-            end
+            tail = 
+            Enum.reduce([1..numparts], tail, fn(_, acc) ->
+              <<tsize::little-unsigned-16, _table_name::binary-size(tsize)-unit(16), tail::binary>> = acc
+              tail
+            end)
           data_type_code == @tds_data_type_image ->
             # TODO NumBarts Reader
             <<numparts::signed-8, tail::binary>> = tail
@@ -393,6 +396,18 @@ defmodule Tds.Types do
   end
 
   # TODO LongLen Types
+  #def decode_data(%{data_reader: :longlen}, <<tail::binary>>), do: Logger.debug "DecodeTail: #{to_hex_string tail}"
+  def decode_data(%{data_reader: :longlen}, <<0x00, tail::binary>>), do: {nil, tail}
+  def decode_data(%{data_type_code: data_type_code, data_reader: :longlen} = data_info, <<text_ptr_size::unsigned-8, text_ptr::size(text_ptr_size)-unit(8), timestamp::unsigned-64, size::little-signed-32, data::binary-size(size)-unit(8), tail::binary>>) do
+    value = 
+    case data_type_code do
+      @tds_data_type_text -> decode_char(data_info[:collation], data)
+      @tds_data_type_ntext -> decode_nchar(data)
+      @tds_data_type_image -> data
+      _ -> nil
+    end
+    {value, tail}
+  end
 
   # TODO Variant Types
 
