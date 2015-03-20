@@ -137,7 +137,6 @@ defmodule Tds.Protocol do
   defp msg_send(msg, %{sock: {mod, sock}, env: env}) do 
     paks = encode_msg(msg, env)
     Enum.each(paks, fn(pak) ->
-      IO.inspect "Pak: #{to_hex_string pak}"
       mod.send(sock, pak)
     end)
   end

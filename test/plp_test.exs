@@ -24,7 +24,6 @@ defmodule PLPTest do
       )
     """, [])
     data = File.read!("#{__DIR__}/plp_data.txt")
-    IO.inspect data
     query("INSERT INTO plp_test VALUES(@1)",[%Tds.Parameter{name: "@1", value: data, type: :string}])
     assert [{data}] = query("SELECT text FROM plp_test",[])
     query("DROP TABLE plp_test", [])
