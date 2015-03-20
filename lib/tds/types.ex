@@ -3,8 +3,6 @@ defmodule Tds.Types do
   import Tds.BinaryUtils
   import Tds.Utils
 
-  require Logger
-
   alias Timex.Date
   alias Tds.Parameter
   alias Tds.DateTime
@@ -395,8 +393,6 @@ defmodule Tds.Types do
     {value, tail}
   end
 
-  # TODO LongLen Types
-  #def decode_data(%{data_reader: :longlen}, <<tail::binary>>), do: Logger.debug "DecodeTail: #{to_hex_string tail}"
   def decode_data(%{data_reader: :longlen}, <<0x00, tail::binary>>), do: {nil, tail}
   def decode_data(%{data_type_code: data_type_code, data_reader: :longlen} = data_info, <<text_ptr_size::unsigned-8, text_ptr::size(text_ptr_size)-unit(8), timestamp::unsigned-64, size::little-signed-32, data::binary-size(size)-unit(8), tail::binary>>) do
     value = 
@@ -411,12 +407,9 @@ defmodule Tds.Types do
 
   # TODO Variant Types
 
-  # TODO PLP TYpes
-  # ShortLength Types
   def decode_data(%{data_reader: :plp}, <<@tds_plp_null, tail::binary>>), do: {nil, tail}
-  def decode_data(%{data_type_code: data_type_code, data_reader: :plp} = data_info, <<_size::little-unsigned-64, tail::binary>>) do
+  def decode_data(%{data_type_code: data_type_code, data_reader: :plp} = data_info, <<size::little-unsigned-64, tail::binary>>) do
     {data, tail} = decode_plp_chunk(tail, <<>>)    
-
     value = cond do
       data_type_code == @tds_data_type_xml ->
         decode_xml(data_info, data)
@@ -636,11 +629,10 @@ defmodule Tds.Types do
     if value != nil do
       value = value |> to_little_ucs2
       value_size = byte_size(value)
-      
-      case value_size do
-        0 ->
+      cond do
+        value_size == 0 or value_size > 8000 ->
           <<0xFF, 0xFF>>
-        _ ->
+        true ->
           <<value_size::little-2*8>>
       end
     else
@@ -857,6 +849,7 @@ defmodule Tds.Types do
           length = String.length(value)
         end
         if length <= 0, do: length = 1
+        if length > 4000, do: length = "max"
         "nvarchar(#{length})"
       :integer -> 
         if value >= 0 do
@@ -877,6 +870,7 @@ defmodule Tds.Types do
           length = String.length(value)
         end
         if length <= 0, do: length = 1
+        if length > 4000, do: length = "max"
         "nvarchar(#{length})"
     end
 
@@ -1052,10 +1046,12 @@ defmodule Tds.Types do
       value = value |> to_little_ucs2
       value_size = byte_size(value)
       
-      case value_size do
-        0 ->
+      cond do
+        value_size == 0 ->
           <<0x00::unsigned-64, 0x00::unsigned-32>>
-        _ ->
+        value_size > 8000 ->
+          encode_plp(value)
+        true ->
           <<value_size::little-size(2)-unit(8)>> <> value
       end
     end
@@ -1178,6 +1174,19 @@ defmodule Tds.Types do
       <<0x00>>
     end
     
+  end
+
+  def encode_plp(data) do
+    size = byte_size(data)
+    <<size::little-unsigned-64>> <> encode_plp_chunk(size, data, <<>>) <> <<0x00::32>>
+  end
+
+  def encode_plp_chunk(0, _, buf), do: buf
+  def encode_plp_chunk(size, data, buf) do
+    <<_t::unsigned-32, chunk_size::unsigned-32>> = <<size::unsigned-64>>
+    <<chunk::binary-size(chunk_size), data::binary>> = data
+    plp = <<chunk_size::little-unsigned-32>> <> chunk
+    encode_plp_chunk(size-chunk_size, data, buf <> plp)
   end
 
   defp int_type_size(int) when int in 0..255, do: 1

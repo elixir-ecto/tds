@@ -1,7 +1,9 @@
 # v0.2.3
 * Bug Fixes
   * Added Long Length decoder support for text, ntext and image
-  
+  * Fixed PLP decode / Encode for sending and receiving large test
+  * Fixed issue where selecting from NTEXT, TEXT, NVARCHAR(MAX), VARCHAR(MAX) would trunc to 4kb
+
 # v0.2.2
 * Bug Fixes
   * Fixed udp port scope for instances

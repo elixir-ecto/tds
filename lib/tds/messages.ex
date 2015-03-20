@@ -82,7 +82,7 @@ defmodule Tds.Messages do
 
   ## Parsers
 
-  def parse(:login, @tds_pack_reply, _header, tail) do
+  def parse(:login, @tds_pack_reply, header, tail) do
     msg_login_ack(type: 4, data: tail)
   end
 
@@ -284,7 +284,6 @@ defmodule Tds.Messages do
   defp encode_rpc_param(%Tds.Parameter{name: name, value: value, direction: _direction, type: type} = param) do
     p_name = to_little_ucs2(name)
     p_flags = param |> Tds.Parameter.option_flags
-    #Logger.debug "Param: #{inspect param}"
     {type_code, type_data, type_attr} = Types.encode_data_type(param)
     p_meta_data = <<byte_size(p_name)>> <> to_little_ucs2(p_name) <> p_flags <> type_data
     p_meta_data <> Types.encode_data(type_code, param.value, type_attr)

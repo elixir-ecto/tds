@@ -27,7 +27,6 @@ defmodule Tds.Protocol do
   end
 
   def send_query(statement, s) do
-    #Logger.debug "SQL: #{inspect statement}"
     msg = msg_sql(query: statement)
 
     case send_to_result(msg, s) do
@@ -80,7 +79,8 @@ defmodule Tds.Protocol do
 
   end
 
-  def message(:login, msg_login_ack(), %{opts: opts, tail: _tail, opts: opts} = s) do
+  def message(:login, msg_login_ack(), %{opts: opts, tail: tail, opts: opts} = s) do
+    
     s = %{s | opts: clean_opts(opts)}
     reply(:ok, s)
     send_query("""
@@ -92,6 +92,7 @@ defmodule Tds.Protocol do
       SET ANSI_PADDING ON;
       SET ANSI_WARNINGS ON;
       SET CONCAT_NULL_YIELDS_NULL ON;
+      SET TEXTSIZE 2147483647;
     """, s)
   end
 
@@ -136,6 +137,7 @@ defmodule Tds.Protocol do
   defp msg_send(msg, %{sock: {mod, sock}, env: env}) do 
     paks = encode_msg(msg, env)
     Enum.each(paks, fn(pak) ->
+      IO.inspect "Pak: #{to_hex_string pak}"
       mod.send(sock, pak)
     end)
   end

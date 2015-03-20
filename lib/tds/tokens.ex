@@ -2,8 +2,6 @@ defmodule Tds.Tokens do
   import Tds.BinaryUtils
   import Tds.Utils
 
-  require Logger
-
   alias Tds.Types
 
   @tds_token_returnstatus   0x79 # 0x79
@@ -32,7 +30,6 @@ defmodule Tds.Tokens do
   ## Decode Token Stream
   def decode_tokens(tail, tokens) when tail == "" or tail == nil, do: tokens
   def decode_tokens(<<tail::binary>>, tokens) do
-    Logger.debug "Token Tail: #{to_hex_string tail}"
     {tokens, tail} = decode_token(tail, tokens)
     decode_tokens(tail, tokens)
   end
@@ -136,15 +133,12 @@ defmodule Tds.Tokens do
           tail::binary>> = tail
       @tds_envtype_begintrans ->
         <<value_size::unsigned-8, new_value::binary-little-size(value_size)-unit(8), 0x00, tail::binary>> = tail
-        #Logger.info "Begin Transaction: #{Tds.Utils.to_hex_string new_value}"
         [trans: new_value]
       @tds_envtype_committrans ->
         <<0x00, value_size::unsigned-8, _old_value::binary-little-size(value_size)-unit(8), tail::binary>> = tail
-        #Logger.info "Commit Transaction"
         [trans: <<0x00>>]
       @tds_envtype_rollbacktrans ->
         <<0x00, value_size::unsigned-8, _old_value::binary-little-size(value_size)-unit(8), tail::binary>> = tail
-        #Logger.info "Rollback Transaction"
         [trans: <<0x00>>]
     end
     {token ++ tokens, tail}
@@ -217,7 +211,6 @@ defmodule Tds.Tokens do
   end
 
   defp decode_column(<<_usertype::int32, _flags::int16, tail::binary>> = data) do
-    Logger.debug "Decode Column: #{to_hex_string data}"
     {info, tail} = Types.decode_info(tail)
     {name, tail} = decode_column_name(tail)
     info = info

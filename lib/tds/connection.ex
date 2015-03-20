@@ -67,7 +67,6 @@ defmodule Tds.Connection do
   end
 
   def attn(pid, opts \\ []) do
-    #Logger.debug "ATTN PID: #{inspect pid}"
     timeout = opts[:timeout] || @timeout
     case GenServer.call(pid, :attn, timeout) do
       %Tds.Result{} = res -> {:ok, res}
@@ -259,7 +258,6 @@ defmodule Tds.Connection do
   end
 
   defp command(:attn, s) do
-    #Logger.error "Command Attn"
     timeout = s.opts[:timeout] || @timeout
     attn_timer_ref = :erlang.start_timer(timeout, self(), :command)
     Protocol.send_attn(%{s |attn_timer: attn_timer_ref, pak_header: "", pak_data: "", tail: "", state: :attn})
