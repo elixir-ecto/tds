@@ -502,11 +502,11 @@ defmodule Tds.Types do
     {hour, min, sec, usec}
   end
 
-  def decode_datetime2(scale, <<data::binary>>) 
+  def decode_datetime2(scale, <<data::binary>>) do
     cond do
       scale in [1, 2] -> <<time::binary-3, date::binary-3>> = data
-      scale in [3, 4] -> <<time::binary-4, date::binary-3>>
-      scale in [5, 6, 7] -> <<time::binary-5, date::binary-3>>
+      scale in [3, 4] -> <<time::binary-4, date::binary-3>> = data
+      scale in [5, 6, 7] -> <<time::binary-5, date::binary-3>> = data
       true -> raise "DateTime Scale Unknown"
     end
     {decode_date(date), decode_time(scale, time)}
