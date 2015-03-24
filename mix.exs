@@ -36,7 +36,9 @@ defmodule Tds.Mixfile do
   end
 
   defp description do
-    "TDS driver for Elixir."
+    """
+    MSSQL / TDS Driver for Ecto.
+    """
   end
 
   defp package do
