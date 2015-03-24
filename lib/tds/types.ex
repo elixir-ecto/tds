@@ -502,21 +502,27 @@ defmodule Tds.Types do
     {hour, min, sec, usec}
   end
 
-  def decode_datetime2(scale, <<time::binary-3, date::binary-3>>) 
-    when scale in [1, 2] do
-    {decode_date(date), decode_time(scale, time)}
-  end
-  def decode_datetime2(scale, <<time::binary-4, date::binary-3>>) 
-    when scale in [3, 4] do
-    {decode_date(date), decode_time(scale, time)}
-  end
-  def decode_datetime2(scale, <<time::binary-5, date::binary-3>>) 
-    when scale in [5, 6, 7] do
+  def decode_datetime2(scale, <<data::binary>>) 
+    cond do
+      scale in [1, 2] -> <<time::binary-3, date::binary-3>> = data
+      scale in [3, 4] -> <<time::binary-4, date::binary-3>>
+      scale in [5, 6, 7] -> <<time::binary-5, date::binary-3>>
+      true -> raise "DateTime Scale Unknown"
+    end
     {decode_date(date), decode_time(scale, time)}
   end
 
-  def decode_datetimeoffset(_scale, <<_data::binary>>) do
-    # TODO
+  def decode_datetimeoffset(scale, <<data::binary>>) do
+    cond do
+      scale in [1, 2] -> <<datetime::binary-6, offset_min::little-signed-16>> = data
+      scale in [3, 4] -> <<datetime::binary-7, offset_min::little-signed-16>> = data
+      scale in [5, 6, 7] -> <<datetime::binary-8, offset_min::little-signed-16>> = data
+      true -> raise "DateTimeOffset Scale Unknown"
+    end
+    d = decode_datetime2(scale, datetime)
+      |> Date.from
+      |> Date.shift(mins: offset_min)
+    {{d.year,d.month,d.day},{d.hour,d.minute,d.second,d.ms}}
   end
 
   def decode_date(<<days::little-size(3)-unit(8)>>) do

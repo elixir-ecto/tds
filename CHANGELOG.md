@@ -1,3 +1,7 @@
+# v0.2.4-dev
+* Bug Fixes
+  * Added support for DateTimeOffset
+
 # v0.2.3
 * Bug Fixes
   * Added Long Length decoder support for text, ntext and image

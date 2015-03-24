@@ -16,6 +16,7 @@ defmodule PLPTest do
     {:ok, pid} = Conn.start_link(opts)
     {:ok, [pid: pid]}
   end
+  
   test "Max and Large PLP returns", context do
     query("DROP TABLE plp_test", [])
     query("""

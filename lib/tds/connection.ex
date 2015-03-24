@@ -17,7 +17,7 @@ defmodule Tds.Connection do
       |> Keyword.put_new(:instance, System.get_env("MSSQLINSTANCE"))
       |> Keyword.put_new(:hostname, System.get_env("MSSQLHOST") || "localhost")
       |> Enum.reject(fn {_k,v} -> is_nil(v) end)
-    
+
     case GenServer.start_link(__MODULE__, []) do
       {:ok, pid} ->
         timeout = opts[:timeout] || @timeout
