@@ -1,6 +1,7 @@
-# v0.2.4-dev
+# v0.2.4
 * Bug Fixes
   * Added support for DateTimeOffset
+  * Updated Deps
 
 # v0.2.3
 * Bug Fixes
