@@ -221,7 +221,7 @@ defmodule Tds.Messages do
   end
 
   defp encode(msg_attn(), _s) do
-    encode_header(@tds_pack_cancel, <<>>)
+    [encode_header(@tds_pack_cancel, <<>>)]
   end
 
   defp encode(msg_sql(query: q), %{trans: trans}) do

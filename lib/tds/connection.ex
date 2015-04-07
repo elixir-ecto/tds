@@ -69,7 +69,8 @@ defmodule Tds.Connection do
   def attn(pid, opts \\ []) do
     timeout = opts[:timeout] || @timeout
     case GenServer.call(pid, :attn, timeout) do
-      %Tds.Result{} = res -> {:ok, res}
+      %Tds.Result{} = res -> 
+        {:ok, res}
       %Tds.Error{} = err  ->
         {:error, err}
     end
@@ -136,8 +137,15 @@ defmodule Tds.Connection do
     end
   end
 
-  def handle_call(:attn, _from, s) do
-    command(:attn, s)
+  def handle_call(:attn, from, s) do
+    {caller, _} = from
+    ref = Process.monitor(caller)
+    s = %{s | queue: :queue.new}
+    s = update_in s.queue, &:queue.in({:attn, from, ref}, &1)
+    case command(:attn, s) do
+      {:ok, s} -> {:noreply, s}
+      {:error, error, s} -> error(error, s)
+    end
   end
 
   def handle_call(command, from, %{state: state} = s) do

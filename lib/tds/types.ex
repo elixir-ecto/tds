@@ -570,8 +570,6 @@ defmodule Tds.Types do
     nil
   end
 
-
-
   @doc """
   Data Type Encoders
   Encodes the COLMETADATA for the data type
