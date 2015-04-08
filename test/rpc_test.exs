@@ -29,7 +29,7 @@ defmodule RPCTest do
       20080906120000
     ]
     Enum.each(nums, fn(num) ->  
-      assert [{num}] = query("SELECT @n1", [%Parameter{name: "@n1", value: num}])
+      assert [{num}] == query("SELECT @n1", [%Parameter{name: "@n1", value: num}])
     end)
 
     # Negative Numbers
@@ -40,18 +40,18 @@ defmodule RPCTest do
       -11111111111111111111111111111111111111
     ]
     Enum.each(nums, fn(num) ->  
-      assert [{num}] = query("SELECT @n1", [%Parameter{name: "@n1", value: num}])
+      assert [{Decimal.new("#{num}")}] == query("SELECT @n1", [%Parameter{name: "@n1", value: num}])
     end)
 
     # Decimals
     nums = [
-      Decimal.new("1.11111111"),
-      Decimal.new("1.111111111111111111"),
-      Decimal.new("1.111111111111111111111111111"),
-      Decimal.new("1.1111111111111111111111111111111111111")
+      1.11111111,
+      1.111111111111111111,
+      1.111111111111111111111111111,
+      1.1111111111111111111111111111111111111
     ]
-    Enum.each(nums, fn(num) ->  
-      assert [{num}] = query("SELECT @n1", [%Parameter{name: "@n1", value: num}])
+    Enum.each(nums, fn(num) -> 
+      assert [{Decimal.new("#{num}")}] == query("SELECT @n1", [%Parameter{name: "@n1", value: Decimal.new("#{num}")}])
     end)
 
     # VarChar Strings
@@ -62,7 +62,7 @@ defmodule RPCTest do
       ""
     ]
     Enum.each(strs, fn(str) ->  
-      assert [{str}] = query("SELECT @n1", [%Parameter{name: "@n1", value: str}])
+      assert [{str}] == query("SELECT @n1", [%Parameter{name: "@n1", value: str}])
     end)
 
     strs = [
@@ -73,7 +73,7 @@ defmodule RPCTest do
       ""
     ]
     Enum.each(strs, fn(str) ->  
-      assert [{str}] = query("SELECT @n1", [%Parameter{name: "@n1", type: :string, value: str}])
+      assert [{str}] == query("SELECT @n1", [%Parameter{name: "@n1", type: :string, value: str}])
     end)
     
     # Dates and Times
