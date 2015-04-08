@@ -27,7 +27,7 @@ defmodule Tds.Connection do
               :ok -> {:ok, pid}
               err -> {:error, err}
             end
-          instance ->
+          _instance ->
             case GenServer.call(pid, {:instance, opts}, timeout) do
               :ok -> 
                 case GenServer.call(pid, {:connect, opts}, timeout) do
@@ -103,7 +103,6 @@ defmodule Tds.Connection do
   def handle_call({:instance, opts}, from, s) do
     host      = Keyword.fetch!(opts, :hostname)
     host      = if is_binary(host), do: String.to_char_list(host), else: host
-    timeout   = opts[:timeout] || @timeout
 
     case :gen_udp.open(0, [:binary, {:active, true}, {:reuseaddr, true}]) do
       {:ok, sock} ->
@@ -181,7 +180,7 @@ defmodule Tds.Connection do
     {:noreply, s}
   end
 
-  def handle_info({:udp, _, _, 1434, <<head::binary-3, data::binary>>}, %{opts: opts, ireq: pid, usock: sock} = s) do
+  def handle_info({:udp, _, _, 1434, <<_head::binary-3, data::binary>>}, %{opts: opts, ireq: pid, usock: sock} = s) do
     :gen_udp.close(sock)
     server = String.split(data, ";;")
       |> Enum.slice(0..-2)
@@ -203,13 +202,9 @@ defmodule Tds.Connection do
       nil -> 
         error(%Tds.Error{message: "Instance #{opts.instance} not found"}, s)
       serv -> 
-        timeout = opts[:timeout] || @timeout
         {port, _} = Integer.parse(serv[:tcp])
-        #opts = Keyword.put(opts, :port, port)
         GenServer.reply(pid, :ok)
-        
         {:noreply, %{s | opts: opts, itcp: port}}
-        #GenServer.call(self, {:connect, %{port: s[:tcp], instance: nil}}, timeout)
     end
 
   end

@@ -266,9 +266,10 @@ defmodule Tds.Types do
           data_type_code == @tds_data_type_image ->
             # TODO NumBarts Reader
             <<numparts::signed-8, tail::binary>> = tail
-
-            Enum.each(1..numparts, fn(_n) ->  
-              <<size::unsigned-16, _str::size(size)-unit(16), tail::binary>> = tail
+            tail =
+            Enum.reduce([1..numparts], tail, fn(_, acc) ->  
+              <<size::unsigned-16, _str::size(size)-unit(16), tail::binary>> = acc
+              tail
             end)
             col_info = col_info
               |> Map.put(:data_reader, :bytelen)
@@ -394,7 +395,7 @@ defmodule Tds.Types do
   end
 
   def decode_data(%{data_reader: :longlen}, <<0x00, tail::binary>>), do: {nil, tail}
-  def decode_data(%{data_type_code: data_type_code, data_reader: :longlen} = data_info, <<text_ptr_size::unsigned-8, text_ptr::size(text_ptr_size)-unit(8), timestamp::unsigned-64, size::little-signed-32, data::binary-size(size)-unit(8), tail::binary>>) do
+  def decode_data(%{data_type_code: data_type_code, data_reader: :longlen} = data_info, <<text_ptr_size::unsigned-8, _text_ptr::size(text_ptr_size)-unit(8), _timestamp::unsigned-64, size::little-signed-32, data::binary-size(size)-unit(8), tail::binary>>) do
     value = 
     case data_type_code do
       @tds_data_type_text -> decode_char(data_info[:collation], data)
@@ -408,7 +409,7 @@ defmodule Tds.Types do
   # TODO Variant Types
 
   def decode_data(%{data_reader: :plp}, <<@tds_plp_null, tail::binary>>), do: {nil, tail}
-  def decode_data(%{data_type_code: data_type_code, data_reader: :plp} = data_info, <<size::little-unsigned-64, tail::binary>>) do
+  def decode_data(%{data_type_code: data_type_code, data_reader: :plp} = data_info, <<_size::little-unsigned-64, tail::binary>>) do
     {data, tail} = decode_plp_chunk(tail, <<>>)    
     value = cond do
       data_type_code == @tds_data_type_xml ->
@@ -459,7 +460,7 @@ defmodule Tds.Types do
     {{date.year, date.month, date.day}, {date.hour, date.minute, date.second, 0}}
   end
 
-  def encode_datetime({{y,m,d},{h,mm,s,0}} = date), do: encode_datetime(Date.from {{y,m,d},{h,mm,s}})
+  def encode_datetime({{y,m,d},{h,mm,s,0}}), do: encode_datetime(Date.from {{y,m,d},{h,mm,s}})
   def encode_datetime({{_,_,_},{_,_,_}} = date), do: encode_datetime(Date.from date)
   def encode_datetime(%Timex.DateTime{} = date) do
     days = Date.diff @datetime, date, :days
@@ -573,7 +574,7 @@ defmodule Tds.Types do
   Data Type Encoders
   Encodes the COLMETADATA for the data type
   """
-  def encode_data_type(%Parameter{value: value, type: type} = param) when type != nil do
+  def encode_data_type(%Parameter{type: type} = param) when type != nil do
     case type do
       :boolean -> encode_binary_type(param)
       :binary -> encode_binary_type(param)
@@ -587,6 +588,60 @@ defmodule Tds.Types do
     end
   end
 
+  def encode_data_type(%Parameter{value: value} = param) 
+  when value == true or value == false do 
+    encode_data_type(%{param | type: :boolean})
+  end
+
+  def encode_data_type(%Parameter{value: value} = param) 
+  when is_binary(value) and value == "" do 
+    encode_data_type(%{param | type: :string})
+  end
+
+  def encode_data_type(%Parameter{value: value} = param) 
+  when is_binary(value) do 
+    encode_data_type(%{param | type: :binary})
+  end
+
+  def encode_data_type(%Parameter{value: value} = param) 
+  when is_integer(value) and value >= 0 do 
+    encode_data_type(%{param | type: :integer})
+  end
+
+  def encode_data_type(%Parameter{value: value} = param) 
+  when is_float(value) do 
+    encode_data_type(%{param | type: :float})
+  end
+
+  def encode_data_type(%Parameter{value: value} = param) 
+  when (is_integer(value) and value < 0) do 
+    encode_data_type(%{param | value: Decimal.new(value), type: :decimal})
+  end
+
+  def encode_data_type(%Parameter{value: %Decimal{}} = param) do 
+    encode_data_type(%{param | type: :decimal})
+  end
+
+  def encode_data_type(%Parameter{value: %DateTime{}} = param) do
+    encode_data_type(%{param | type: :datetime})
+  end
+
+  def encode_data_type(%Parameter{value: %DateTime2{}} = param) do
+    encode_data_type(%{param | type: :datetime2})
+  end
+
+  def encode_data_type(%Parameter{value: {{_,_,_},{_,_,_}}} = param) do
+    encode_data_type(%{param | type: :datetime})
+  end
+
+  def encode_data_type(%Parameter{value: {{_,_,_},{_,_,_,0}}} = param) do
+    encode_data_type(%{param | type: :datetime})
+  end
+
+  def encode_data_type(%Parameter{value: {{_,_,_},{_,_,_,_}}} = param) do
+    encode_data_type(%{param | type: :datetime2})
+  end
+
   def encode_binary_type(%Parameter{value: value} = param) 
   when value == "" do
    encode_string_type(param)
@@ -594,10 +649,10 @@ defmodule Tds.Types do
 
   def encode_binary_type(%Parameter{value: value} = param) 
   when is_integer(value) do 
-    param = %{param | value: <<value>>} |> encode_binary_type
+    %{param | value: <<value>>} |> encode_binary_type
   end
 
-  def encode_binary_type(%Parameter{value: value} = param) do
+  def encode_binary_type(%Parameter{value: value}) do
     if value == nil do
       length = <<0xFF, 0xFF>>
     else
@@ -651,7 +706,7 @@ defmodule Tds.Types do
     encode_decimal_type(param)
   end
 
-  def encode_integer_type(%Parameter{value: value} = param) 
+  def encode_integer_type(%Parameter{value: value}) 
   when value >= 0 do
   attributes = []
     type = @tds_data_type_intn
@@ -662,16 +717,16 @@ defmodule Tds.Types do
       <<0x01::int8>>
     else 
       value_size = int_type_size(value)
-      cond do
-        value_size == 1 -> 
-          data_type_code = @tds_data_type_tinyint #Enum.find(data_types, fn(x) -> x[:name] == :tinyint end)
-        value_size == 2 -> 
-          data_type_code = @tds_data_type_smallint #Enum.find(data_types, fn(x) -> x[:name] == :smallint end)
-        value_size > 2 and value_size <= 4 -> 
-          data_type_code = @tds_data_type_int #Enum.find(data_types, fn(x) -> x[:name] == :int end)
-        value_size > 4 and value_size <= 8 ->
-          data_type_code = @tds_data_type_bigint #Enum.find(data_types, fn(x) -> x[:name] == :bigint end)
-      end
+      # cond do
+      #   value_size == 1 -> 
+      #     data_type_code = @tds_data_type_tinyint #Enum.find(data_types, fn(x) -> x[:name] == :tinyint end)
+      #   value_size == 2 -> 
+      #     data_type_code = @tds_data_type_smallint #Enum.find(data_types, fn(x) -> x[:name] == :smallint end)
+      #   value_size > 2 and value_size <= 4 -> 
+      #     data_type_code = @tds_data_type_int #Enum.find(data_types, fn(x) -> x[:name] == :int end)
+      #   value_size > 4 and value_size <= 8 ->
+      #     data_type_code = @tds_data_type_bigint #Enum.find(data_types, fn(x) -> x[:name] == :bigint end)
+      # end
       attributes = attributes
         |> Keyword.put(:length, value_size)
       <<value_size>>
@@ -770,70 +825,16 @@ defmodule Tds.Types do
     {type, data, precision: precision, scale: scale}
   end
 
-  def encode_datetime_type(%Parameter{} = param) do
+  def encode_datetime_type(%Parameter{}) do
     type = @tds_data_type_datetimen
     data = <<type, 0x08>>
     {type, data, []}
   end
 
-  def encode_datetime2_type(%Parameter{} = param) do
+  def encode_datetime2_type(%Parameter{}) do
     type = @tds_data_type_datetime2n
     data = <<type, 0x08>>
     {type, data, []}
-  end
-
-  def encode_data_type(%Parameter{value: value} = param) 
-  when value == true or value == false do 
-    encode_data_type(%{param | type: :boolean})
-  end
-
-  def encode_data_type(%Parameter{value: value} = param) 
-  when is_binary(value) and value == "" do 
-    encode_data_type(%{param | type: :string})
-  end
-
-  def encode_data_type(%Parameter{value: value} = param) 
-  when is_binary(value) do 
-    encode_data_type(%{param | type: :binary})
-  end
-
-  def encode_data_type(%Parameter{value: value} = param) 
-  when is_integer(value) and value >= 0 do 
-    encode_data_type(%{param | type: :integer})
-  end
-
-  def encode_data_type(%Parameter{value: value} = param) 
-  when is_float(value) do 
-    encode_data_type(%{param | type: :float})
-  end
-
-  def encode_data_type(%Parameter{value: value} = param) 
-  when (is_integer(value) and value < 0) do 
-    encode_data_type(%{param | value: Decimal.new(value), type: :decimal})
-  end
-
-  def encode_data_type(%Parameter{value: %Decimal{}} = param) do 
-    encode_data_type(%{param | type: :decimal})
-  end
-
-  def encode_data_type(%Parameter{value: %DateTime{}} = param) do
-    encode_data_type(%{param | type: :datetime})
-  end
-
-  def encode_data_type(%Parameter{value: %DateTime2{}} = param) do
-    encode_data_type(%{param | type: :datetime2})
-  end
-
-  def encode_data_type(%Parameter{value: {{_,_,_},{_,_,_}}} = param) do
-    encode_data_type(%{param | type: :datetime})
-  end
-
-  def encode_data_type(%Parameter{value: {{_,_,_},{_,_,_,0}}} = param) do
-    encode_data_type(%{param | type: :datetime})
-  end
-
-  def encode_data_type(%Parameter{value: {{_,_,_},{_,_,_,_}}} = param) do
-    encode_data_type(%{param | type: :datetime2})
   end
 
   @doc """
@@ -878,75 +879,6 @@ defmodule Tds.Types do
     end
 
     "#{name} #{desc}"
-  end
-
-  @doc """
-  Decimal Type Parameter Descriptor
-  """
-  def encode_decimal_descriptor(%Parameter{value: nil}), do: encode_binary_descriptor(nil)
-  def encode_decimal_descriptor(%Parameter{value: value} = param) when is_float(value) do 
-    param = param
-     |> Map.put(:value, Decimal.new(value))
-    encode_decimal_descriptor(param)
-  end
-
-  def encode_decimal_descriptor(%Parameter{value: %Decimal{} = dec}) do
-    d_ctx = Decimal.get_context
-    d_ctx = %{d_ctx | precision: 38}
-    Decimal.set_context d_ctx
-    value_list = dec
-      |> Decimal.abs
-      |> Decimal.to_string(:normal)
-      |> String.split(".")
-    case value_list do
-      [p,s] -> 
-        precision = String.length(p) + String.length(s); scale = String.length(s)
-      [p] -> 
-        precision = String.length(p); scale = 0
-    end
-    "decimal(#{precision}, #{scale})"
-  end
-  def encode_decimal_descriptor(%Parameter{type: :decimal, value: value} = param) do
-    encode_decimal_descriptor(%{param | value: Decimal.new()})
-  end
-
-  @doc """
-  Float Type Parameter Descriptor
-  """
-  def encode_float_descriptor(%Parameter{value: nil}), do: "decimal(1,0)"
-  def encode_float_descriptor(%Parameter{value: value} = param) when is_float(value) do
-    param = param
-     |> Map.put(:value, Decimal.new(value))
-     encode_float_descriptor(param)
-  end 
-  def encode_float_descriptor(%Parameter{value: %Decimal{} = dec}) do
-    d_ctx = Decimal.get_context
-    d_ctx = %{d_ctx | precision: 38}
-    Decimal.set_context d_ctx
-    value_list = dec
-      |> Decimal.abs
-      |> Decimal.to_string(:normal)
-      |> String.split(".")
-    case value_list do
-      [p,s] -> 
-        precision = String.length(p) + String.length(s); scale = String.length(s)
-      [p] -> 
-        precision = String.length(p)
-    end
-    "float(#{precision})"
-  end
-
-  @doc """
-  Binary Type Parameter Descriptor
-  """
-  def encode_binary_descriptor(value) when is_integer(value), do: encode_binary_descriptor(<<value>>)
-  def encode_binary_descriptor(value) do
-    if value == nil do
-      size = 1
-    else 
-      size = byte_size(value)
-    end
-    "varbinary(#{size})"
   end
 
   @doc """
@@ -1000,7 +932,7 @@ defmodule Tds.Types do
   end
 
   # Negative Integers
-  def encode_param_descriptor(%Parameter{name: name, value: value} = param) 
+  def encode_param_descriptor(%Parameter{value: value} = param) 
   when is_integer(value) and value < 0 do
     param = %{param | type: :decimal, value: Decimal.new(value)}
     encode_param_descriptor(param)
@@ -1013,15 +945,85 @@ defmodule Tds.Types do
   end
 
   # Binary
-  def encode_param_descriptor(%Parameter{name: name, value: value} = param) 
+  def encode_param_descriptor(%Parameter{value: value} = param) 
   when is_binary(value) and value == "" do
     param = %{param | type: :string}
     encode_param_descriptor(param)
   end
-  def encode_param_descriptor(%Parameter{name: name, value: value} = param) 
+
+  def encode_param_descriptor(%Parameter{value: value} = param) 
   when is_binary(value) do
     param = %{param | type: :binary}
     encode_param_descriptor(param)
+  end
+
+  @doc """
+  Decimal Type Parameter Descriptor
+  """
+  def encode_decimal_descriptor(%Parameter{value: nil}), do: encode_binary_descriptor(nil)
+  def encode_decimal_descriptor(%Parameter{value: value} = param) when is_float(value) do 
+    param = param
+     |> Map.put(:value, Decimal.new(value))
+    encode_decimal_descriptor(param)
+  end
+
+  def encode_decimal_descriptor(%Parameter{value: %Decimal{} = dec}) do
+    d_ctx = Decimal.get_context
+    d_ctx = %{d_ctx | precision: 38}
+    Decimal.set_context d_ctx
+    value_list = dec
+      |> Decimal.abs
+      |> Decimal.to_string(:normal)
+      |> String.split(".")
+    case value_list do
+      [p,s] -> 
+        precision = String.length(p) + String.length(s); scale = String.length(s)
+      [p] -> 
+        precision = String.length(p); scale = 0
+    end
+    "decimal(#{precision}, #{scale})"
+  end
+  def encode_decimal_descriptor(%Parameter{type: :decimal} = param) do
+    encode_decimal_descriptor(%{param | value: Decimal.new()})
+  end
+
+  @doc """
+  Float Type Parameter Descriptor
+  """
+  def encode_float_descriptor(%Parameter{value: nil}), do: "decimal(1,0)"
+  def encode_float_descriptor(%Parameter{value: value} = param) when is_float(value) do
+    param = param
+     |> Map.put(:value, Decimal.new(value))
+     encode_float_descriptor(param)
+  end 
+  def encode_float_descriptor(%Parameter{value: %Decimal{} = dec}) do
+    d_ctx = Decimal.get_context
+    d_ctx = %{d_ctx | precision: 38}
+    Decimal.set_context d_ctx
+    value_list = dec
+      |> Decimal.abs
+      |> Decimal.to_string(:normal)
+      |> String.split(".")
+    case value_list do
+      [p,s] -> 
+        precision = String.length(p) + String.length(s); scale = String.length(s)
+      [p] -> 
+        precision = String.length(p)
+    end
+    "float(#{precision})"
+  end
+
+  @doc """
+  Binary Type Parameter Descriptor
+  """
+  def encode_binary_descriptor(value) when is_integer(value), do: encode_binary_descriptor(<<value>>)
+  def encode_binary_descriptor(value) do
+    if value == nil do
+      size = 1
+    else 
+      size = byte_size(value)
+    end
+    "varbinary(#{size})"
   end
 
   @doc """
@@ -1131,7 +1133,7 @@ defmodule Tds.Types do
     encode_data(data_type, Decimal.new(value), attr)
   end
 
-  def encode_data(@tds_data_type_datetimen, value, attr) do
+  def encode_data(@tds_data_type_datetimen, value, _attr) do
     data = encode_datetime(value)
     if data == nil do
       <<0x00>>

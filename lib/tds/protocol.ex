@@ -79,7 +79,7 @@ defmodule Tds.Protocol do
 
   end
 
-  def message(:login, msg_login_ack(), %{opts: opts, tail: tail, opts: opts} = s) do
+  def message(:login, msg_login_ack(), %{opts: opts, opts: opts} = s) do
     
     s = %{s | opts: clean_opts(opts)}
     reply(:ok, s)

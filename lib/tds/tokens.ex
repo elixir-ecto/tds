@@ -109,7 +109,7 @@ defmodule Tds.Tokens do
       |> to_string
       |> Integer.parse
 
-    {bitmap, tail} = bitmap_list(tail, bitmap_bytes)
+    {bitmap, tail} = bitmap_list([], tail, bitmap_bytes)
     bitmap = bitmap |> Enum.reverse
     {row, tail} = decode_row_columns(tail, tokens, {}, column_count, 0, bitmap)
 
@@ -123,13 +123,13 @@ defmodule Tds.Tokens do
         <<new_value_size::unsigned-8, 
           new_value::binary-little-size(new_value_size)-unit(8), 
           old_value_size::unsigned-8, 
-          old_value::binary-little-size(old_value_size)-unit(8), 
+          _old_value::binary-little-size(old_value_size)-unit(8), 
           tail::binary>> = tail
       @tds_envtype_packetsize ->
         <<new_value_size::unsigned-8, 
           new_value::binary-little-size(new_value_size)-unit(8), 
           old_value_size::unsigned-8, 
-          old_value::binary-little-size(old_value_size)-unit(8), 
+          _old_value::binary-little-size(old_value_size)-unit(8), 
           tail::binary>> = tail
       @tds_envtype_begintrans ->
         <<value_size::unsigned-8, new_value::binary-little-size(value_size)-unit(8), 0x00, tail::binary>> = tail
@@ -196,7 +196,7 @@ defmodule Tds.Tokens do
   defp bitmap_list(bitmap, <<tail::binary>>, n) when n <= 0 do
     {bitmap, tail}
   end
-  defp bitmap_list(bitmap \\ [], <<byte::binary-size(1)-unit(8), tail::binary>>, n) when n > 0 do
+  defp bitmap_list(bitmap, <<byte::binary-size(1)-unit(8), tail::binary>>, n) when n > 0 do
     list = for <<bit::1 <- byte>>, do: bit
     bitmap_list(list ++ bitmap, tail, n - 1)
   end
@@ -210,7 +210,7 @@ defmodule Tds.Tokens do
     decode_columns(tail, [column | columns], n - 1)
   end
 
-  defp decode_column(<<_usertype::int32, _flags::int16, tail::binary>> = data) do
+  defp decode_column(<<_usertype::int32, _flags::int16, tail::binary>>) do
     {info, tail} = Types.decode_info(tail)
     {name, tail} = decode_column_name(tail)
     info = info
