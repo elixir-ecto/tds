@@ -1,3 +1,7 @@
+# v0.2.5
+* Bug Fixes
+  * Enum error when calling ATTN on server
+
 # v0.2.4
 * Bug Fixes
   * Added support for DateTimeOffset
