@@ -1,3 +1,7 @@
+# v0.2.6
+* Bug Fixes
+  * Fixed issue where messages spanning multiple packets might not finish
+
 # v0.2.5
 * Bug Fixes
   * Enum error when calling ATTN on server

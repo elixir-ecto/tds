@@ -68,6 +68,7 @@ defmodule Tds.Tokens do
       line_number: line_number,
     }
     # TODO Need to concat errors for delivery
+    # Logger.debug "SQL Error: #{inspect e}"
     {[error: e], nil}
   end
 

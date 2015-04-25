@@ -3,6 +3,8 @@ defmodule Tds.Connection do
   alias Tds.Protocol
   alias Tds.Messages
 
+  require Logger
+
   import Tds.BinaryUtils
   import Tds.Utils
 
@@ -17,7 +19,6 @@ defmodule Tds.Connection do
       |> Keyword.put_new(:instance, System.get_env("MSSQLINSTANCE"))
       |> Keyword.put_new(:hostname, System.get_env("MSSQLHOST") || "localhost")
       |> Enum.reject(fn {_k,v} -> is_nil(v) end)
-
     case GenServer.start_link(__MODULE__, []) do
       {:ok, pid} ->
         timeout = opts[:timeout] || @timeout
@@ -47,6 +48,7 @@ defmodule Tds.Connection do
   end
 
   def query(pid, statement, params, opts \\ []) do
+
     message = {:query, statement, params, opts}
     timeout = opts[:timeout] || @timeout
     call_proc(pid, message, timeout)
@@ -151,7 +153,6 @@ defmodule Tds.Connection do
     {caller, _} = from
     ref = Process.monitor(caller)
     s = update_in s.queue, &:queue.in({command, from, ref}, &1)
-
     case state do
       :ready ->
         case next(s) do
@@ -166,6 +167,7 @@ defmodule Tds.Connection do
 
 
   def handle_info({:DOWN, ref, :process, _, _}, s) do
+    Logger.debug "Caller went down"
     case :queue.out(s.queue) do
       {{:value, {_,_,^ref}}, _queue} ->
         {_, s} = command(:attn, s)
@@ -266,7 +268,9 @@ defmodule Tds.Connection do
     Protocol.send_attn(%{s |attn_timer: attn_timer_ref, pak_header: "", pak_data: "", tail: "", state: :attn})
   end
 
-  defp new_data(<<_data::0>>, s), do: {:ok, s}
+  defp new_data(<<_data::0>>, s) do
+    {:ok, s}
+  end
   defp new_data(<<0xFD, 0x20, _cur_cmd::binary(2), 0::size(8)-unit(8), _tail::binary>>, %{state: :attn} = s) do
     s = %{s | pak_header: "", pak_data: "", tail: ""}
     Protocol.message(:attn, :attn, s)
@@ -276,13 +280,12 @@ defmodule Tds.Connection do
   defp new_data(<<packet::binary>>, %{state: state, pak_data: buf_data, pak_header: buf_header, tail: tail} = s) do
     <<type::int8, status::int8, size::int16, head_rem::int32, data::binary>> = tail <> packet
     if buf_header == "" do
-
       buf_header = <<type::int8, status::int8, size::int16, head_rem::int32>>
     else
       data = tail <> packet
     end
 
-    <<type::int8, status::int8, size::int16, _head_rem::int32>> = buf_header
+    <<type::int8, status::int8, size::int16, _spid::int16, _pack_id::int8, _window::int8>> = buf_header
     size = size - 8
 
     case data do
@@ -291,11 +294,13 @@ defmodule Tds.Connection do
           1 ->
             msg = Messages.parse(state, type, buf_header, buf_data<>data)
             case Protocol.message(state, msg, s) do
-              {:ok, s} -> new_data(tail, %{s | pak_header: "", pak_data: "", tail: tail})
-              {:error, _, _} = err -> err
+              {:ok, s} -> 
+                new_data(tail, %{s | pak_header: "", pak_data: "", tail: tail})
+              {:error, _, _} = err -> 
+                err
             end
           _ ->
-            {:ok, %{s | pak_data: buf_data <> data, pak_header: "", tail: tail}}
+            new_data(tail, %{s | pak_data: buf_data <> data, pak_header: "", tail: ""})
         end
       _ ->
         {:ok, %{s | tail: tail <> data, pak_header: buf_header}}
