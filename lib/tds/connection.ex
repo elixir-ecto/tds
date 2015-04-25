@@ -3,8 +3,6 @@ defmodule Tds.Connection do
   alias Tds.Protocol
   alias Tds.Messages
 
-  require Logger
-
   import Tds.BinaryUtils
   import Tds.Utils
 
@@ -167,7 +165,6 @@ defmodule Tds.Connection do
 
 
   def handle_info({:DOWN, ref, :process, _, _}, s) do
-    Logger.debug "Caller went down"
     case :queue.out(s.queue) do
       {{:value, {_,_,^ref}}, _queue} ->
         {_, s} = command(:attn, s)
