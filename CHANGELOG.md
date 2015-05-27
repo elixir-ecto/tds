@@ -1,3 +1,7 @@
+# v0.2.7-dev
+* Enhancements
+  * Added ability to pass socket options to connect.
+
 # v0.2.6
 * Bug Fixes
   * Fixed issue where messages spanning multiple packets might not finish

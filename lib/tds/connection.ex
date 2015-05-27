@@ -119,7 +119,7 @@ defmodule Tds.Connection do
     port      = s[:itcp] || opts[:port] || System.get_env("MSSQLPORT") || 1433
     if is_binary(port), do: {port, _} = Integer.parse(port)
     timeout   = opts[:timeout] || @timeout
-    sock_opts = [{:active, :once}, :binary, {:packet, :raw}, {:delay_send, false}]
+    sock_opts = [{:active, :once}, :binary, {:packet, :raw}, {:delay_send, false}] ++ (opts[:socket_options] || [])
 
     {caller, _} = from
     ref = Process.monitor(caller)
