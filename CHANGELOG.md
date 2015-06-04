@@ -1,3 +1,5 @@
+# v0.2.8-dev
+
 # v0.2.7
 * Enhancements
   * Added ability to pass socket options to connect.
