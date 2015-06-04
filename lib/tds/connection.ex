@@ -21,19 +21,19 @@ defmodule Tds.Connection do
       {:ok, pid} ->
         timeout = opts[:timeout] || @timeout
         case opts[:instance] do
-          nil -> 
+          nil ->
             case GenServer.call(pid, {:connect, opts}, timeout) do
               :ok -> {:ok, pid}
               err -> {:error, err}
             end
           _instance ->
             case GenServer.call(pid, {:instance, opts}, timeout) do
-              :ok -> 
+              :ok ->
                 case GenServer.call(pid, {:connect, opts}, timeout) do
                   :ok -> {:ok, pid}
                   err -> {:error, err}
                 end
-              err -> 
+              err ->
                 {:error, err}
             end
         end
@@ -69,7 +69,7 @@ defmodule Tds.Connection do
   def attn(pid, opts \\ []) do
     timeout = opts[:timeout] || @timeout
     case GenServer.call(pid, :attn, timeout) do
-      %Tds.Result{} = res -> 
+      %Tds.Result{} = res ->
         {:ok, res}
       %Tds.Error{} = err  ->
         {:error, err}
@@ -84,13 +84,13 @@ defmodule Tds.Connection do
       usock: nil,
       itcp: nil,
       ireq: nil,
-      opts: nil, 
-      state: :ready, 
-      tail: "", 
+      opts: nil,
+      state: :ready,
+      tail: "",
       queue: :queue.new,
       attn_timer: nil,
-      statement: nil, 
-      pak_header: "", 
+      statement: nil,
+      pak_header: "",
       pak_data: "",
       env: %{trans: <<0x00>>}}}
   end
@@ -183,24 +183,24 @@ defmodule Tds.Connection do
     :gen_udp.close(sock)
     server = String.split(data, ";;")
       |> Enum.slice(0..-2)
-      |> Enum.reduce([], fn(str, acc) ->  
+      |> Enum.reduce([], fn(str, acc) ->
         server = String.split(str, ";")
-          |> Enum.chunk(2) 
+          |> Enum.chunk(2)
           |> Enum.reduce([], fn ([k,v], acc) ->
             k = k
               |> String.downcase
               |> String.to_atom
-            Keyword.put_new(acc, k, v) 
+            Keyword.put_new(acc, k, v)
           end)
         [server | acc]
       end)
-      |> Enum.find(fn(s) -> 
+      |> Enum.find(fn(s) ->
         String.downcase(s[:instancename]) == String.downcase(opts[:instance])
       end)
     case server do
-      nil -> 
+      nil ->
         error(%Tds.Error{message: "Instance #{opts.instance} not found"}, s)
-      serv -> 
+      serv ->
         {port, _} = Integer.parse(serv[:tcp])
         GenServer.reply(pid, :ok)
         {:noreply, %{s | opts: opts, itcp: port}}
@@ -291,9 +291,9 @@ defmodule Tds.Connection do
           1 ->
             msg = Messages.parse(state, type, buf_header, buf_data<>data)
             case Protocol.message(state, msg, s) do
-              {:ok, s} -> 
+              {:ok, s} ->
                 new_data(tail, %{s | pak_header: "", pak_data: "", tail: tail})
-              {:error, _, _} = err -> 
+              {:error, _, _} = err ->
                 err
             end
           _ ->
