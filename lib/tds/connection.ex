@@ -86,12 +86,12 @@ defmodule Tds.Connection do
       ireq: nil,
       opts: nil,
       state: :ready,
-      tail: "",
+      tail: "", #placeholder while waiting for more inbound data
       queue: :queue.new,
       attn_timer: nil,
       statement: nil,
-      pak_header: "",
-      pak_data: "",
+      pak_header: "", #current tds packet header
+      pak_data: "", #current tds message holding previous tds packets, #TODO should probably rename this
       env: %{trans: <<0x00>>}}}
   end
 
@@ -169,8 +169,6 @@ defmodule Tds.Connection do
         {:noreply, s}
     end
   end
-
-
 
   def handle_info({:DOWN, ref, :process, _, _}, s) do
     case :queue.out(s.queue) do
@@ -270,16 +268,21 @@ defmodule Tds.Connection do
   defp command(:attn, s) do
     timeout = s.opts[:timeout] || @timeout
     attn_timer_ref = :erlang.start_timer(timeout, self(), :command)
-    Protocol.send_attn(%{s |attn_timer: attn_timer_ref, pak_header: "", pak_data: "", tail: "", state: :attn})
+    Protocol.send_attn(%{s | attn_timer: attn_timer_ref, pak_header: "", pak_data: "", tail: "", state: :attn})
   end
 
+  #no data to process
   defp new_data(<<_data::0>>, s) do
     {:ok, s}
   end
+
+  #DONE_ATTN The DONE message is a server acknowledgement of a client ATTENTION message.
   defp new_data(<<0xFD, 0x20, _cur_cmd::binary(2), 0::size(8)-unit(8), _tail::binary>>, %{state: :attn} = s) do
     s = %{s | pak_header: "", pak_data: "", tail: ""}
     Protocol.message(:attn, :attn, s)
   end
+
+  #shift 8 bytes while in attention state, Protocol updates state
   defp new_data(<<_b::size(1)-unit(8), tail::binary>>, %{state: :attn} = s), do: new_data(tail, s)
 
   defp new_data(<<packet::binary>>, %{state: state, pak_data: buf_data, pak_header: buf_header, tail: tail} = s) do
