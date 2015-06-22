@@ -86,12 +86,12 @@ defmodule Tds.Connection do
       ireq: nil,
       opts: nil,
       state: :ready,
-      tail: "",
+      tail: "", #only has non-empty value when waiting for more data
       queue: :queue.new,
       attn_timer: nil,
       statement: nil,
-      pak_header: "",
-      pak_data: "",
+      pak_header: "", #current tds packet header
+      pak_data: "", #current tds message holding previous tds packets, #TODO should probably rename this
       env: %{trans: <<0x00>>}}}
   end
 
@@ -169,8 +169,6 @@ defmodule Tds.Connection do
         {:noreply, s}
     end
   end
-
-
 
   def handle_info({:DOWN, ref, :process, _, _}, s) do
     case :queue.out(s.queue) do
@@ -270,45 +268,61 @@ defmodule Tds.Connection do
   defp command(:attn, s) do
     timeout = s.opts[:timeout] || @timeout
     attn_timer_ref = :erlang.start_timer(timeout, self(), :command)
-    Protocol.send_attn(%{s |attn_timer: attn_timer_ref, pak_header: "", pak_data: "", tail: "", state: :attn})
+    Protocol.send_attn(%{s | attn_timer: attn_timer_ref, pak_header: "", pak_data: "", tail: "", state: :attn})
   end
 
+  #no data to process
   defp new_data(<<_data::0>>, s) do
     {:ok, s}
   end
+
+  #DONE_ATTN The DONE message is a server acknowledgement of a client ATTENTION message.
   defp new_data(<<0xFD, 0x20, _cur_cmd::binary(2), 0::size(8)-unit(8), _tail::binary>>, %{state: :attn} = s) do
     s = %{s | pak_header: "", pak_data: "", tail: ""}
     Protocol.message(:attn, :attn, s)
   end
+
+  #shift 8 bytes while in attention state, Protocol updates state
   defp new_data(<<_b::size(1)-unit(8), tail::binary>>, %{state: :attn} = s), do: new_data(tail, s)
 
-  defp new_data(<<packet::binary>>, %{state: state, pak_data: buf_data, pak_header: buf_header, tail: tail} = s) do
-    <<type::int8, status::int8, size::int16, head_rem::int32, data::binary>> = tail <> packet
-    if buf_header == "" do
-      buf_header = <<type::int8, status::int8, size::int16, head_rem::int32>>
+  #no packet header yet
+  defp new_data(<<data::binary>>, %{pak_header: ""} = s) do
+    if byte_size(data) >= 8 do
+      #assume incoming data starts with packet header, if it's long enough
+      <<pak_header::binary(8), tail::binary>> = data
+      new_data(tail, %{s | pak_header: pak_header})
     else
-      data = tail <> packet
+      #have no packet header yet, wait for more data
+      {:ok, %{s | tail: data}}
     end
+  end
 
-    <<type::int8, status::int8, size::int16, _spid::int16, _pack_id::int8, _window::int8>> = buf_header
-    size = size - 8
+  defp new_data(<<data::binary>>, %{state: state, pak_header: pak_header, pak_data: pak_data} = s) do
+    <<type::int8, status::int8, size::int16, _head_rem::int32>> = pak_header
+    size = size - 8 #size includes packet header
 
     case data do
-      <<data :: binary(size), tail :: binary>> ->
+      <<data::binary(size), tail::binary>> ->
+        #satisfied size specified in packet header
         case status do
           1 ->
-            msg = Messages.parse(state, type, buf_header, buf_data<>data)
+            #status 1 means last packet of message
+            #TODO Messages.parse does not use pak_header
+            msg = Messages.parse(state, type, pak_header, pak_data <> data)
             case Protocol.message(state, msg, s) do
               {:ok, s} ->
-                new_data(tail, %{s | pak_header: "", pak_data: "", tail: tail})
+                #message processed, reset header and msg buffer, then process tail
+                new_data(tail, %{s | pak_header: "", pak_data: ""})
               {:error, _, _} = err ->
                 err
             end
           _ ->
-            new_data(tail, %{s | pak_data: buf_data <> data, pak_header: "", tail: ""})
+            #not the last packet of message, more packets coming with new packet header
+            new_data(tail, %{s | pak_header: "", pak_data: pak_data <> data})
         end
       _ ->
-        {:ok, %{s | tail: tail <> data, pak_header: buf_header}}
+        #size specified in packet header still unsatisfied, wait for more data
+        {:ok, %{s | tail: data, pak_header: pak_header}}
     end
   end
 
