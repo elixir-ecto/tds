@@ -1,4 +1,6 @@
-# v0.2.8-dev
+# v0.2.8
+* Bug Fixes
+  * Fixed issue where tail would time out queries randomly
 
 # v0.2.7
 * Enhancements
