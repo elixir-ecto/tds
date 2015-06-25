@@ -121,16 +121,16 @@ defmodule Tds.Tokens do
   defp decode_token(<<@tds_token_envchange, _length::little-unsigned-16, env_type::unsigned-8, tail::binary>>, tokens) do
     token = case env_type do
       @tds_envtype_database ->
-        <<new_value_size::unsigned-8, 
-          new_value::binary-little-size(new_value_size)-unit(8), 
-          old_value_size::unsigned-8, 
-          _old_value::binary-little-size(old_value_size)-unit(8), 
+        <<new_value_size::unsigned-8,
+          new_value::binary-little-size(new_value_size)-unit(8),
+          old_value_size::unsigned-8,
+          _old_value::binary-little-size(old_value_size)-unit(8),
           tail::binary>> = tail
       @tds_envtype_packetsize ->
-        <<new_value_size::unsigned-8, 
-          new_value::binary-little-size(new_value_size)-unit(8), 
-          old_value_size::unsigned-8, 
-          _old_value::binary-little-size(old_value_size)-unit(8), 
+        <<new_value_size::unsigned-8,
+          new_value::binary-little-size(new_value_size)-unit(8),
+          old_value_size::unsigned-8,
+          _old_value::binary-little-size(old_value_size)-unit(8),
           tail::binary>> = tail
       @tds_envtype_begintrans ->
         <<value_size::unsigned-8, new_value::binary-little-size(value_size)-unit(8), 0x00, tail::binary>> = tail
@@ -148,8 +148,8 @@ defmodule Tds.Tokens do
   ## DONE
   defp decode_token(<<@tds_token_done, status::int16, cur_cmd::binary(2), row_count::little-size(8)-unit(8), _tail::binary>>, tokens) do
     case tokens do
-      [done: done] -> 
-        
+      [done: done] ->
+
         cond do
           row_count > done.rows -> {[done: %{status: status, cmd: cur_cmd, rows: row_count}] ++ tokens, nil}
           true -> {tokens, nil}
@@ -162,7 +162,7 @@ defmodule Tds.Tokens do
   ## DONEPROC
   defp decode_token(<<@tds_token_doneproc, status::int16, cur_cmd::binary(2), row_count::little-size(8)-unit(8), _tail::binary>>, tokens) do
     case tokens do
-      [done: done] -> 
+      [done: done] ->
         cond do
           row_count > done.rows -> {[done: %{status: status, cmd: cur_cmd, rows: row_count}] ++ tokens, nil}
           true -> {tokens, nil}
@@ -175,7 +175,7 @@ defmodule Tds.Tokens do
   ## DONEINPROC
   defp decode_token(<<@tds_token_doneinproc, status::int16, cur_cmd::binary(2), row_count::little-size(8)-unit(8), _something::binary-size(5), _tail::binary>>, tokens) do
     case tokens do
-      [done: done] -> 
+      [done: done] ->
         cond do
           row_count > done.rows -> {[done: %{status: status, cmd: cur_cmd, rows: row_count}] ++ tokens, nil}
           true -> {tokens, nil}
@@ -185,7 +185,7 @@ defmodule Tds.Tokens do
     end
   end
 
-  defp decode_column_order(<<tail::binary>>, n, columns) when n == 0 do 
+  defp decode_column_order(<<tail::binary>>, n, columns) when n == 0 do
     {columns, tail}
   end
   defp decode_column_order(<<col_id::little-unsigned-16, tail::binary>>, n, columns) do

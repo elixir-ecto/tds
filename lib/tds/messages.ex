@@ -89,7 +89,7 @@ defmodule Tds.Messages do
   def parse(:executing, @tds_pack_reply, _header, tail) do
     tokens = []
     tokens = decode_tokens(tail, tokens)
-    
+
     case tokens do
       [error: error] ->
         msg_error(e: error)
@@ -100,12 +100,12 @@ defmodule Tds.Messages do
     end
   end
 
-  
+
 
   ## Encoders
 
   def encode_msg(msg, env) do
-    encode(msg, env) 
+    encode(msg, env)
   end
 
   defp encode(msg_prelogin(params: _params), _env) do
@@ -227,7 +227,7 @@ defmodule Tds.Messages do
   defp encode(msg_sql(query: q), %{trans: trans}) do
     #convert query to unicodestream
     q_ucs = to_little_ucs2(q)
-    
+
     #Transaction Descriptor header
     header_type = <<2::little-size(2)-unit(8)>>
     trans_size = byte_size(trans)
@@ -275,7 +275,7 @@ defmodule Tds.Messages do
   end
 
   # Finished processing params
-  defp encode_rpc_params([], ret), do: ret 
+  defp encode_rpc_params([], ret), do: ret
   defp encode_rpc_params([%Tds.Parameter{} = param | tail], ret) do
     p = encode_rpc_param(param)
     encode_rpc_params(tail, ret <> p)
@@ -309,7 +309,7 @@ defmodule Tds.Messages do
     Enum.reverse paks
   end
   defp encode_packets(type, <<data::binary-size(@tds_pack_data_size)-unit(8), tail::binary>>, paks) do
-    status = 
+    status =
     if byte_size(tail) > 0, do: 0, else: 1
     header = encode_header(type, data, id: length(paks)+1, status: status)
     encode_packets(type, tail, [header <> data | paks])

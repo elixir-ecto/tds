@@ -139,7 +139,7 @@ defmodule Tds.Types do
     {%{data_type: :fixed, data_type_code: data_type_code, length: length},tail}
   end
 
-  def decode_info(<<data_type_code::unsigned-8, tail::binary>>) when data_type_code in @variable_data_types do  
+  def decode_info(<<data_type_code::unsigned-8, tail::binary>>) when data_type_code in @variable_data_types do
     col_info = %{data_type: :variable, data_type_code: data_type_code}
     cond do
       data_type_code == @tds_data_type_daten ->
@@ -188,7 +188,7 @@ defmodule Tds.Types do
         @tds_data_type_varchar,
         @tds_data_type_binary,
         @tds_data_type_varbinary
-      ] -> 
+      ] ->
         <<length::little-unsigned-8, tail::binary>> = tail
         if data_type_code in [
             @tds_data_type_numericn,
@@ -245,7 +245,7 @@ defmodule Tds.Types do
         @tds_data_type_text,
         @tds_data_type_image,
         @tds_data_type_ntext,
-        @tds_data_type_variant 
+        @tds_data_type_variant
       ] ->
         <<length::signed-32, tail::binary>> = tail
         col_info = col_info
@@ -258,7 +258,7 @@ defmodule Tds.Types do
               |> Map.put(:collation, collation)
               |> Map.put(:data_reader, :longlen)
             <<numparts::signed-8, tail::binary>> = tail
-            tail = 
+            tail =
             Enum.reduce([1..numparts], tail, fn(_, acc) ->
               <<tsize::little-unsigned-16, _table_name::binary-size(tsize)-unit(16), tail::binary>> = acc
               tail
@@ -267,7 +267,7 @@ defmodule Tds.Types do
             # TODO NumBarts Reader
             <<numparts::signed-8, tail::binary>> = tail
             tail =
-            Enum.reduce([1..numparts], tail, fn(_, acc) ->  
+            Enum.reduce([1..numparts], tail, fn(_, acc) ->
               <<size::unsigned-16, _str::size(size)-unit(16), tail::binary>> = acc
               tail
             end)
@@ -291,9 +291,9 @@ defmodule Tds.Types do
   def decode_data(%{data_type: :fixed, data_type_code: data_type_code, length: length}, <<tail::binary>>) do
     <<value_binary::binary-size(length)-unit(8), tail::binary>> = tail
     value = case data_type_code do
-      @tds_data_type_null -> 
+      @tds_data_type_null ->
         nil
-      @tds_data_type_bit -> 
+      @tds_data_type_bit ->
         value_binary != <<0x00>>
       @tds_data_type_smalldatetime -> decode_smalldatetime(value_binary)
       @tds_data_type_smallmoney -> decode_smallmoney(value_binary)
@@ -301,7 +301,7 @@ defmodule Tds.Types do
         <<value::little-float-32>> = value_binary
         Float.round value, 4
       @tds_data_type_datetime -> decode_datetime(value_binary)
-      @tds_data_type_float -> 
+      @tds_data_type_float ->
         <<value::little-float-64>> = value_binary
         Float.round value, 8
       @tds_data_type_money -> decode_money(value_binary)
@@ -341,9 +341,9 @@ defmodule Tds.Types do
         data_type_code == @tds_data_type_floatn ->
           data = data <> tail
           case length do
-            4 -> 
+            4 ->
               <<value::little-float-32, tail::binary>> = data
-            8 -> 
+            8 ->
               <<value::little-float-64, tail::binary>> = data
           end
           value
@@ -396,7 +396,7 @@ defmodule Tds.Types do
 
   def decode_data(%{data_reader: :longlen}, <<0x00, tail::binary>>), do: {nil, tail}
   def decode_data(%{data_type_code: data_type_code, data_reader: :longlen} = data_info, <<text_ptr_size::unsigned-8, _text_ptr::size(text_ptr_size)-unit(8), _timestamp::unsigned-64, size::little-signed-32, data::binary-size(size)-unit(8), tail::binary>>) do
-    value = 
+    value =
     case data_type_code do
       @tds_data_type_text -> decode_char(data_info[:collation], data)
       @tds_data_type_ntext -> decode_nchar(data)
@@ -410,7 +410,7 @@ defmodule Tds.Types do
 
   def decode_data(%{data_reader: :plp}, <<@tds_plp_null, tail::binary>>), do: {nil, tail}
   def decode_data(%{data_type_code: data_type_code, data_reader: :plp} = data_info, <<_size::little-unsigned-64, tail::binary>>) do
-    {data, tail} = decode_plp_chunk(tail, <<>>)    
+    {data, tail} = decode_plp_chunk(tail, <<>>)
     value = cond do
       data_type_code == @tds_data_type_xml ->
         decode_xml(data_info, data)
@@ -453,7 +453,7 @@ defmodule Tds.Types do
     money = pow10(money,(4 * -1))
     Float.round money, 4
   end
-  
+
   def decode_datetime(<<days::little-signed-32, sec::little-unsigned-32>>) do
     date = Date.shift(@datetime, days: days)
     date = Date.shift(date, secs: (sec/300))
@@ -544,7 +544,7 @@ defmodule Tds.Types do
     Decimal.set_context d_ctx
     d = Decimal.new pow10(value,(scale * -1))
     value = pow10(d.coef, d.exp)
-    value = 
+    value =
     case sign do
       0 -> value * -1
       _ -> value
@@ -566,7 +566,7 @@ defmodule Tds.Types do
   end
 
   def decode_udt(%{}, <<_data::binary>>) do
-    # TODO: Decode UDT Data 
+    # TODO: Decode UDT Data
     nil
   end
 
@@ -588,37 +588,37 @@ defmodule Tds.Types do
     end
   end
 
-  def encode_data_type(%Parameter{value: value} = param) 
-  when value == true or value == false do 
+  def encode_data_type(%Parameter{value: value} = param)
+  when value == true or value == false do
     encode_data_type(%{param | type: :boolean})
   end
 
-  def encode_data_type(%Parameter{value: value} = param) 
-  when is_binary(value) and value == "" do 
+  def encode_data_type(%Parameter{value: value} = param)
+  when is_binary(value) and value == "" do
     encode_data_type(%{param | type: :string})
   end
 
-  def encode_data_type(%Parameter{value: value} = param) 
-  when is_binary(value) do 
+  def encode_data_type(%Parameter{value: value} = param)
+  when is_binary(value) do
     encode_data_type(%{param | type: :binary})
   end
 
-  def encode_data_type(%Parameter{value: value} = param) 
-  when is_integer(value) and value >= 0 do 
+  def encode_data_type(%Parameter{value: value} = param)
+  when is_integer(value) and value >= 0 do
     encode_data_type(%{param | type: :integer})
   end
 
-  def encode_data_type(%Parameter{value: value} = param) 
-  when is_float(value) do 
+  def encode_data_type(%Parameter{value: value} = param)
+  when is_float(value) do
     encode_data_type(%{param | type: :float})
   end
 
-  def encode_data_type(%Parameter{value: value} = param) 
-  when (is_integer(value) and value < 0) do 
+  def encode_data_type(%Parameter{value: value} = param)
+  when (is_integer(value) and value < 0) do
     encode_data_type(%{param | value: Decimal.new(value), type: :decimal})
   end
 
-  def encode_data_type(%Parameter{value: %Decimal{}} = param) do 
+  def encode_data_type(%Parameter{value: %Decimal{}} = param) do
     encode_data_type(%{param | type: :decimal})
   end
 
@@ -642,13 +642,13 @@ defmodule Tds.Types do
     encode_data_type(%{param | type: :datetime2})
   end
 
-  def encode_binary_type(%Parameter{value: value} = param) 
+  def encode_binary_type(%Parameter{value: value} = param)
   when value == "" do
    encode_string_type(param)
   end
 
-  def encode_binary_type(%Parameter{value: value} = param) 
-  when is_integer(value) do 
+  def encode_binary_type(%Parameter{value: value} = param)
+  when is_integer(value) do
     %{param | value: <<value>>} |> encode_binary_type
   end
 
@@ -681,9 +681,9 @@ defmodule Tds.Types do
   end
 
   def encode_string_type(%Parameter{value: value}) do
-    
+
     collation = <<0x00, 0x00, 0x00, 0x00, 0x00>>
-    length = 
+    length =
     if value != nil do
       value = value |> to_little_ucs2
       value_size = byte_size(value)
@@ -701,12 +701,12 @@ defmodule Tds.Types do
     {type, data, [collation: collation]}
   end
 
-  def encode_integer_type(%Parameter{value: value} = param) 
+  def encode_integer_type(%Parameter{value: value} = param)
   when value < 0 do
     encode_decimal_type(param)
   end
 
-  def encode_integer_type(%Parameter{value: value}) 
+  def encode_integer_type(%Parameter{value: value})
   when value >= 0 do
   attributes = []
     type = @tds_data_type_intn
@@ -715,14 +715,14 @@ defmodule Tds.Types do
       attributes = attributes
         |> Keyword.put(:length, 1)
       <<0x01::int8>>
-    else 
+    else
       value_size = int_type_size(value)
       # cond do
-      #   value_size == 1 -> 
+      #   value_size == 1 ->
       #     data_type_code = @tds_data_type_tinyint #Enum.find(data_types, fn(x) -> x[:name] == :tinyint end)
-      #   value_size == 2 -> 
+      #   value_size == 2 ->
       #     data_type_code = @tds_data_type_smallint #Enum.find(data_types, fn(x) -> x[:name] == :smallint end)
-      #   value_size > 2 and value_size <= 4 -> 
+      #   value_size > 2 and value_size <= 4 ->
       #     data_type_code = @tds_data_type_int #Enum.find(data_types, fn(x) -> x[:name] == :int end)
       #   value_size > 4 and value_size <= 8 ->
       #     data_type_code = @tds_data_type_bigint #Enum.find(data_types, fn(x) -> x[:name] == :bigint end)
@@ -737,7 +737,7 @@ defmodule Tds.Types do
 
   def encode_decimal_type(%Parameter{value: nil} = param) do
     encode_binary_type(param)
-  end 
+  end
   def encode_decimal_type(%Parameter{value: value}) do
     d_ctx = Decimal.get_context
     d_ctx = %{d_ctx | precision: 38}
@@ -747,29 +747,29 @@ defmodule Tds.Types do
       |> Decimal.to_string(:normal)
       |> String.split(".")
     case value_list do
-      [p,s] -> 
+      [p,s] ->
         precision = String.length(p) + String.length(s); scale = String.length(s)
-      [p] -> 
+      [p] ->
         precision = String.length(p); scale = 0
     end
 
-    dec_abs = value 
-      |> Decimal.abs 
-    value = dec_abs.coef  
+    dec_abs = value
+      |> Decimal.abs
+    value = dec_abs.coef
       |> :binary.encode_unsigned(:little)
     value_size = byte_size(value)
-    
+
     padding = cond do
       precision <= 9 ->
-        byte_len = 4 
+        byte_len = 4
         byte_len - value_size
-      precision <= 19 -> 
+      precision <= 19 ->
         byte_len = 8
         byte_len - value_size
-      precision <= 28 -> 
+      precision <= 28 ->
         byte_len = 12
         byte_len - value_size
-      precision <= 38 -> 
+      precision <= 38 ->
         byte_len = 16
         byte_len - value_size
     end
@@ -797,23 +797,23 @@ defmodule Tds.Types do
       |> Decimal.to_string(:normal)
       |> String.split(".")
     case value_list do
-      [p,s] -> 
+      [p,s] ->
         precision = String.length(p) + String.length(s); scale = String.length(s)
-      [p] -> 
+      [p] ->
         precision = String.length(p); scale = 0
     end
 
-    dec_abs = value 
-      |> Decimal.abs 
-    value = dec_abs.coef  
+    dec_abs = value
+      |> Decimal.abs
+    value = dec_abs.coef
       |> :binary.encode_unsigned(:little)
     value_size = byte_size(value)
-    
+
     padding = cond do
       precision <= 9 ->
-        byte_len = 4 
+        byte_len = 4
         byte_len - value_size
-      precision <= 19 -> 
+      precision <= 19 ->
         byte_len = 8
         byte_len - value_size
     end
@@ -846,7 +846,7 @@ defmodule Tds.Types do
       :datetime -> "datetime"
       :datetime2 -> "datetime2"
       :binary -> encode_binary_descriptor(value)
-      :string -> 
+      :string ->
         if value == nil do
           length = 0
         else
@@ -855,19 +855,19 @@ defmodule Tds.Types do
         if length <= 0, do: length = 1
         if length > 4000, do: length = "max"
         "nvarchar(#{length})"
-      :integer -> 
+      :integer ->
         if value >= 0 do
           "bigint"
         else
-          precision = value 
+          precision = value
             |> Integer.to_string
             |> String.length
           "decimal(#{precision-1}, 0)"
-        end 
+        end
       :decimal -> encode_decimal_descriptor(param)
       :float -> encode_float_descriptor(param)
       :boolean -> "bit"
-      _ -> 
+      _ ->
         if value == nil do
           length = 0
         else
@@ -886,12 +886,13 @@ defmodule Tds.Types do
   """
   # nil
   def encode_param_descriptor(%Parameter{value: nil} = param) do
+    #Logger.debug "Param Descriptor nil"
     param = %{param | type: :boolean}
     encode_param_descriptor(param)
   end
 
   # Boolean
-  def encode_param_descriptor(%Parameter{value: value} = param) 
+  def encode_param_descriptor(%Parameter{value: value} = param)
   when value == true or value == false do
     param = %{param | type: :boolean}
     encode_param_descriptor(param)
@@ -913,26 +914,27 @@ defmodule Tds.Types do
     encode_param_descriptor(param)
   end
   def encode_param_descriptor(%Parameter{value: {{_,_,_},{_,_,_,_}}} = param) do
+    #Logger.debug "Param Descriptor datetime2"
     param = %{param | type: :datetime2}
     encode_param_descriptor(param)
   end
 
   # Positive Integers
-  def encode_param_descriptor(%Parameter{value: value} = param) 
+  def encode_param_descriptor(%Parameter{value: value} = param)
   when is_integer(value) and value >= 0 do
     param = %{param | type: :integer}
     encode_param_descriptor(param)
   end
 
   # Float
-  def encode_param_descriptor(%Parameter{value: value} = param) 
-  when is_float(value) do 
+  def encode_param_descriptor(%Parameter{value: value} = param)
+  when is_float(value) do
     param = %{param | type: :float}
     encode_param_descriptor(param)
   end
 
   # Negative Integers
-  def encode_param_descriptor(%Parameter{value: value} = param) 
+  def encode_param_descriptor(%Parameter{value: value} = param)
   when is_integer(value) and value < 0 do
     param = %{param | type: :decimal, value: Decimal.new(value)}
     encode_param_descriptor(param)
@@ -945,13 +947,14 @@ defmodule Tds.Types do
   end
 
   # Binary
-  def encode_param_descriptor(%Parameter{value: value} = param) 
+  def encode_param_descriptor(%Parameter{value: value} = param)
   when is_binary(value) and value == "" do
+    #Logger.debug "Param Descriptor String"
     param = %{param | type: :string}
     encode_param_descriptor(param)
   end
 
-  def encode_param_descriptor(%Parameter{value: value} = param) 
+  def encode_param_descriptor(%Parameter{value: value} = param)
   when is_binary(value) do
     param = %{param | type: :binary}
     encode_param_descriptor(param)
@@ -961,7 +964,7 @@ defmodule Tds.Types do
   Decimal Type Parameter Descriptor
   """
   def encode_decimal_descriptor(%Parameter{value: nil}), do: encode_binary_descriptor(nil)
-  def encode_decimal_descriptor(%Parameter{value: value} = param) when is_float(value) do 
+  def encode_decimal_descriptor(%Parameter{value: value} = param) when is_float(value) do
     param = param
      |> Map.put(:value, Decimal.new(value))
     encode_decimal_descriptor(param)
@@ -976,9 +979,9 @@ defmodule Tds.Types do
       |> Decimal.to_string(:normal)
       |> String.split(".")
     case value_list do
-      [p,s] -> 
+      [p,s] ->
         precision = String.length(p) + String.length(s); scale = String.length(s)
-      [p] -> 
+      [p] ->
         precision = String.length(p); scale = 0
     end
     "decimal(#{precision}, #{scale})"
@@ -995,7 +998,7 @@ defmodule Tds.Types do
     param = param
      |> Map.put(:value, Decimal.new(value))
      encode_float_descriptor(param)
-  end 
+  end
   def encode_float_descriptor(%Parameter{value: %Decimal{} = dec}) do
     d_ctx = Decimal.get_context
     d_ctx = %{d_ctx | precision: 38}
@@ -1005,9 +1008,9 @@ defmodule Tds.Types do
       |> Decimal.to_string(:normal)
       |> String.split(".")
     case value_list do
-      [p,s] -> 
+      [p,s] ->
         precision = String.length(p) + String.length(s); scale = String.length(s)
-      [p] -> 
+      [p] ->
         precision = String.length(p)
     end
     "float(#{precision})"
@@ -1020,7 +1023,7 @@ defmodule Tds.Types do
   def encode_binary_descriptor(value) do
     if value == nil do
       size = 1
-    else 
+    else
       size = byte_size(value)
     end
     "varbinary(#{size})"
@@ -1029,8 +1032,8 @@ defmodule Tds.Types do
   @doc """
   Data Encoding Binary Types
   """
-  def encode_data(@tds_data_type_bigvarbinary = data_type, value, attr) 
-  when is_integer(value), 
+  def encode_data(@tds_data_type_bigvarbinary = data_type, value, attr)
+  when is_integer(value),
     do: encode_data(data_type, <<value>>, attr)
 
   def encode_data(@tds_data_type_bigvarbinary, value, _) do
@@ -1050,7 +1053,7 @@ defmodule Tds.Types do
     else
       value = value |> to_little_ucs2
       value_size = byte_size(value)
-      
+
       cond do
         value_size == 0 ->
           <<0x00::unsigned-64, 0x00::unsigned-32>>
@@ -1096,28 +1099,28 @@ defmodule Tds.Types do
     Decimal.set_context d_ctx
     precision = attr[:precision]
     d = value
-      |> Decimal.to_string 
+      |> Decimal.to_string
       |> Decimal.new
     sign = case d.sign do 1 -> 1; -1 -> 0 end
-    
+
     d_abs = Decimal.abs d
 
     value = d_abs.coef
 
-    value_binary = value  
+    value_binary = value
       |> :binary.encode_unsigned(:little)
     value_size = byte_size(value_binary)
     padding = cond do
       precision <= 9 ->
-        byte_len = 4 
+        byte_len = 4
         byte_len - value_size
-      precision <= 19 -> 
+      precision <= 19 ->
         byte_len = 8
         byte_len - value_size
-      precision <= 28 -> 
+      precision <= 28 ->
         byte_len = 12
         byte_len - value_size
-      precision <= 38 -> 
+      precision <= 38 ->
         byte_len = 16
         byte_len - value_size
     end
@@ -1140,7 +1143,6 @@ defmodule Tds.Types do
     else
       <<0x08>> <> data
     end
-    
   end
 
 
@@ -1151,20 +1153,20 @@ defmodule Tds.Types do
     if value != nil do
       <<
        p1::binary-size(1),
-       p2::binary-size(1), 
-       p3::binary-size(1), 
-       p4::binary-size(1), 
-       p5::binary-size(1), 
-       p6::binary-size(1), 
-       p7::binary-size(1), 
-       p8::binary-size(1), 
-       p9::binary-size(1), 
-       p10::binary-size(1), 
-       p11::binary-size(1), 
-       p12::binary-size(1), 
-       p13::binary-size(1), 
-       p14::binary-size(1), 
-       p15::binary-size(1), 
+       p2::binary-size(1),
+       p3::binary-size(1),
+       p4::binary-size(1),
+       p5::binary-size(1),
+       p6::binary-size(1),
+       p7::binary-size(1),
+       p8::binary-size(1),
+       p9::binary-size(1),
+       p10::binary-size(1),
+       p11::binary-size(1),
+       p12::binary-size(1),
+       p13::binary-size(1),
+       p14::binary-size(1),
+       p15::binary-size(1),
        p16::binary-size(1)>> = value
 
       # <<v1::little-signed-32>> = p4 <> p3 <> p2 <>p1
@@ -1178,7 +1180,7 @@ defmodule Tds.Types do
     else
       <<0x00>>
     end
-    
+
   end
 
   def encode_plp(data) do

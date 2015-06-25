@@ -57,7 +57,7 @@ defmodule Tds.Utils do
   end
 
   def ready(%{queue: queue} = s) do
-    queue = 
+    queue =
       case :queue.out(queue) do
       {{:value, {_, _, ref}}, q} ->
         Process.demonitor(ref)
