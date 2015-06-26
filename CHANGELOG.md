@@ -1,4 +1,7 @@
-# v0.2.9-dev
+# v0.3.0
+* Enhancements
+  * Added parameter encoding support for datetime2
+  * Removed dependency on Timex
 
 # v0.2.8
 * Bug Fixes
