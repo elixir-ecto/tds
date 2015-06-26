@@ -463,7 +463,7 @@ defmodule Tds.Types do
     #Logger.debug "#{inspect date}"
     #Logger.debug "#{inspect secs300}"
     {_, {h, m, s}} = trunc(secs300 / 300) |> :calendar.seconds_to_daystime
-    {date, {h, m, s, 0}}
+    {date, {h, m, s}}
   end
 
   def encode_datetime({date, {h,m,s,_}}), do: encode_datetime({date, {h,m,s}})

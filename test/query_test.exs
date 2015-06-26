@@ -21,20 +21,20 @@ defmodule QueryTest do
     query("DROP TABLE FixedLength", [])
     query("""
       CREATE TABLE FixedLength (
-        TinyInt tinyint, 
-        Bit bit, 
-        SmallInt smallint, 
-        Int int, 
-        SmallDateTime smalldatetime, 
-        Real real, 
-        Money money, 
-        DateTime datetime, 
-        Float float, 
-        SmallMoney smallmoney, 
+        TinyInt tinyint,
+        Bit bit,
+        SmallInt smallint,
+        Int int,
+        SmallDateTime smalldatetime,
+        Real real,
+        Money money,
+        DateTime datetime,
+        Float float,
+        SmallMoney smallmoney,
         BitInt bigint)
       """, [])
     query("INSERT INTO FixedLength VALUES(1, 0, 12, 100, '2014-01-10T12:30:00', 0.5, '$-40,532.5367', '2014-01-11T11:34:25', 5.6, '$6.3452', 1000)", []);
-    assert [{1, false, 12, 100, {{2014, 01, 10},{12, 30, 00, 0}}, 0.5, -40532.5367, {{2014, 01, 11},{11, 34, 25, 0}}, 5.6, 6.3452 , 1000}] = query("SELECT TOP(1) * FROM FixedLength", [])
+    assert [{1, false, 12, 100, {{2014, 01, 10},{12, 30}}, 0.5, -40532.5367, {{2014, 01, 11},{11, 34, 25}}, 5.6, 6.3452 , 1000}] = query("SELECT TOP(1) * FROM FixedLength", [])
     query("DROP TABLE FixedLength", [])
   end
 
@@ -44,7 +44,7 @@ defmodule QueryTest do
     assert [{1, 1}] = query("SELECT 1, 1", [])
     assert [{-1}] = query("SELECT -1", [])
     assert [{10000000000000}] = query("select CAST(10000000000000 AS bigint)", [])
-    
+
     assert [{"string"}] = query("SELECT 'string'", [])
     assert [{"ẽstring"}] = query("SELECT N'ẽstring'", [])
     assert [{true, false}] = query("SELECT CAST(1 AS BIT), CAST(0 AS BIT)", [])
