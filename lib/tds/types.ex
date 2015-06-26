@@ -1,19 +1,17 @@
 defmodule Tds.Types do
-
+  #require Logger
   import Tds.BinaryUtils
   import Tds.Utils
 
-  alias Timex.Date
   alias Tds.Parameter
   alias Tds.DateTime
   alias Tds.DateTime2
 
-  @gd_epoch :calendar.date_to_gregorian_days({2000, 1, 1})
-  @gs_epoch :calendar.datetime_to_gregorian_seconds({{2000, 1, 1}, {0, 0, 0}})
-  @datetime Date.from {{1900, 1, 1}, {0, 0, 0}}
+  @year_1900_days :calendar.date_to_gregorian_days({1900,1,1})
   @days_in_month 30
-  @secs_in_day 24 * 60 * 60
-  @numeric_base 10_000
+  @secs_in_min 60
+  @secs_in_hour 60 * @secs_in_min
+  @secs_in_day 24 * @secs_in_hour
 
   @tds_data_type_null           0x1F
   @tds_data_type_tinyint        0x30
@@ -45,8 +43,8 @@ defmodule Tds.Types do
 
   @tds_data_type_uniqueidentifier 0x24
   @tds_data_type_intn             0x26
-  @tds_data_type_decimal          0x37
-  @tds_data_type_numeric          0x3F
+  @tds_data_type_decimal          0x37 #legacy
+  @tds_data_type_numeric          0x3F #legacy
   @tds_data_type_bitn             0x68
   @tds_data_type_decimaln         0x6A
   @tds_data_type_numericn         0x6C
@@ -205,7 +203,7 @@ defmodule Tds.Types do
       data_type_code == @tds_data_type_xml ->
         <<schema::unsigned-8, tail::binary>> = tail
         if schema == 1 do
-          # TODO
+          # TODO should stick a raise in here??
           # BVarChar dbname
           # BVarChar owning schema
           # USVarChar xml schema collection
@@ -444,9 +442,15 @@ defmodule Tds.Types do
   end
 
   def decode_smalldatetime(<<days::little-unsigned-16, mins::little-unsigned-16>>) do
-    date = Date.shift(@datetime, days: days)
-     |> Date.shift(mins: mins)
-     {{date.year, date.month, date.day},{date.hour, date.minute, date.second, 0}}
+    date = :calendar.gregorian_days_to_date(@year_1900_days + days)
+    hour = mins / 60 |> trunc
+    min = mins -  (hour * 60) |> trunc
+    {date, {hour, min}}
+  end
+  def encode_smalldatetime({date, {hour, min}}) do
+    days = :calendar.date_to_gregorian_days(date) - @year_1900_days
+    mins = hour * 60 + min
+    <<days::little-unsigned-16, mins::little-unsigned-16>>
   end
 
   def decode_smallmoney(<<money::little-signed-32>>) do
@@ -454,20 +458,19 @@ defmodule Tds.Types do
     Float.round money, 4
   end
 
-  def decode_datetime(<<days::little-signed-32, sec::little-unsigned-32>>) do
-    date = Date.shift(@datetime, days: days)
-    date = Date.shift(date, secs: (sec/300))
-    {{date.year, date.month, date.day}, {date.hour, date.minute, date.second, 0}}
+  def decode_datetime(<<days::little-signed-32, secs300::little-unsigned-32>>) do
+    date = :calendar.gregorian_days_to_date(@year_1900_days + days)
+    #Logger.debug "#{inspect date}"
+    #Logger.debug "#{inspect secs300}"
+    {_, {h, m, s}} = trunc(secs300 / 300) |> :calendar.seconds_to_daystime
+    {date, {h, m, s, 0}}
   end
 
-  def encode_datetime({{y,m,d},{h,mm,s,0}}), do: encode_datetime(Date.from {{y,m,d},{h,mm,s}})
-  def encode_datetime({{_,_,_},{_,_,_}} = date), do: encode_datetime(Date.from date)
-  def encode_datetime(%Timex.DateTime{} = date) do
-    days = Date.diff @datetime, date, :days
-    d = Date.shift(@datetime, days: days)
-    sec = Date.diff d, date, :secs
-    sec = sec*300
-    <<days::little-signed-32, sec::little-unsigned-32>>
+  def encode_datetime({date, {h,m,s,_}}), do: encode_datetime({date, {h,m,s}})
+  def encode_datetime({date, {h,m,s}}) do
+    days = :calendar.date_to_gregorian_days(date) - @year_1900_days
+    secs300 = (h * @secs_in_hour + m * @secs_in_min + s) * 300
+    <<days::little-signed-32, secs300::little-unsigned-32>>
   end
   def encode_datetime(nil) do
 
@@ -478,6 +481,7 @@ defmodule Tds.Types do
     Float.round money, 4
   end
 
+  #Time
   def decode_time(scale, <<time::binary>>) do
     cond do
       scale in [1, 2] ->
@@ -488,22 +492,55 @@ defmodule Tds.Types do
         <<time::little-unsigned-40>> = time
     end
 
-    usec = time
-      |> pow10(7-scale)
-    hour = Float.floor(usec / 10000000 / 60 / 60)
-      |> trunc
-    usec = usec - (hour * 60 * 60 * 10000000)
-    min = Float.floor(usec / 10000000 / 60)
-      |> trunc
-    usec = usec - (min * 60 * 10000000)
-    sec = Float.floor(usec / 10000000)
-      |> trunc
-    usec = usec - (sec * 10000000)
+    in_one_sec = :math.pow(10, scale) #|> trunc
 
-    {hour, min, sec, usec}
+    fsec = time
+    hour = (fsec / @secs_in_hour / in_one_sec) |> trunc
+    fsec = fsec - (hour * @secs_in_hour * in_one_sec)
+    min = (fsec / @secs_in_min / in_one_sec) |> trunc
+    fsec = fsec - (min * @secs_in_min * in_one_sec)
+    sec = (fsec / in_one_sec) |> trunc
+    fsec = fsec - (sec * in_one_sec) |> trunc
+
+    # fsec = time
+    #   |> pow10(7-scale)
+    # hour = Float.floor(fsec / 10_000_000 / 60 / 60)
+    #   |> trunc
+    # fsec = fsec - (hour * 60 * 60 * 10_000_000)
+    # min = Float.floor(fsec / 10_000_000 / 60)
+    #   |> trunc
+    # fsec = fsec - (min * 60 * 10_000_000)
+    # sec = Float.floor(fsec / 10_000_000)
+    #   |> trunc
+    # fsec = fsec - (sec * 10_000_000)
+
+    {hour, min, sec, fsec}
   end
 
+  #time(n) is represented as one unsigned integer that represents the number of 10-n second increments since 12 AM within a day. The length, in bytes, of that integer depends on the scale n as follows:
+# 3 bytes if 0 <= n < = 2.
+# 4 bytes if 3 <= n < = 4.
+# 5 bytes if 5 <= n < = 7.
+  def encode_time(time), do: encode_time(7, time)
+  def encode_time(scale, {hour, min, sec, fsec}) do
+    in_one_sec = :math.pow(10, scale) |> trunc #10^scale s in 1 sec
+    fractional_time = (hour * 3600 * in_one_sec) +
+      (min * 60 * in_one_sec) +
+      (sec * in_one_sec) + fsec
+    #Logger.debug "#{inspect fractional_time}"
+    cond do
+      scale in [1, 2] ->
+        <<fractional_time::little-unsigned-24>>
+      scale in [3, 4] ->
+        <<fractional_time::little-unsigned-32>>
+      scale in [5, 6, 7] ->
+        <<fractional_time::little-unsigned-40>>
+    end
+  end
+
+  #DateTime2
   def decode_datetime2(scale, <<data::binary>>) do
+    #Logger.debug "D DT2 #{inspect data}"
     cond do
       scale in [1, 2] -> <<time::binary-3, date::binary-3>> = data
       scale in [3, 4] -> <<time::binary-4, date::binary-3>> = data
@@ -513,27 +550,62 @@ defmodule Tds.Types do
     {decode_date(date), decode_time(scale, time)}
   end
 
+  def encode_datetime2(datetime), do: encode_datetime2(7, datetime)
+  def encode_datetime2(scale, {date,time}) do
+    #Logger.debug "E DT2 date #{inspect date}"
+    #Logger.debug "E DT2 time #{inspect time}"
+    date = encode_date(date)
+    time = encode_time(scale, time)
+    time <> date
+  end
+
+  #DateTimeOffset
   def decode_datetimeoffset(scale, <<data::binary>>) do
+    #Logger.debug "D DTO #{inspect data}"
     cond do
-      scale in [1, 2] -> <<datetime::binary-6, offset_min::little-signed-16>> = data
-      scale in [3, 4] -> <<datetime::binary-7, offset_min::little-signed-16>> = data
-      scale in [5, 6, 7] -> <<datetime::binary-8, offset_min::little-signed-16>> = data
+      scale in [1, 2] ->
+        <<datetime::binary-6, offset_min::little-signed-16>> = data
+      scale in [3, 4] ->
+        <<datetime::binary-7, offset_min::little-signed-16>> = data
+      scale in [5, 6, 7] ->
+        <<datetime::binary-8, offset_min::little-signed-16>> = data
       true -> raise "DateTimeOffset Scale Unknown"
     end
-    d = decode_datetime2(scale, datetime)
-      |> Date.from
-      |> Date.shift(mins: offset_min)
-    {{d.year,d.month,d.day},{d.hour,d.minute,d.second,d.ms}}
+    {date, time} = decode_datetime2(scale, datetime)
+    {date, time, offset_min}
+  end
+  def encode_datetimeoffset(data), do: encode_datetimeoffset(7, data)
+  def encode_datetimeoffset(scale, {date, time, offset_min}) do
+    # Logger.debug "E DTO date #{inspect date}"
+    # Logger.debug "E DTO time #{inspect time}"
+    # Logger.debug "E DTO offset #{inspect offset_min}"
+    datetime = encode_datetime2(scale, {date, time})
+    cond do
+      scale in [1, 2] ->
+        <<datetime::binary-6, offset_min::little-signed-16>>
+      scale in [3, 4] ->
+        <<datetime::binary-7, offset_min::little-signed-16>>
+      scale in [5, 6, 7] ->
+        <<datetime::binary-8, offset_min::little-signed-16>>
+    end
   end
 
-  def decode_date(<<days::little-size(3)-unit(8)>>) do
-    date = Date.from {{1, 1, 1}, {0, 0, 0}}
-    date = Date.shift(date, days: days)
-    {date.year, date.month, date.day}
+  #Date
+  def decode_date(<<days::little-24>>) do
+    :calendar.gregorian_days_to_date(days + 366)
+  end
+  def encode_date(date) do
+    days = :calendar.date_to_gregorian_days(date) - 366
+    <<days::little-24>>
   end
 
-  def decode_uuid(<<v1::little-signed-32, v2::little-signed-16, v3::little-signed-16, v4::signed-16, v5::signed-48>>) do
-    <<v1::integer-32 , v2::integer-16, v3::integer-16, v4::integer-16, v5::integer-48>>
+  #UUID
+  def decode_uuid(<<v1::little-signed-32, v2::little-signed-16, v3::little-signed-16, v4::signed-64>>) do
+    <<v1::32, v2::16, v3::16, v4::64>>
+  end
+
+  def encode_uuid(<<v1::32, v2::16, v3::16, v4::64>>) do
+    <<v1::little-signed-32, v2::little-signed-16, v3::little-signed-16, v4::signed-64>>
   end
 
   def decode_decimal(precision, scale, <<sign::int8, value::binary>>) do
@@ -575,6 +647,7 @@ defmodule Tds.Types do
   Encodes the COLMETADATA for the data type
   """
   def encode_data_type(%Parameter{type: type} = param) when type != nil do
+    #Logger.debug "---- EDT #{inspect param}"
     case type do
       :boolean -> encode_binary_type(param)
       :binary -> encode_binary_type(param)
@@ -583,6 +656,7 @@ defmodule Tds.Types do
       :decimal -> encode_decimal_type(param)
       :float -> encode_float_type(param)
       :datetime -> encode_datetime_type(param)
+      :datetime2 -> encode_datetime2_type(param)
       :uuid -> encode_uuid_type(param)
       _ -> encode_string_type(param)
     end
@@ -708,7 +782,7 @@ defmodule Tds.Types do
 
   def encode_integer_type(%Parameter{value: value})
   when value >= 0 do
-  attributes = []
+    attributes = []
     type = @tds_data_type_intn
     length =
     if value == nil do
@@ -826,15 +900,17 @@ defmodule Tds.Types do
   end
 
   def encode_datetime_type(%Parameter{}) do
+    #Logger.debug "encode_datetime_type"
     type = @tds_data_type_datetimen
     data = <<type, 0x08>>
     {type, data, []}
   end
 
   def encode_datetime2_type(%Parameter{}) do
+    #Logger.debug "encode_datetime2_type"
     type = @tds_data_type_datetime2n
-    data = <<type, 0x08>>
-    {type, data, []}
+    data = <<type, 0x07>>
+    {type, data, scale: 7}
   end
 
   @doc """
@@ -845,6 +921,9 @@ defmodule Tds.Types do
       :uuid -> "uniqueidentifier"
       :datetime -> "datetime"
       :datetime2 -> "datetime2"
+      :datetimeoffset ->  "datetimeoffset"
+      :date -> "date"
+      :time -> "time"
       :binary -> encode_binary_descriptor(value)
       :string ->
         if value == nil do
@@ -1145,42 +1224,27 @@ defmodule Tds.Types do
     end
   end
 
+  def encode_data(@tds_data_type_datetime2n, value, _attr) do
+    #Logger.debug "EncodeData #{inspect value}"
+    data = encode_datetime2(value)
+    if data == nil do
+      <<0x00>>
+    else
+      #Logger.debug "EncodeData #{inspect data}"
+      <<0x08>> <> data
+    end
+  end
+
 
   @doc """
   Data Encoding UUID Types
   """
   def encode_data(@tds_data_type_uniqueidentifier, value, _) do
     if value != nil do
-      <<
-       p1::binary-size(1),
-       p2::binary-size(1),
-       p3::binary-size(1),
-       p4::binary-size(1),
-       p5::binary-size(1),
-       p6::binary-size(1),
-       p7::binary-size(1),
-       p8::binary-size(1),
-       p9::binary-size(1),
-       p10::binary-size(1),
-       p11::binary-size(1),
-       p12::binary-size(1),
-       p13::binary-size(1),
-       p14::binary-size(1),
-       p15::binary-size(1),
-       p16::binary-size(1)>> = value
-
-      # <<v1::little-signed-32>> = p4 <> p3 <> p2 <>p1
-      # <<v2::little-signed-16>> = p6 <> p5
-      # <<v3::little-signed-16>> = p8 <> p7
-      # <<v4::signed-16>> = p10 <> p9
-      # <<v5::signed-48>> = p11 <> p12 <> p13 <> p14 <> p15 <> p16
-      # v1 <> v2 <> v3 <> v4 <> v5
-      <<0x10>> <> p4 <> p3 <> p2 <>p1 <> p6 <> p5 <> p8 <> p7 <> p9 <> p10 <> p11 <> p12 <> p13 <> p14 <> p15 <> p16
-
+      <<0x10>> <> encode_uuid(value)
     else
       <<0x00>>
     end
-
   end
 
   def encode_plp(data) do

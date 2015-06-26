@@ -31,7 +31,6 @@ defmodule Tds.Mixfile do
   defp deps do
     [
       {:decimal, "~> 1.0"},
-      {:timex, "~> 0.13"}
     ]
   end
 
