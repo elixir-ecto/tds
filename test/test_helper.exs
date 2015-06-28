@@ -1,6 +1,9 @@
 System.at_exit fn _ -> Logger.flush end
 ExUnit.start()
 
+Logger.configure(level: :debug,
+      format: "$date $time [$level] $metadata\n\t$message\n",
+      metadata: [:module, :function, :line])
 
 defmodule Tds.TestHelper do
   require Logger
