@@ -33,8 +33,9 @@ defmodule QueryTest do
         SmallMoney smallmoney,
         BitInt bigint)
       """, [])
-    query("INSERT INTO FixedLength VALUES(1, 0, 12, 100, '2014-01-10T12:30:00', 0.5, '$-40,532.5367', '2014-01-11T11:34:25', 5.6, '$6.3452', 1000)", []);
-    assert [{1, false, 12, 100, {{2014, 01, 10},{12, 30}}, 0.5, -40532.5367, {{2014, 01, 11},{11, 34, 25}}, 5.6, 6.3452 , 1000}] = query("SELECT TOP(1) * FROM FixedLength", [])
+    query("INSERT INTO FixedLength VALUES(1, 0, 12, 100, '2014-01-10T12:30:00', 0.5, '-822,337,203,685,477.5808', '2014-01-11T11:34:25', 5.6, '$-214,748.3648', 1000)", []);
+    assert [{1, false, 12, 100, {{2014, 01, 10},{12, 30}}, 0.5, -822_337_203_685_477.5808, {{2014, 01, 11},{11, 34, 25}}, 5.6, -214_748.3648 , 1000}] == query("SELECT TOP(1) * FROM FixedLength", [])
+
     query("DROP TABLE FixedLength", [])
   end
 
