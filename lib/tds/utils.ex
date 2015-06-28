@@ -67,6 +67,12 @@ defmodule Tds.Utils do
     end
     Connection.next(%{s | statement: "", queue: queue, state: :ready})
   end
+  #pow10 should be to 10^n
+  # def pow10(pow), do: pow10(pow, 1)
+  # def pow10(0, acc), do: acc
+  # def pow10(pow, acc) when pow > 0, do: pow10(pow-1, acc*10)
+  # def pow10(pow, acc) when pow < 0, do: pow10(pow+1, acc/10)
+
 
   def pow10(num,0), do: num
   def pow10(num,pow) when pow > 0 do
