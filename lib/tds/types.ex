@@ -454,8 +454,7 @@ defmodule Tds.Types do
   end
 
   def decode_smallmoney(<<money::little-signed-32>>) do
-    money = pow10(money,(4 * -1))
-    Float.round money, 4
+    Float.round(money * 0.0001, 4)
   end
 
   def decode_datetime(<<days::little-signed-32, secs300::little-unsigned-32>>) do
@@ -476,9 +475,9 @@ defmodule Tds.Types do
 
   end
 
-  def decode_money(<<_money_m::little-signed-32, money_l::little-signed-32>>) do
-    money = pow10(money_l,(4 * -1))
-    Float.round money, 4
+  def decode_money(<<money_m::little-unsigned-32, money_l::little-unsigned-32>>) do
+    <<money::signed-64>> = <<money_m::32>> <> <<money_l::32>>
+    Float.round(money * 0.0001, 4)
   end
 
   #Time
