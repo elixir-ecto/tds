@@ -1,3 +1,7 @@
+# v0.4.0
+* Backwards Incompatable Changes
+  * datetime tuples are now {{year,month,day},{hour,min,sec,usec}}
+
 # v0.3.0
 * Enhancements
   * Added parameter encoding support for datetime2
