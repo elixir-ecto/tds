@@ -2,8 +2,6 @@ defmodule Tds.Tokens do
   import Tds.BinaryUtils
   import Tds.Utils
 
-  require Logger
-
   alias Tds.Types
 
   @tds_token_returnstatus   0x79 # 0x79
