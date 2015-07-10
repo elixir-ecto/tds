@@ -1,3 +1,7 @@
+# v0.5.0-dev
+* Backwards Incompatable Changes
+  * Rows now return as list instead of tuple
+
 # v0.4.0
 * Backwards Incompatable Changes
   * datetime tuples are now {{year,month,day},{hour,min,sec,usec}}

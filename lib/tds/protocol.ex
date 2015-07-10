@@ -38,7 +38,7 @@ defmodule Tds.Protocol do
   end
 
   def send_param_query(statement, params, s) do
-    param_desc = params |> Enum.map(fn(%Parameter{} = param) -> 
+    param_desc = params |> Enum.map(fn(%Parameter{} = param) ->
       Tds.Types.encode_param_descriptor(param)
     end)
     param_desc = param_desc
@@ -80,7 +80,7 @@ defmodule Tds.Protocol do
   end
 
   def message(:login, msg_login_ack(), %{opts: opts, opts: opts} = s) do
-    
+
     s = %{s | opts: clean_opts(opts)}
     reply(:ok, s)
     send_query("""
@@ -134,7 +134,7 @@ defmodule Tds.Protocol do
     ready(s)
   end
 
-  defp msg_send(msg, %{sock: {mod, sock}, env: env}) do 
+  defp msg_send(msg, %{sock: {mod, sock}, env: env}) do
     paks = encode_msg(msg, env)
     Enum.each(paks, fn(pak) ->
       mod.send(sock, pak)

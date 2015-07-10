@@ -2,6 +2,8 @@ defmodule Tds.Tokens do
   import Tds.BinaryUtils
   import Tds.Utils
 
+  require Logger
+
   alias Tds.Types
 
   @tds_token_returnstatus   0x79 # 0x79
@@ -95,8 +97,8 @@ defmodule Tds.Tokens do
   ## ROW
   defp decode_token(<<@tds_token_row, tail::binary>>, tokens) do
     column_count = Enum.count tokens[:columns]
-    {row, tail} = decode_row_columns(tail, tokens, {}, column_count, 0)
-
+    {row, tail} = decode_row_columns(tail, tokens, [], column_count, 0)
+    row = row |> Enum.reverse
     tokens = Keyword.update(tokens, :rows, [row], fn(_x) -> [row|tokens[:rows]] end)
     {tokens, tail}
   end
@@ -112,8 +114,8 @@ defmodule Tds.Tokens do
 
     {bitmap, tail} = bitmap_list([], tail, bitmap_bytes)
     bitmap = bitmap |> Enum.reverse
-    {row, tail} = decode_row_columns(tail, tokens, {}, column_count, 0, bitmap)
-
+    {row, tail} = decode_row_columns(tail, tokens, [], column_count, 0, bitmap)
+    row = row |> Enum.reverse
     tokens = Keyword.update(tokens, :rows, [row], fn(_x) -> [row|tokens[:rows]] end)
     {tokens, tail}
   end
@@ -231,7 +233,7 @@ defmodule Tds.Tokens do
   defp decode_row_columns(<<tail::binary>>, tokens, row, column_count, n) do
     {:ok, column} = Enum.fetch(tokens[:columns], n)
     {value, tail} = decode_row_column(tail, column)
-    row = Tuple.insert_at(row, tuple_size(row), value)
+    row = [value | row]
     decode_row_columns(tail, tokens, row, column_count, n + 1)
   end
 
@@ -240,17 +242,16 @@ defmodule Tds.Tokens do
   end
 
   defp decode_row_columns(<<tail::binary>>, tokens, row, column_count, n, bitmap) do
-
+    {value, tail} =
     case Enum.fetch(bitmap, n) do
       {:ok, 0} ->
         {:ok, column} = Enum.fetch(tokens[:columns], n)
-        {value, tail} = decode_row_column(tail, column)
-        row = Tuple.insert_at(row, tuple_size(row), value)
-        decode_row_columns(tail, tokens, row, column_count, n + 1, bitmap)
+        decode_row_column(tail, column)
       {_, _} ->
-        row = Tuple.insert_at(row, tuple_size(row), nil)
-        decode_row_columns(tail, tokens, row, column_count, n + 1, bitmap)
+        {nil, tail}
     end
+    row = [value | row]
+    decode_row_columns(tail, tokens, row, column_count, n + 1, bitmap)
   end
 
   defp decode_row_column(<<tail::binary>>, column) do

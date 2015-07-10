@@ -41,10 +41,10 @@ defmodule BinaryTest do
       %Parameter{name: "@5", value: <<0, 1, 0, 1>>, type: :binary},
       %Parameter{name: "@6", value: <<0x82, 0x25, 0xF2, 0xA9, 0xAF, 0xBA, 0x45, 0xC5, 0xA4, 0x31, 0x86, 0xB9, 0xA8, 0x67, 0xE0, 0xF7>>, type: :uuid}
     ]
-    
+
     query("INSERT INTO bin_test (char, varchar, nvarchar, binary, varbinary, uuid) VALUES (@1, @2, @3, @4, @5, @6)", params)
-    assert [{"H", "ello", "World", <<0>>, <<0, 1, 0, 1>>, <<0x82, 0x25, 0xF2, 0xA9, 0xAF, 0xBA, 0x45, 0xC5, 0xA4, 0x31, 0x86, 0xB9, 0xA8, 0x67, 0xE0, 0xF7>>}] = query("SELECT TOP(1) * FROM bin_test", [])
-    
+    assert [["H", "ello", "World", <<0>>, <<0, 1, 0, 1>>, <<0x82, 0x25, 0xF2, 0xA9, 0xAF, 0xBA, 0x45, 0xC5, 0xA4, 0x31, 0x86, 0xB9, 0xA8, 0x67, 0xE0, 0xF7>>]] = query("SELECT TOP(1) * FROM bin_test", [])
+
     #query("DROP TABLE bin_test", [])
   end
 
@@ -69,7 +69,7 @@ defmodule BinaryTest do
       %Parameter{name: "@6", value: nil, type: :binary}
     ]
     query("INSERT INTO bin_test (char, varchar, nvarchar, binary, varbinary, uuid) VALUES (@1, @2, @3, @4, @5, @6)", params)
-    assert [{nil, nil, nil, nil, nil, nil}] = query("SELECT TOP(1) * FROM bin_test", [])
+    assert [[nil, nil, nil, nil, nil, nil]] = query("SELECT TOP(1) * FROM bin_test", [])
   end
 
 end

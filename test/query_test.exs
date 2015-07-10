@@ -34,29 +34,29 @@ defmodule QueryTest do
         BitInt bigint)
       """, [])
     query("INSERT INTO FixedLength VALUES(1, 0, 12, 100, '2014-01-10T12:30:00', 0.5, '-822,337,203,685,477.5808', '2014-01-11T11:34:25', 5.6, '$-214,748.3648', 1000)", []);
-    assert [{1, false, 12, 100, {{2014, 01, 10},{12, 30, 0, 0}}, 0.5, -822_337_203_685_477.5808, {{2014, 01, 11},{11, 34, 25, 0}}, 5.6, -214_748.3648 , 1000}] == query("SELECT TOP(1) * FROM FixedLength", [])
+    assert [[1, false, 12, 100, {{2014, 01, 10},{12, 30, 0, 0}}, 0.5, -822_337_203_685_477.5808, {{2014, 01, 11},{11, 34, 25, 0}}, 5.6, -214_748.3648 , 1000]] == query("SELECT TOP(1) * FROM FixedLength", [])
 
     query("DROP TABLE FixedLength", [])
   end
 
   test "Decode basic types", context do
-    assert [{1}] = query("SELECT 1", [])
-    assert [{1}] = query("SELECT 1 as 'number'", [])
-    assert [{1, 1}] = query("SELECT 1, 1", [])
-    assert [{-1}] = query("SELECT -1", [])
-    assert [{10000000000000}] = query("select CAST(10000000000000 AS bigint)", [])
+    assert [[1]] = query("SELECT 1", [])
+    assert [[1]] = query("SELECT 1 as 'number'", [])
+    assert [[1, 1]] = query("SELECT 1, 1", [])
+    assert [[-1]] = query("SELECT -1", [])
+    assert [[10000000000000]] = query("select CAST(10000000000000 AS bigint)", [])
 
-    assert [{"string"}] = query("SELECT 'string'", [])
-    assert [{"ẽstring"}] = query("SELECT N'ẽstring'", [])
-    assert [{true, false}] = query("SELECT CAST(1 AS BIT), CAST(0 AS BIT)", [])
-    assert [{<<0x82, 0x25, 0xF2, 0xA9, 0xAF, 0xBA, 0x45, 0xC5, 0xA4, 0x31, 0x86, 0xB9, 0xA8, 0x67, 0xE0, 0xF7>>}] = query("SELECT CAST('8225F2A9-AFBA-45C5-A431-86B9A867E0F7' AS uniqueidentifier)", [])
+    assert [["string"]] = query("SELECT 'string'", [])
+    assert [["ẽstring"]] = query("SELECT N'ẽstring'", [])
+    assert [[true, false]] = query("SELECT CAST(1 AS BIT), CAST(0 AS BIT)", [])
+    assert [[<<0x82, 0x25, 0xF2, 0xA9, 0xAF, 0xBA, 0x45, 0xC5, 0xA4, 0x31, 0x86, 0xB9, 0xA8, 0x67, 0xE0, 0xF7>>]] = query("SELECT CAST('8225F2A9-AFBA-45C5-A431-86B9A867E0F7' AS uniqueidentifier)", [])
   end
 
   test "Decode NULL", context do
-    assert [{nil}] = query("SELECT NULL", [])
-    assert [{nil}] = query("SELECT CAST(NULL AS BIT)", [])
-    assert [{nil}] = query("SELECT CAST(NULL AS VARCHAR)", [])
-    assert [{nil}] = query("SELECT CAST(NULL AS datetime)", [])
+    assert [[nil]] = query("SELECT NULL", [])
+    assert [[nil]] = query("SELECT CAST(NULL AS BIT)", [])
+    assert [[nil]] = query("SELECT CAST(NULL AS VARCHAR)", [])
+    assert [[nil]] = query("SELECT CAST(NULL AS datetime)", [])
     query("SELECT CAST('1' AS VARCHAR)", [])
   end
 
@@ -89,11 +89,11 @@ defmodule QueryTest do
 
   test "connection works after failure", context do
     assert %Tds.Error{} = query("busted", [])
-    assert [{1}] = query("SELECT 1", [])
+    assert [[1]] = query("SELECT 1", [])
   end
 
   test "char nulls", context do
-    assert [{nil}] = query("SELECT CAST(NULL as nvarchar(255))",[])
+    assert [[nil]] = query("SELECT CAST(NULL as nvarchar(255))",[])
   end
 
 end

@@ -1,4 +1,3 @@
-System.at_exit fn _ -> Logger.flush end
 ExUnit.start()
 
 
