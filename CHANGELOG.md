@@ -1,4 +1,4 @@
-# v0.5.0-dev
+# v0.5.0
 * Backwards Incompatable Changes
   * Rows now return as list instead of tuple
 
