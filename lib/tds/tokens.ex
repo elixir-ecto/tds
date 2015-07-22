@@ -34,6 +34,10 @@ defmodule Tds.Tokens do
     decode_tokens(tail, tokens)
   end
 
+  defp decode_token(<<@tds_token_returnstatus, value::little-size(32), tail::binary>>, tokens) do
+
+    {tokens, tail}
+  end
 
   # COLMETADATA
   defp decode_token(<<@tds_token_colmetadata, column_count::little-2*8, tail::binary>>, tokens) do
