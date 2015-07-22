@@ -1,3 +1,7 @@
+# v0.5.1
+* Bug Fixes
+  * Added token decoder for return status of RPC
+
 # v0.5.0
 * Backwards Incompatable Changes
   * Rows now return as list instead of tuple
