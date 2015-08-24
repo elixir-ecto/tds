@@ -29,7 +29,7 @@ iex> Tds.Connection.query!(pid, "INSERT INTO MyTable (MyColumn) VALUES (@my_valu
   * Supports TDS Version 7.3, 7.4
 
 ## Connecting to SQL Instances
-Tds Supports sql instances by passing ```instance: "instancename"``` to the connection options. 
+Tds Supports sql instances by passing ```instance: "instancename"``` to the connection options.
 
 
 
@@ -68,7 +68,7 @@ The tests require an addition to your hosts file to connect to your sql server d
 
 Additionally SQL authentication needs to be used for connecting and testing. Add the user test_user as owner to the database test_db. See one of the test files for the connection information and port number.
 
-##Special Thanks 
+##Special Thanks
 
 Thanks to ericmj, this driver takes a lot of inspiration from postgrex.
 https://github.com/ericmj/
@@ -79,7 +79,7 @@ Also thanks to everyone in the Elixir Gogle group and on the Elixir IRC Channel
 
 ## License
 
-   Copyright 2014 LiveHelpNow
+   Copyright 2014, 2015 LiveHelpNow
 
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
