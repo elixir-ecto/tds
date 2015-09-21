@@ -214,6 +214,10 @@ defmodule Tds.Connection do
 
   end
 
+  def handle_info({:udp_error, _, :econnreset}, s) do
+    raise "Tds encountered an error while connecting to the Sql Server Browser: econnreset"
+  end
+
   def handle_info({:tcp, _, _data}, %{sock: {mod, sock}, opts: opts, state: :prelogin} = s) do
     case mod do
       :gen_tcp -> :inet.setopts(sock, active: :once)
