@@ -80,7 +80,7 @@ defmodule Tds.Tokens do
       sn_len, server_name::binary-size(sn_len)-unit(16),
       pn_len, proc_name::binary-size(pn_len)-unit(16),
       line_number::little-size(32),
-      tail::binary>>, _tokens) do
+      tail::binary>>, tokens) do
     i = %{
       length: length,
       number: number,
@@ -91,7 +91,8 @@ defmodule Tds.Tokens do
       proc_name: ucs2_to_utf(proc_name),
       line_number: line_number,
     }
-    {[info: i], tail}
+    info_token = Keyword.get(tokens, :info, [])
+    {[[i | info_token] | tokens], tail}
   end
 
 

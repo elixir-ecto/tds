@@ -1,3 +1,7 @@
+# v0.5.2
+* Bug Fixes
+  * If server outputs warning result rows are missing.
+
 # v0.5.1
 * Bug Fixes
   * Added token decoder for return status of RPC
