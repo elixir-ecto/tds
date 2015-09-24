@@ -214,7 +214,7 @@ defmodule Tds.Connection do
 
   end
 
-  def handle_info({:udp_error, _, :econnreset}, s) do
+  def handle_info({:udp_error, _, :econnreset}, _s) do
     raise "Tds encountered an error while connecting to the Sql Server Browser: econnreset"
   end
 
