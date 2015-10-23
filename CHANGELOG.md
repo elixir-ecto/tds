@@ -1,3 +1,7 @@
+# v0.5.3
+* Enhancements
+  * Loosen Elixir dependency
+
 # v0.5.2
 * Bug Fixes
   * If server outputs warning result rows are missing.
