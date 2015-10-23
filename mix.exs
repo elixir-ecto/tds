@@ -41,7 +41,7 @@ defmodule Tds.Mixfile do
   end
 
   defp package do
-    [contributors: ["Justin Schneck"],
+    [maintainers: ["Justin Schneck"],
      licenses: ["Apache 2.0"],
      links: %{"Github" => "https://github.com/livehelpnow/tds"}]
   end
