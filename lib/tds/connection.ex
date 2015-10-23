@@ -205,7 +205,7 @@ defmodule Tds.Connection do
       end)
     case server do
       nil ->
-        error(%Tds.Error{message: "Instance #{opts.instance} not found"}, s)
+        error(%Tds.Error{message: "Instance #{opts[:instance]} not found"}, s)
       serv ->
         {port, _} = Integer.parse(serv[:tcp])
         GenServer.reply(pid, :ok)
