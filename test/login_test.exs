@@ -5,9 +5,9 @@ defmodule LoginTest do
   test "Login with sql server authentication" do
     opts = [
       hostname: "sqlserver.local",
-      username: "test_user",
-      password: "passw0rd!",
-      database: "test_db"
+      username: "mssql",
+      password: "mssql",
+      database: "test"
     ]
 
     assert {:ok, pid} = Conn.start_link(opts)

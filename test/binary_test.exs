@@ -10,9 +10,9 @@ defmodule BinaryTest do
   setup do
     opts = [
       hostname: "sqlserver.local",
-      username: "test_user",
-      password: "passw0rd!",
-      database: "test_db"
+      username: "mssql",
+      password: "mssql",
+      database: "test"
     ]
     {:ok, pid} = Conn.start_link(opts)
     {:ok, [pid: pid]}
