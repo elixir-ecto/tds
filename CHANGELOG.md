@@ -1,3 +1,7 @@
+# v0.5.4
+* Enhancements
+  * Cleaned up code style for Elixir 1.2.0 warnings
+
 # v0.5.3
 * Enhancements
   * Loosen Elixir dependency
