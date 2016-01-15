@@ -184,11 +184,12 @@ defmodule Tds.Messages do
     cchLanguage = <<0::size(16)>>
 
     ibDatabase = <<curr_offset::little-size(16)>>
-    if database == "" do
-      cchDatabase = <<0xAC>>
-    else
-      cchDatabase = <<String.length(database)::little-size(16)>>
-    end
+    cchDatabase =
+      if database == "" do
+        <<0xAC>>
+      else
+        <<String.length(database)::little-size(16)>>
+      end
 
 
     clientID = <<0::size(48)>>

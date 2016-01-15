@@ -114,26 +114,27 @@ defmodule Tds.Types do
   #
 
   def decode_info(<<data_type_code::unsigned-8, tail::binary>>) when data_type_code in @fixed_data_types do
-    cond do
-      data_type_code == @tds_data_type_null -> length = 0
-      data_type_code in [
-        @tds_data_type_tinyint,
-        @tds_data_type_bit
-      ] -> length = 1
-      data_type_code == @tds_data_type_smallint -> length = 2
-      data_type_code in [
-        @tds_data_type_int,
-        @tds_data_type_smalldatetime,
-        @tds_data_type_real,
-        @tds_data_type_smallmoney
-      ] -> length = 4
-      data_type_code in [
-        @tds_data_type_datetime,
-        @tds_data_type_float,
-        @tds_data_type_money,
-        @tds_data_type_bigint
-      ] -> length = 8
-    end
+    length =
+      cond do
+        data_type_code == @tds_data_type_null -> 0
+        data_type_code in [
+          @tds_data_type_tinyint,
+          @tds_data_type_bit
+        ] -> 1
+        data_type_code == @tds_data_type_smallint -> 2
+        data_type_code in [
+          @tds_data_type_int,
+          @tds_data_type_smalldatetime,
+          @tds_data_type_real,
+          @tds_data_type_smallmoney
+        ] -> 4
+        data_type_code in [
+          @tds_data_type_datetime,
+          @tds_data_type_float,
+          @tds_data_type_money,
+          @tds_data_type_bigint
+        ] -> 8
+      end
     {%{data_type: :fixed, data_type_code: data_type_code, length: length},tail}
   end
 
@@ -151,23 +152,22 @@ defmodule Tds.Types do
         @tds_data_type_datetimeoffsetn
       ] ->
         <<scale::unsigned-8, tail::binary>> = tail
-        cond do
-          scale in [0, 1, 2] ->
-            length = 3
-          scale in [3, 4] ->
-            length = 4
-          scale in [5, 6, 7] ->
-            length = 5
-          true -> nil
-        end
+        length =
+          cond do
+            scale in [0, 1, 2] -> 3
+            scale in [3, 4] -> 4
+            scale in [5, 6, 7] -> 5
+            true -> nil
+          end
         col_info = col_info
           |> Map.put(:scale, scale)
 
-        case data_type_code do
-          @tds_data_type_datetime2n -> length = length + 3
-          @tds_data_type_datetimeoffsetn -> length = length + 5
-          _ -> length
-        end
+        length =
+          case data_type_code do
+            @tds_data_type_datetime2n -> length + 3
+            @tds_data_type_datetimeoffsetn -> length + 5
+            _ -> length
+          end
         col_info = col_info
           |> Map.put(:length, length)
           |> Map.put(:data_reader, :bytelen)
@@ -321,12 +321,19 @@ defmodule Tds.Types do
         data_type_code == @tds_data_type_intn ->
           data = data <> tail
           case length do
-            1 -> <<value::unsigned-8, tail::binary>> = data
-            2 -> <<value::little-signed-16, tail::binary>> = data
-            4 -> <<value::little-signed-32, tail::binary>> = data
-            8 -> <<value::little-signed-64, tail::binary>> = data
+            1 ->
+              <<value::unsigned-8, tail::binary>> = data
+              value
+            2 ->
+              <<value::little-signed-16, tail::binary>> = data
+              value
+            4 ->
+              <<value::little-signed-32, tail::binary>> = data
+              value
+            8 ->
+              <<value::little-signed-64, tail::binary>> = data
+              value
           end
-          value
         data_type_code in [
           @tds_data_type_decimal,
           @tds_data_type_numeric,
@@ -341,10 +348,11 @@ defmodule Tds.Types do
           case length do
             4 ->
               <<value::little-float-32, tail::binary>> = data
+              value
             8 ->
               <<value::little-float-64, tail::binary>> = data
+              value
           end
-          value
         data_type_code == @tds_data_type_moneyn ->
           case length do
             4 -> decode_smallmoney(data)
@@ -597,11 +605,12 @@ defmodule Tds.Types do
   end
 
   def encode_binary_type(%Parameter{value: value}) do
-    if value == nil do
-      length = <<0xFF, 0xFF>>
-    else
-      length = <<byte_size(value)::little-unsigned-16>>
-    end
+    length =
+      if value == nil do
+        <<0xFF, 0xFF>>
+      else
+        <<byte_size(value)::little-unsigned-16>>
+      end
     type = @tds_data_type_bigvarbinary
     data = <<type>> <> length
     {type, data, []}
@@ -614,11 +623,12 @@ defmodule Tds.Types do
   end
 
   def encode_uuid_type(%Parameter{value: value}) do
-    if value == nil do
-      length = 0x00
-    else
-      length = 0x10
-    end
+    length =
+      if value == nil do
+        0x00
+      else
+        0x10
+      end
     type = @tds_data_type_uniqueidentifier
     data = <<type, length>>
     {type, data, []}
@@ -690,12 +700,13 @@ defmodule Tds.Types do
       |> Decimal.abs
       |> Decimal.to_string(:normal)
       |> String.split(".")
-    case value_list do
-      [p,s] ->
-        precision = String.length(p) + String.length(s); scale = String.length(s)
-      [p] ->
-        precision = String.length(p); scale = 0
-    end
+    {precision, scale} =
+      case value_list do
+        [p,s] ->
+          {String.length(p) + String.length(s), String.length(s)}
+        [p] ->
+          {String.length(p), 0}
+      end
 
     dec_abs = value
       |> Decimal.abs
@@ -703,21 +714,14 @@ defmodule Tds.Types do
       |> :binary.encode_unsigned(:little)
     value_size = byte_size(value)
 
-    padding = cond do
-      precision <= 9 ->
-        byte_len = 4
-        byte_len - value_size
-      precision <= 19 ->
-        byte_len = 8
-        byte_len - value_size
-      precision <= 28 ->
-        byte_len = 12
-        byte_len - value_size
-      precision <= 38 ->
-        byte_len = 16
-        byte_len - value_size
-    end
-
+    len =
+      cond do
+        precision <= 9 -> 4
+        precision <= 19 -> 8
+        precision <= 28 -> 12
+        precision <= 38 -> 16
+      end
+    padding = len - value_size
     value_size = value_size + padding + 1
 
     type = @tds_data_type_decimaln
@@ -740,12 +744,13 @@ defmodule Tds.Types do
       |> Decimal.abs
       |> Decimal.to_string(:normal)
       |> String.split(".")
-    case value_list do
-      [p,s] ->
-        precision = String.length(p) + String.length(s); scale = String.length(s)
-      [p] ->
-        precision = String.length(p); scale = 0
-    end
+    {precision, scale} =
+      case value_list do
+        [p,s] ->
+          {String.length(p) + String.length(s), String.length(s)}
+        [p] ->
+          {String.length(p), 0}
+      end
 
     dec_abs = value
       |> Decimal.abs
@@ -753,15 +758,12 @@ defmodule Tds.Types do
       |> :binary.encode_unsigned(:little)
     value_size = byte_size(value)
 
-    padding = cond do
-      precision <= 9 ->
-        byte_len = 4
-        byte_len - value_size
-      precision <= 19 ->
-        byte_len = 8
-        byte_len - value_size
-    end
-
+    len =
+      cond do
+        precision <= 9 -> 4
+        precision <= 19 -> 8
+      end
+    padding = len - value_size
     value_size = value_size + padding
 
     type = @tds_data_type_floatn
@@ -783,11 +785,12 @@ defmodule Tds.Types do
       :smalldatetime -> "smalldatetime"
       :binary -> encode_binary_descriptor(value)
       :string ->
-        if value == nil do
-          length = 0
-        else
-          length = String.length(value)
-        end
+        length =
+          if value == nil do
+            0
+          else
+            String.length(value)
+          end
         if length <= 0, do: length = 1
         if length > 4000, do: length = "max"
         "nvarchar(#{length})"
@@ -804,11 +807,12 @@ defmodule Tds.Types do
       :float -> encode_float_descriptor(param)
       :boolean -> "bit"
       _ ->
-        if value == nil do
-          length = 0
-        else
-          length = String.length(value)
-        end
+        length =
+          if value == nil do
+            0
+          else
+            String.length(value)
+          end
         if length <= 0, do: length = 1
         if length > 4000, do: length = "max"
         "nvarchar(#{length})"
@@ -924,12 +928,13 @@ defmodule Tds.Types do
       |> Decimal.abs
       |> Decimal.to_string(:normal)
       |> String.split(".")
-    case value_list do
-      [p,s] ->
-        precision = String.length(p) + String.length(s); scale = String.length(s)
-      [p] ->
-        precision = String.length(p); scale = 0
-    end
+    {precision, scale} =
+      case value_list do
+        [p,s] ->
+          {String.length(p) + String.length(s), String.length(s)}
+        [p] ->
+          {String.length(p), 0}
+      end
     "decimal(#{precision}, #{scale})"
   end
   def encode_decimal_descriptor(%Parameter{type: :decimal} = param) do
@@ -953,12 +958,13 @@ defmodule Tds.Types do
       |> Decimal.abs
       |> Decimal.to_string(:normal)
       |> String.split(".")
-    case value_list do
-      [p,s] ->
-        precision = String.length(p) + String.length(s); scale = String.length(s)
-      [p] ->
-        precision = String.length(p)
-    end
+    precision =
+      case value_list do
+        [p,s] ->
+          String.length(p) + String.length(s)
+        [p] ->
+          String.length(p)
+      end
     "float(#{precision})"
   end
 
@@ -967,11 +973,12 @@ defmodule Tds.Types do
   """
   def encode_binary_descriptor(value) when is_integer(value), do: encode_binary_descriptor(<<value>>)
   def encode_binary_descriptor(value) do
-    if value == nil do
-      size = 1
-    else
-      size = byte_size(value)
-    end
+    size =
+      if value == nil do
+        1
+      else
+        byte_size(value)
+      end
     "varbinary(#{size})"
   end
 
@@ -1056,21 +1063,14 @@ defmodule Tds.Types do
     value_binary = value
       |> :binary.encode_unsigned(:little)
     value_size = byte_size(value_binary)
-    padding = cond do
-      precision <= 9 ->
-        byte_len = 4
-        byte_len - value_size
-      precision <= 19 ->
-        byte_len = 8
-        byte_len - value_size
-      precision <= 28 ->
-        byte_len = 12
-        byte_len - value_size
-      precision <= 38 ->
-        byte_len = 16
-        byte_len - value_size
-    end
-
+    len =
+      cond do
+        precision <= 9 -> 4
+        precision <= 19 -> 8
+        precision <= 28 -> 12
+        precision <= 38 -> 16
+      end
+    {byte_len, padding} = {len, len - value_size}
     byte_len = byte_len + 1
     value_binary = value_binary <> <<0::size(padding)-unit(8)>>
     <<byte_len>> <> <<sign>> <> value_binary
@@ -1117,12 +1117,13 @@ defmodule Tds.Types do
 
   def encode_data(@tds_data_type_datetimen, value, attr) do
     #Logger.debug "dtn #{inspect attr}"
-    case attr[:length] do
-      4 ->
-        data = encode_smalldatetime(value)
-      _ ->
-        data = encode_datetime(value)
-    end
+    data =
+      case attr[:length] do
+        4 ->
+          encode_smalldatetime(value)
+        _ ->
+          encode_datetime(value)
+      end
 
     if data == nil do
       <<0x00>>
@@ -1290,12 +1291,19 @@ defmodule Tds.Types do
 
   #DateTime2
   def decode_datetime2(scale, <<data::binary>>) do
-    cond do
-      scale in [0, 1, 2] -> <<time::binary-3, date::binary-3>> = data
-      scale in [3, 4] -> <<time::binary-4, date::binary-3>> = data
-      scale in [5, 6, 7] -> <<time::binary-5, date::binary-3>> = data
-      true -> raise "DateTime Scale Unknown"
-    end
+    {time, date} =
+      cond do
+        scale in [0, 1, 2] ->
+          <<time::binary-3, date::binary-3>> = data
+          {time, date}
+        scale in [3, 4] ->
+          <<time::binary-4, date::binary-3>> = data
+          {time, date}
+        scale in [5, 6, 7] ->
+          <<time::binary-5, date::binary-3>> = data
+          {time, date}
+        true -> raise "DateTime Scale Unknown"
+      end
     {decode_date(date), decode_time(scale, time)}
   end
 
@@ -1308,15 +1316,19 @@ defmodule Tds.Types do
 
   #DateTimeOffset
   def decode_datetimeoffset(scale, <<data::binary>>) do
-    cond do
-      scale in [0, 1, 2] ->
-        <<datetime::binary-6, offset_min::little-signed-16>> = data
-      scale in [3, 4] ->
-        <<datetime::binary-7, offset_min::little-signed-16>> = data
-      scale in [5, 6, 7] ->
-        <<datetime::binary-8, offset_min::little-signed-16>> = data
-      true -> raise "DateTimeOffset Scale Unknown"
-    end
+    {datetime, offset_min} =
+      cond do
+        scale in [0, 1, 2] ->
+          <<datetime::binary-6, offset_min::little-signed-16>> = data
+          {datetime, offset_min}
+        scale in [3, 4] ->
+          <<datetime::binary-7, offset_min::little-signed-16>> = data
+          {datetime, offset_min}
+        scale in [5, 6, 7] ->
+          <<datetime::binary-8, offset_min::little-signed-16>> = data
+          {datetime, offset_min}
+        true -> raise "DateTimeOffset Scale Unknown"
+      end
     {date, time} = decode_datetime2(scale, datetime)
     {date, time, offset_min}
   end
