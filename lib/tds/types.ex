@@ -506,6 +506,7 @@ defmodule Tds.Types do
   Encodes the COLMETADATA for the data type
   """
   def encode_data_type(%Parameter{type: type} = param) when type != nil do
+    IO.puts "Data Type: #{inspect param}"
     case type do
       :boolean -> encode_binary_type(param)
       :binary -> encode_binary_type(param)
@@ -774,7 +775,7 @@ defmodule Tds.Types do
   @doc """
   Creates the Parameter Descriptor for the selected type
   """
-  def encode_param_descriptor(%Parameter{name: name, value: value, type: type} = param) when type != nil do
+  def encode_param_descriptor(%Parameter{name: name, value: value, type: type, length: length} = param) when type != nil do
     desc = case type do
       :uuid -> "uniqueidentifier"
       :datetime -> "datetime"
@@ -783,15 +784,13 @@ defmodule Tds.Types do
       :date -> "date"
       :time -> "time"
       :smalldatetime -> "smalldatetime"
-      :binary -> encode_binary_descriptor(value)
+      :binary ->
+        length = length || "max"
+        if length > 4000, do: length = "max"
+        if value == nil, do: length = "1"
+        "varbinary(#{length})"
       :string ->
-        length =
-          if value == nil do
-            0
-          else
-            String.length(value)
-          end
-        if length <= 0, do: length = 1
+        length = length || "max"
         if length > 4000, do: length = "max"
         "nvarchar(#{length})"
       :integer ->
@@ -807,13 +806,7 @@ defmodule Tds.Types do
       :float -> encode_float_descriptor(param)
       :boolean -> "bit"
       _ ->
-        length =
-          if value == nil do
-            0
-          else
-            String.length(value)
-          end
-        if length <= 0, do: length = 1
+        length = length || "max"
         if length > 4000, do: length = "max"
         "nvarchar(#{length})"
     end
