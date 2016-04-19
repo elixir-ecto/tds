@@ -506,7 +506,6 @@ defmodule Tds.Types do
   Encodes the COLMETADATA for the data type
   """
   def encode_data_type(%Parameter{type: type} = param) when type != nil do
-    IO.puts "Data Type: #{inspect param}"
     case type do
       :boolean -> encode_binary_type(param)
       :binary -> encode_binary_type(param)
