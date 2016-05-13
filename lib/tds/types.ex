@@ -696,7 +696,6 @@ defmodule Tds.Types do
     d_ctx = Decimal.get_context
     d_ctx = %{d_ctx | precision: 38}
     Decimal.set_context d_ctx
-
     value_list = Decimal.new(value)
       |> Decimal.abs
       |> Decimal.to_string(:normal)
