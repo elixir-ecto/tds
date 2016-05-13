@@ -696,7 +696,7 @@ defmodule Tds.Types do
     d_ctx = Decimal.get_context
     d_ctx = %{d_ctx | precision: 38}
     Decimal.set_context d_ctx
-    value_list = value
+    value_list = Decimal.new(value)
       |> Decimal.abs
       |> Decimal.to_string(:normal)
       |> String.split(".")
@@ -708,7 +708,7 @@ defmodule Tds.Types do
           {String.length(p), 0}
       end
 
-    dec_abs = value
+    dec_abs = Decimal.new(value)
       |> Decimal.abs
     value = dec_abs.coef
       |> :binary.encode_unsigned(:little)
@@ -937,8 +937,9 @@ defmodule Tds.Types do
       end
     "decimal(#{precision}, #{scale})"
   end
-  def encode_decimal_descriptor(%Parameter{type: :decimal} = param) do
-    encode_decimal_descriptor(%{param | value: Decimal.new()})
+  
+  def encode_decimal_descriptor(%Parameter{type: :decimal, value: value} = param) do
+    encode_decimal_descriptor(%{param | value: Decimal.new(value)})
   end
 
   @doc """
