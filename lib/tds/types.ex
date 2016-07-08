@@ -105,6 +105,10 @@ defmodule Tds.Types do
     @tds_data_type_variant
   ]
 
+  @date_time_types [@tds_data_type_timen, 
+                    @tds_data_type_datetime2n, 
+                    @tds_data_type_datetimeoffsetn] 
+
   @tds_plp_marker 0xffff
   @tds_plp_null 0xffffffffffffffff
   @tds_plp_unknown 0xfffffffffffffffe
@@ -140,147 +144,111 @@ defmodule Tds.Types do
 
   def decode_info(<<data_type_code::unsigned-8, tail::binary>>) when data_type_code in @variable_data_types do
     col_info = %{data_type: :variable, data_type_code: data_type_code}
-    cond do
-      data_type_code == @tds_data_type_daten ->
-        length = 3
-        col_info = col_info
-          |> Map.put(:length, length)
-          |> Map.put(:data_reader, :bytelen)
-      data_type_code in [
-        @tds_data_type_timen,
-        @tds_data_type_datetime2n,
-        @tds_data_type_datetimeoffsetn
-      ] ->
-        <<scale::unsigned-8, tail::binary>> = tail
-        length =
-          cond do
-            scale in [0, 1, 2] -> 3
-            scale in [3, 4] -> 4
-            scale in [5, 6, 7] -> 5
-            true -> nil
-          end
-        col_info = col_info
-          |> Map.put(:scale, scale)
 
-        length =
-          case data_type_code do
-            @tds_data_type_datetime2n -> length + 3
-            @tds_data_type_datetimeoffsetn -> length + 5
-            _ -> length
-          end
-        col_info = col_info
-          |> Map.put(:length, length)
-          |> Map.put(:data_reader, :bytelen)
-      data_type_code in [
-        @tds_data_type_uniqueidentifier,
-        @tds_data_type_intn,
-        @tds_data_type_decimal,
-        @tds_data_type_decimaln,
-        @tds_data_type_numeric,
-        @tds_data_type_numericn,
-        @tds_data_type_bitn,
-        @tds_data_type_floatn,
-        @tds_data_type_moneyn,
-        @tds_data_type_datetimen,
-        @tds_data_type_char,
-        @tds_data_type_varchar,
-        @tds_data_type_binary,
-        @tds_data_type_varbinary
-      ] ->
-        <<length::little-unsigned-8, tail::binary>> = tail
-        if data_type_code in [
-            @tds_data_type_numericn,
-            @tds_data_type_decimaln
-          ] do
-          <<precision::unsigned-8, scale::unsigned-8, tail::binary>> = tail
-          col_info = col_info
-            |> Map.put(:precision, precision)
-            |> Map.put(:scale, scale)
-        end
-        col_info = col_info
-          |> Map.put(:length, length)
-          |> Map.put(:data_reader, :bytelen)
-      data_type_code == @tds_data_type_xml ->
-        <<schema::unsigned-8, tail::binary>> = tail
-        if schema == 1 do
-          # TODO should stick a raise in here??
-          # BVarChar dbname
-          # BVarChar owning schema
-          # USVarChar xml schema collection
-        end
-        col_info = col_info
-          |> Map.put(:data_reader, :plp)
-      data_type_code in [
-        @tds_data_type_bigvarbinary,
-        @tds_data_type_bigvarchar,
-        @tds_data_type_bigbinary,
-        @tds_data_type_bigchar,
-        @tds_data_type_nvarchar,
-        @tds_data_type_nchar,
-        @tds_data_type_udt
-      ] ->
-        <<length::little-unsigned-16, tail::binary>> = tail
-        if data_type_code in [
-          @tds_data_type_bigvarchar,
-          @tds_data_type_bigchar,
-          @tds_data_type_nvarchar,
-          @tds_data_type_nchar
-          ] do
-          <<collation::binary-5, tail::binary>> = tail
-          col_info = col_info
-            |> Map.put(:collation, collation)
-        end
-        if length == 0xFFFF do
-          col_info = col_info
-            |> Map.put(:data_reader, :plp)
-        else
-          col_info = col_info
-            |> Map.put(:data_reader, :shortlen)
-        end
-        col_info = col_info
-          |> Map.put(:length, length)
-      data_type_code in [
-        @tds_data_type_text,
-        @tds_data_type_image,
-        @tds_data_type_ntext,
-        @tds_data_type_variant
-      ] ->
-        <<length::signed-32, tail::binary>> = tail
-        col_info = col_info
-          |> Map.put(:length, length)
-        cond do
-          data_type_code in [@tds_data_type_text, @tds_data_type_ntext] ->
-
-            <<collation::binary-5, tail::binary>> = tail
-            col_info = col_info
-              |> Map.put(:collation, collation)
-              |> Map.put(:data_reader, :longlen)
-            <<numparts::signed-8, tail::binary>> = tail
-            tail =
-            Enum.reduce([1..numparts], tail, fn(_, acc) ->
-              <<tsize::little-unsigned-16, _table_name::binary-size(tsize)-unit(16), tail::binary>> = acc
-              tail
-            end)
-          data_type_code == @tds_data_type_image ->
-            # TODO NumBarts Reader
-            <<numparts::signed-8, tail::binary>> = tail
-            tail =
-            Enum.reduce([1..numparts], tail, fn(_, acc) ->
-              <<size::unsigned-16, _str::size(size)-unit(16), tail::binary>> = acc
-              tail
-            end)
-            col_info = col_info
-              |> Map.put(:data_reader, :bytelen)
-          data_type_code == @tds_data_type_variant ->
-            col_info = col_info
-              |> Map.put(:data_reader, :variant)
-          true -> nil
-        end
-
-
-    end
+    {col_info, tail} = decode_info(data_type_code, col_info, tail)
     {col_info,tail}
   end
+
+  defp decode_info(@tds_data_type_daten, col_info, tail) do
+    length = 3
+    col_info = col_info |> Map.put(:length, length) |> Map.put(:data_reader, :bytelen)
+    {col_info, tail}
+  end
+
+  defp decode_info(data_type_code, col_info, tail) when data_type_code in @date_time_types do
+    <<scale::unsigned-8, new_tail::binary>> = tail
+    length =
+      cond do
+        scale in [0, 1, 2] -> 3
+        scale in [3, 4] -> 4
+        scale in [5, 6, 7] -> 5
+        true -> nil
+      end
+      col_info = col_info
+                 |> Map.put(:scale, scale)
+
+    length =
+      case data_type_code do
+        @tds_data_type_datetime2n -> length + 3
+        @tds_data_type_datetimeoffsetn -> length + 5
+        _ -> length
+      end
+      col_info = col_info
+                  |> Map.put(:length, length)
+                  |> Map.put(:data_reader, :bytelen)
+    {col_info, new_tail}  
+  end
+
+  defp decode_info(data_type_code, col_info, tail) when data_type_code in [@tds_data_type_uniqueidentifier, @tds_data_type_intn, @tds_data_type_decimal, @tds_data_type_decimaln, @tds_data_type_numeric, @tds_data_type_numericn, @tds_data_type_bitn, @tds_data_type_floatn, @tds_data_type_moneyn, @tds_data_type_datetimen, @tds_data_type_char, @tds_data_type_varchar, @tds_data_type_binary, @tds_data_type_varbinary] do
+    <<length::little-unsigned-8, new_tail::binary>> = tail
+    {col_info, new_tail} = col_info |> precision(data_type_code, new_tail)
+    
+    col_info = col_info 
+               |> Map.put(:length, length)
+               |> Map.put(:data_reader, :bytelen)
+
+    {col_info, new_tail}
+  end
+
+  defp decode_info(@tds_data_type_xml, col_info, tail) do
+    <<schema::unsigned-8, new_tail::binary>> = tail
+    if schema == 1 do
+      # TODO should stick a raise in here??
+      # BVarChar dbname
+      # BVarChar owning schema
+      # USVarChar xml schema collection
+    end
+    col_info = col_info |> Map.put(:data_reader, :plp)
+    {col_info, new_tail}
+  end
+
+  defp decode_info(data_type_code, col_info, tail) when data_type_code in [@tds_data_type_bigvarbinary, @tds_data_type_bigvarchar, @tds_data_type_bigbinary, @tds_data_type_bigchar, @tds_data_type_nvarchar, @tds_data_type_nchar, @tds_data_type_udt] do
+    <<length::little-unsigned-16, new_tail::binary>> = tail
+    {col_info, new_tail} = data_type_code |> collation(col_info, new_tail)
+    col_info = binary_length(col_info, length)
+    col_info = col_info |> Map.put(:length, length)
+    {col_info, new_tail}
+  end 
+
+  defp decode_info(data_type_code, col_info, tail) when data_type_code in [@tds_data_type_text, @tds_data_type_image, @tds_data_type_ntext, @tds_data_type_variant] do
+    <<length::signed-32, new_tail::binary>> = tail
+    col_info = col_info
+                |> Map.put(:length, length)
+    cond do
+      data_type_code in [@tds_data_type_text, @tds_data_type_ntext] ->
+        <<collation::binary-5, new_tail::binary>> = new_tail
+        col_info = col_info
+                   |> Map.put(:collation, collation)
+                   |> Map.put(:data_reader, :longlen)
+        <<numparts::signed-8, new_tail::binary>> = new_tail
+        new_tail = Enum.reduce([1..numparts], new_tail, fn(_, acc) -> 
+          <<tsize::little-unsigned-16, _table_name::binary-size(tsize)-unit(16), new_tail::binary>> = acc
+          new_tail
+        end)
+      data_type_code == @tds_data_type_image ->
+        # TODO NumBarts Reader
+        <<numparts::signed-8, new_tail::binary>> = new_tail
+        new_tail = Enum.reduce([1..numparts], new_tail, fn(_, acc) ->
+          <<size::unsigned-16, _str::size(size)-unit(16), new_tail::binary>> = acc
+          new_tail
+        end)
+        col_info = col_info
+                   |> Map.put(:data_reader, :bytelen)
+      data_type_code == @tds_data_type_variant ->
+        col_info = col_info
+                   |> Map.put(:data_reader, :variant)
+      true -> nil
+    end
+  end
+
+  defp precision(col_info, data_type_code, tail) when data_type_code in [@tds_data_type_numericn, @tds_data_type_decimaln] do
+    <<precision::unsigned-8, scale::unsigned-8, new_tail::binary>> = tail
+    col_info = col_info |> Map.put(:precision, precision) |> Map.put(:scale, scale)
+    {col_info, new_tail}
+  end
+
+  defp precision(col_info, _, tail), do: {col_info, tail}
+
 
   #
   #  Data Decoders
@@ -312,87 +280,35 @@ defmodule Tds.Types do
   # ByteLength Types
   def decode_data(%{data_reader: :bytelen}, <<0x00, tail::binary>>), do: {nil, tail}
   def decode_data(%{data_type_code: data_type_code, data_reader: :bytelen, length: length} = data_info, <<size::unsigned-8, data::binary-size(size), tail::binary>>) do
-      value = cond do
-        data_type_code == @tds_data_type_daten -> decode_date(data)
-        data_type_code == @tds_data_type_timen -> decode_time(data_info[:scale], data)
-        data_type_code == @tds_data_type_datetime2n -> decode_datetime2(data_info[:scale], data)
-        data_type_code == @tds_data_type_datetimeoffsetn -> decode_datetimeoffset(data_info[:scale], data)
-        data_type_code == @tds_data_type_uniqueidentifier -> decode_uuid(data)
-        data_type_code == @tds_data_type_intn ->
-          data = data <> tail
-          case length do
-            1 ->
-              <<value::unsigned-8, tail::binary>> = data
-              value
-            2 ->
-              <<value::little-signed-16, tail::binary>> = data
-              value
-            4 ->
-              <<value::little-signed-32, tail::binary>> = data
-              value
-            8 ->
-              <<value::little-signed-64, tail::binary>> = data
-              value
-          end
-        data_type_code in [
-          @tds_data_type_decimal,
-          @tds_data_type_numeric,
-          @tds_data_type_decimaln,
-          @tds_data_type_numericn
-        ] ->
-          decode_decimal(data_info[:precision], data_info[:scale], data)
-        data_type_code == @tds_data_type_bitn ->
-          data != <<0x00>>
-        data_type_code == @tds_data_type_floatn ->
-          data = data <> tail
-          case length do
-            4 ->
-              <<value::little-float-32, tail::binary>> = data
-              value
-            8 ->
-              <<value::little-float-64, tail::binary>> = data
-              value
-          end
-        data_type_code == @tds_data_type_moneyn ->
-          case length do
-            4 -> decode_smallmoney(data)
-            8 -> decode_money(data)
-          end
-        data_type_code == @tds_data_type_datetimen ->
-          case length do
-            4 -> decode_smalldatetime(data)
-            8 -> decode_datetime(data)
-          end
-        data_type_code in [
-          @tds_data_type_char,
-          @tds_data_type_varchar
-        ] -> decode_char(data_info[:collation], data)
-        data_type_code in [
-          @tds_data_type_binary,
-          @tds_data_type_varbinary
-        ] -> data
-      end
-      {value, tail}
+    {value, new_tail} = cond do
+                          data_type_code == @tds_data_type_daten -> {decode_date(data), tail}
+                          data_type_code == @tds_data_type_timen -> {decode_time(data_info[:scale], data), tail}
+                          data_type_code == @tds_data_type_datetime2n -> {decode_datetime2(data_info[:scale], data), tail}
+                          data_type_code == @tds_data_type_datetimeoffsetn -> {decode_datetimeoffset(data_info[:scale], data), tail}
+                          data_type_code == @tds_data_type_uniqueidentifier -> {decode_uuid(data), tail}
+                          data_type_code == @tds_data_type_intn -> decode_int_with_byte_length(length, data <> tail)
+                          data_type_code in [@tds_data_type_decimal, @tds_data_type_numeric, @tds_data_type_decimaln, @tds_data_type_numericn] ->
+                            {decode_decimal(data_info[:precision], data_info[:scale], data), tail}
+                          data_type_code == @tds_data_type_bitn -> {data != <<0x00>>, tail}
+                          data_type_code == @tds_data_type_floatn -> decode_float(length, data <> tail)
+                          data_type_code == @tds_data_type_moneyn -> decode_money(length, data, tail)
+                          data_type_code == @tds_data_type_datetimen -> decode_datetime(length, data, tail)
+                          data_type_code in [@tds_data_type_char, @tds_data_type_varchar] -> {decode_char(data_info[:collation], data), tail}
+                          data_type_code in [@tds_data_type_binary, @tds_data_type_varbinary] -> {data, tail}
+                        end
+      {value, new_tail}
+
   end
 
   # ShortLength Types
   def decode_data(%{data_reader: :shortlen}, <<0xFF, 0xFF, tail::binary>>), do: {nil, tail}
   def decode_data(%{data_type_code: data_type_code, data_reader: :shortlen} = data_info, <<size::little-unsigned-16, data::binary-size(size), tail::binary>>) do
     value = cond do
-      data_type_code in [
-        @tds_data_type_bigvarchar,
-        @tds_data_type_bigchar
-      ] ->
+      data_type_code in [@tds_data_type_bigvarchar, @tds_data_type_bigchar] ->
         decode_char(data_info[:collation], data)
-      data_type_code in [
-        @tds_data_type_bigvarbinary,
-        @tds_data_type_bigbinary
-      ] ->
+      data_type_code in [@tds_data_type_bigvarbinary, @tds_data_type_bigbinary] ->
         data
-      data_type_code in [
-        @tds_data_type_nvarchar,
-        @tds_data_type_nchar
-      ] ->
+      data_type_code in [@tds_data_type_nvarchar, @tds_data_type_nchar] ->
         decode_nchar(data)
       data_type_code == @tds_data_type_udt ->
         decode_udt(data_info, data)
@@ -443,6 +359,20 @@ defmodule Tds.Types do
     end
     {value, tail}
   end
+
+  defp decode_int_with_byte_length(1, <<value::unsigned-8, new_tail::binary>>), do: {value, new_tail}
+  defp decode_int_with_byte_length(2, <<value::little-signed-16, new_tail::binary>>), do: {value, new_tail}
+  defp decode_int_with_byte_length(4, <<value::little-signed-32, new_tail::binary>>), do: {value, new_tail}
+  defp decode_int_with_byte_length(8, <<value::little-signed-64, new_tail::binary>>), do: {value, new_tail}
+
+  defp decode_float(4, <<value::little-float-32, new_tail::binary>>), do: {value, new_tail}
+  defp decode_float(8, <<value::little-float-64, new_tail::binary>>), do: {value, new_tail}
+
+  defp decode_money(4, data, tail), do: {decode_smallmoney(data), tail}
+  defp decode_money(8, data, tail), do: {decode_money(data), tail}
+
+  defp decode_datetime(4, data, tail), do: {decode_smalldatetime(data), tail}
+  defp decode_datetime(8, data, tail), do: {decode_datetime(data), tail}
 
   def decode_plp_chunk(<<chunksize::little-unsigned-32, tail::binary>>, buf) when chunksize == 0, do: {buf, tail}
   def decode_plp_chunk(<<chunksize::little-unsigned-32, chunk::binary-size(chunksize)-unit(8), tail::binary>>, buf) do
@@ -660,33 +590,17 @@ defmodule Tds.Types do
     encode_decimal_type(param)
   end
 
-  def encode_integer_type(%Parameter{value: value})
-  when value >= 0 do
-    attributes = []
+  def encode_integer_type(%Parameter{value: value}) when value >= 0 do
     type = @tds_data_type_intn
-    length =
-    if value == nil do
-      attributes = attributes
-        |> Keyword.put(:length, 1)
-      <<0x01::int8>>
-    else
-      value_size = int_type_size(value)
-      # cond do
-      #   value_size == 1 ->
-      #     data_type_code = @tds_data_type_tinyint #Enum.find(data_types, fn(x) -> x[:name] == :tinyint end)
-      #   value_size == 2 ->
-      #     data_type_code = @tds_data_type_smallint #Enum.find(data_types, fn(x) -> x[:name] == :smallint end)
-      #   value_size > 2 and value_size <= 4 ->
-      #     data_type_code = @tds_data_type_int #Enum.find(data_types, fn(x) -> x[:name] == :int end)
-      #   value_size > 4 and value_size <= 8 ->
-      #     data_type_code = @tds_data_type_bigint #Enum.find(data_types, fn(x) -> x[:name] == :bigint end)
-      # end
-      attributes = attributes
-        |> Keyword.put(:length, value_size)
-      <<value_size>>
-    end
+    {length, attributes} = integer_type_length(value)
     data = <<type>> <> length
     {type, data, attributes}
+  end
+
+  defp integer_type_length(nil), do: {<<0x01::int8>>, [:length, 1]}
+  defp integer_type_length(value) do
+    value_size = int_type_size(value)
+    {<<value_size>>, [:length, value_size]}  
   end
 
   def encode_decimal_type(%Parameter{value: nil} = param) do
@@ -708,10 +622,8 @@ defmodule Tds.Types do
           {String.length(p), 0}
       end
 
-    dec_abs = value
-      |> Decimal.abs
-    value = dec_abs.coef
-      |> :binary.encode_unsigned(:little)
+    dec_abs = value |> Decimal.abs
+    value = dec_abs.coef |> :binary.encode_unsigned(:little)
     value_size = byte_size(value)
 
     len =
@@ -784,16 +696,7 @@ defmodule Tds.Types do
       :time -> "time"
       :smalldatetime -> "smalldatetime"
       :binary -> encode_binary_descriptor(value)
-      :string ->
-        length =
-          if value == nil do
-            0
-          else
-            String.length(value)
-          end
-        if length <= 0, do: length = 1
-        if length > 4000, do: length = "max"
-        "nvarchar(#{length})"
+      :string -> string_length(value) |> nvarchar_length
       :integer ->
         if value >= 0 do
           "bigint"
@@ -807,14 +710,7 @@ defmodule Tds.Types do
       :float -> encode_float_descriptor(param)
       :boolean -> "bit"
       _ ->
-        length =
-          if value == nil do
-            0
-          else
-            String.length(value)
-          end
-        if length <= 0, do: length = 1
-        if length > 4000, do: length = "max"
+        length = boolean_length(value)
         "nvarchar(#{length})"
     end
 
@@ -937,8 +833,8 @@ defmodule Tds.Types do
       end
     "decimal(#{precision}, #{scale})"
   end
-  def encode_decimal_descriptor(%Parameter{type: :decimal} = param) do
-    encode_decimal_descriptor(%{param | value: Decimal.new()})
+  def encode_decimal_descriptor(%Parameter{type: :decimal, value: value} = param) do
+    encode_decimal_descriptor(%{param | value: Decimal.new(value)})
   end
 
   @doc """
@@ -1165,10 +1061,40 @@ defmodule Tds.Types do
     encode_plp_chunk(size-chunk_size, data, buf <> plp)
   end
 
+  defp string_length(nil), do: 0
+  defp string_length(value), do: String.length(value)
+
+  defp nvarchar_length(string_length) when string_length <= 0, do: "nvarchar(1)"
+  defp nvarchar_length(string_length) when string_length > 4000, do: "nvarchar(max)"
+  defp nvarchar_length(string_length), do: "nvarchar(#{string_length})"
+
+  defp boolean_length(nil), do: 1
+  defp boolean_length(value) do
+    string_length = String.length(value)
+    cond do
+      string_length <= 0   -> 1
+      string_length > 4000 -> "max"
+      true                 -> string_length
+    end
+  end
+
   defp int_type_size(int) when int in 0..255, do: 1
   defp int_type_size(int) when int in -32768..32767, do: 2
   defp int_type_size(int) when int in -2147483648..2147483647, do: 4
   defp int_type_size(int) when int in -9223372036854775808..9223372036854775807, do: 8
+
+  defp collation(data_type_code, col_info, tail) when data_type_code in [@tds_data_type_bigvarchar, @tds_data_type_bigchar, @tds_data_type_nvarchar, @tds_data_type_nchar] do
+    <<collation::binary-5, new_tail::binary>> = tail
+    col_info = col_info
+               |> Map.put(:collation, collation)
+    {col_info, new_tail}
+  end
+  
+  defp collation(_, col_info, tail), do: {col_info, tail}
+
+  defp binary_length(col_info, 0xFFFF), do: col_info |> Map.put(:data_reader, :plp)
+  defp binary_length(col_info, _), do: col_info |> Map.put(:data_reader, :shortlen)
+
 
   @doc """
   Data Encoding DateTime Types
@@ -1241,28 +1167,31 @@ defmodule Tds.Types do
 
   #Time
   def decode_time(scale, <<fsec::binary>>) do
-    cond do
-      scale in [0, 1, 2] ->
-        <<fsec::little-unsigned-24>> = fsec
-      scale in [3, 4] ->
-        <<fsec::little-unsigned-32>> = fsec
-      scale in [5, 6, 7] ->
-        <<fsec::little-unsigned-40>> = fsec
-    end
+    parsed_fsec = cond do
+                    scale in [0, 1, 2] ->
+                      <<parsed_fsec::little-unsigned-24>> = fsec
+                      parsed_fsec
+                    scale in [3, 4] ->
+                      <<parsed_fsec::little-unsigned-32>> = fsec
+                      parsed_fsec
+                    scale in [5, 6, 7] ->
+                      <<parsed_fsec::little-unsigned-40>> = fsec
+                      parsed_fsec
+                  end
 
     fs_per_sec = :math.pow(10, scale)
 
-    hour = (fsec / fs_per_sec / @secs_in_hour) |> trunc
-    fsec = fsec - (hour * @secs_in_hour * fs_per_sec)
+    hour = (parsed_fsec / fs_per_sec / @secs_in_hour) |> trunc
+    parsed_fsec = parsed_fsec - (hour * @secs_in_hour * fs_per_sec)
 
-    min = (fsec / fs_per_sec / @secs_in_min) |> trunc
-    fsec = fsec - (min * @secs_in_min * fs_per_sec)
+    min = (parsed_fsec / fs_per_sec / @secs_in_min) |> trunc
+    parsed_fsec = parsed_fsec - (min * @secs_in_min * fs_per_sec)
 
-    sec = (fsec / fs_per_sec) |> trunc
+    sec = (parsed_fsec / fs_per_sec) |> trunc
 
-    fsec = fsec - (sec * fs_per_sec) |> trunc
+    parsed_fsec = parsed_fsec - (sec * fs_per_sec) |> trunc
 
-    {hour, min, sec, fsec}
+    {hour, min, sec, parsed_fsec}
   end
 
 #time(n) is represented as one unsigned integer that represents the number of 10-n second increments since 12 AM within a day. The length, in bytes, of that integer depends on the scale n as follows:
@@ -1376,7 +1305,4 @@ defmodule Tds.Types do
     data = <<type, 0x07>>
     {type, data, scale: 7}
   end
-
-
-
 end
