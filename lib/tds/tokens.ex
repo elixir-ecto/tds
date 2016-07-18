@@ -150,43 +150,17 @@ defmodule Tds.Tokens do
   end
 
   ## DONE
-  defp decode_token(<<@tds_token_done, status::int16, cur_cmd::binary(2), row_count::little-size(8)-unit(8), _tail::binary>>, tokens) do
-    case tokens do
-      [done: done] ->
-
-        cond do
-          row_count > done.rows -> {[done: %{status: status, cmd: cur_cmd, rows: row_count}] ++ tokens, nil}
-          true -> {tokens, nil}
-        end
-        {tokens, nil}
-      _ ->  {[done: %{status: status, cmd: cur_cmd, rows: row_count}] ++ tokens, nil}
-    end
-  end
-
-  ## DONEPROC
-  defp decode_token(<<@tds_token_doneproc, status::int16, cur_cmd::binary(2), row_count::little-size(8)-unit(8), _tail::binary>>, tokens) do
-    case tokens do
-      [done: done] ->
-        cond do
-          row_count > done.rows -> {[done: %{status: status, cmd: cur_cmd, rows: row_count}] ++ tokens, nil}
-          true -> {tokens, nil}
-        end
-        {tokens, nil}
-      _ ->  {[done: %{status: status, cmd: cur_cmd, rows: row_count}] ++ tokens, nil}
-    end
-  end
-
-  ## DONEINPROC
-  defp decode_token(<<@tds_token_doneinproc, status::int16, cur_cmd::binary(2), row_count::little-size(8)-unit(8), _something::binary-size(5), _tail::binary>>, tokens) do
-    case tokens do
-      [done: done] ->
-        cond do
-          row_count > done.rows -> {[done: %{status: status, cmd: cur_cmd, rows: row_count}] ++ tokens, nil}
-          true -> {tokens, nil}
-        end
-        {tokens, nil}
-      _ ->  {[done: %{status: status, cmd: cur_cmd, rows: row_count}] ++ tokens, nil}
-    end
+  defp decode_token(<<done_token, status::int16, cur_cmd::binary(2), row_count::little-size(8)-unit(8), tail::binary>>, tokens)
+  when done_token in [@tds_token_done, @tds_token_doneproc, @tds_token_doneinproc] do
+    result = %{
+      done: %{status: status, cmd: cur_cmd, rows: row_count},
+      rows: tokens[:rows],
+      columns: tokens[:columns]
+    }
+    updated_tokens = tokens
+      |> Keyword.drop([:rows, :columns])
+      |> Keyword.update(:results, [result], fn results -> [result | results] end)
+    {updated_tokens, tail}
   end
 
   defp decode_column_order(<<tail::binary>>, n, columns) when n == 0 do

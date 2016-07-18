@@ -13,7 +13,7 @@ defmodule Tds.Messages do
   defrecord :msg_ready, [:status]
   defrecord :msg_sql, [:query]
   defrecord :msg_trans, [:trans]
-  defrecord :msg_sql_result, [:columns, :rows, :done]
+  defrecord :msg_sql_resultset, [:results]
   defrecord :msg_sql_empty, []
   defrecord :msg_rpc, [:proc, :query, :params]
   defrecord :msg_error, [:e]
@@ -96,7 +96,7 @@ defmodule Tds.Messages do
       [done: %{}, trans: <<trans::binary>>] ->
         msg_trans(trans: trans)
       tokens ->
-        msg_sql_result(columns: tokens[:columns], rows: tokens[:rows], done: tokens[:done])
+        msg_sql_resultset(results: tokens[:results])
     end
   end
 

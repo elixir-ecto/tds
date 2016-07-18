@@ -98,19 +98,12 @@ defmodule Tds.Protocol do
 
   ## executing
 
-  def message(:executing, msg_sql_result(columns: columns, rows: rows, done: done), %{} = s) do
-    if columns != nil do
-      columns = Enum.reduce(columns, [], fn (col, acc) -> [col[:name]|acc] end) |> Enum.reverse
-    end
-    num_rows = done.rows;
-    if rows != nil do
-      rows = Enum.reverse rows
-    end
-    if num_rows == 0 && rows == nil do
-      rows = []
-    end
-    result = %Tds.Result{columns: columns, rows: rows, num_rows: num_rows}
-    reply(result, s)
+  def message(:executing, msg_sql_resultset(results: results), %{} = s) do
+    results
+      |> Enum.reverse()
+      |> Enum.filter(fn %{columns: columns} -> columns != nil end)
+      |> Enum.map(&parse_resultset/1)
+      |> reply(s)
     ready(s)
   end
 
@@ -132,6 +125,18 @@ defmodule Tds.Protocol do
     result = %Tds.Result{columns: [], rows: [], num_rows: 0}
     reply(result, s)
     ready(s)
+  end
+
+  defp parse_resultset(%{columns: columns, rows: rows, done: done}) do
+    columns = if columns != nil do
+      Enum.reduce(columns, [], fn (col, acc) -> [col[:name]|acc] end) |> Enum.reverse
+    end
+    num_rows = done.rows;
+    rows = if rows != nil do
+      Enum.reverse rows
+    end
+    rows = if num_rows == 0 && rows == nil, do: [], else: rows
+    %Tds.Result{columns: columns, rows: rows, num_rows: num_rows}
   end
 
   defp msg_send(msg, %{sock: {mod, sock}, env: env}) do
