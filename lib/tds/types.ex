@@ -330,7 +330,7 @@ defmodule Tds.Types do
 
   # TODO Variant Types
 
-  def decode_data(%{data_reader: :plp}, <<@tds_plp_null, tail::binary>>), do: {nil, tail}
+  def decode_data(%{data_reader: :plp}, <<@tds_plp_null :: little-unsigned-64, tail::binary>>), do: {nil, tail}
   def decode_data(%{data_type_code: data_type_code, data_reader: :plp} = data_info, <<_size::little-unsigned-64, tail::binary>>) do
     {data, tail} = decode_plp_chunk(tail, <<>>)
     value = cond do
