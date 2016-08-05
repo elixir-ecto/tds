@@ -7,8 +7,6 @@ defmodule Tds.Protocol do
   alias Tds.Parameter
   alias Tds.Query
 
-  require Logger
-
   @behaviour DBConnection
 
   @timeout 5000
@@ -29,8 +27,6 @@ defmodule Tds.Protocol do
   ]
 
   def connect(opts) do
-    Logger.debug "CALLED connect/1 with #{inspect opts}"
-
     opts = opts
     |> Keyword.put_new(:username, System.get_env("MSSQLUSER") || System.get_env("USER"))
     |> Keyword.put_new(:password, System.get_env("MSSQLPASSWORD"))
@@ -52,9 +48,6 @@ defmodule Tds.Protocol do
   end
 
   def disconnect(_err, %{sock: {:gen_tcp, sock}} = s) do
-    Logger.debug "CALLED disconnect/2"
-    Logger.debug "SOCK: #{inspect sock}"
-
     :ok = :gen_tcp.close(sock)
     # If socket is active we flush any socket messages so the next
     # socket does not get the messages.
@@ -77,26 +70,14 @@ defmodule Tds.Protocol do
   end
 
   def checkout(s) do
-    Logger.debug "CALLED checkout/1"
-    Logger.debug "STATE: #{inspect s}"
-
     {:ok, s}
   end
 
   def checkin(s) do
-    Logger.debug "CALLED checkin/1"
-    Logger.debug "STATE: #{inspect s}"
-
     {:ok, s}
   end
 
   def handle_execute(%Query{statement: statement} = query, params, opts, %{sock: sock} = s) do
-    Logger.debug "CALLED handle_execute/4"
-    Logger.debug "QUERY: #{inspect query}"
-    Logger.debug "PARAMS: #{inspect params}"
-    Logger.debug "OPTS: #{inspect opts}"
-    Logger.debug "STATE: #{inspect s}"
-
     params = opts[:parameters] || params
 
     if params != [] do
@@ -107,11 +88,6 @@ defmodule Tds.Protocol do
   end
 
   def handle_prepare(%{statement: statement}, opts, %{sock: sock} = s) do
-    Logger.debug "CALLED handle_prepare/3"
-    Logger.debug "STATEMENT: #{inspect statement}"
-    Logger.debug "OPTS: #{inspect opts}"
-    Logger.debug "STATE: #{inspect s}"
-
     params = opts[:parameters]
     |> Parameter.prepared_params
 
@@ -119,29 +95,16 @@ defmodule Tds.Protocol do
   end
 
   def handle_close(query, opts, %{sock: sock} = s) do
-    Logger.debug "CALLED handle_close/3"
-    Logger.debug "QUERY: #{inspect query}"
-    Logger.debug "OPTS: #{inspect opts}"
-    Logger.debug "STATE: #{inspect s}"
-
     params = opts[:parameters]
 
     send_close(query, params, s)
   end
 
   def handle_begin(opts, %{sock: sock} = s) do
-    Logger.debug "CALLED handle_begin/2"
-    Logger.debug "OPTS: #{inspect opts}"
-    Logger.debug "STATE: #{inspect s}"
-
     send_transaction("TM_BEGIN_XACT", %{s | transaction: :started})
   end
 
   def handle_commit(opts, %{transaction: status} = s) do
-    Logger.debug "CALLED handle_commit/2"
-    Logger.debug "OPTS: #{inspect opts}"
-    Logger.debug "STATE: #{inspect s}"
-
     case status do
       :failed ->
         handle_rollback([], s)
@@ -151,20 +114,12 @@ defmodule Tds.Protocol do
   end
 
   def handle_rollback(opts, %{sock: sock} = s) do
-    Logger.debug "CALLED handle_rollback/2"
-    Logger.debug "OPTS: #{inspect opts}"
-    Logger.debug "STATE: #{inspect s}"
-
     send_transaction("TM_ROLLBACK_XACT", %{s | transaction: :failed})
   end
 
   # CONNECTION
 
   defp instance(opts, s) do
-    Logger.debug "CALLED instance/2"
-    Logger.debug "OPTS: #{inspect opts}"
-    Logger.debug "STATE: #{inspect s}"
-
     host      = Keyword.fetch!(opts, :hostname)
     host      = if is_binary(host), do: String.to_char_list(host), else: host
 
@@ -179,10 +134,6 @@ defmodule Tds.Protocol do
   end
 
   defp connect(opts, s) do
-    Logger.debug "CALLED connect/2"
-    Logger.debug "OPTS: #{inspect opts}"
-    Logger.debug "STATE: #{inspect s}"
-
     host      = Keyword.fetch!(opts, :hostname)
     host      = if is_binary(host), do: String.to_char_list(host), else: host
     port      = s.itcp || opts[:port] || System.get_env("MSSQLPORT") || 1433
@@ -210,8 +161,6 @@ defmodule Tds.Protocol do
   end
 
   defp parse_udp({_, 1434, <<_head::binary-3, data::binary>>}, %{opts: opts, usock: sock} = s) do
-    Logger.debug "CALLED parse_udp/2"
-
     :gen_udp.close(sock)
     server = String.split(data, ";;")
       |> Enum.slice(0..-2)
@@ -243,8 +192,6 @@ defmodule Tds.Protocol do
   end
 
   def handle_info({:tcp, _, _data}, %{sock: {mod, sock}, opts: opts, state: :prelogin} = s) do
-    Logger.debug "CALLED handle_info :tcp Protocol.login"
-
     case mod do
       :gen_tcp -> :inet.setopts(sock, active: :once)
       :ssl     -> :ssl.setopts(sock, active: :once)
@@ -262,9 +209,6 @@ defmodule Tds.Protocol do
   end
 
   def handle_info(msg, s) do
-    Logger.debug "CALLED handle_info/2 fallback"
-    Logger.debug "MSG: #{inspect msg}"
-
     {:ok, s}
   end
 
@@ -369,9 +313,6 @@ defmodule Tds.Protocol do
   end
 
   def send_query(statement, s) do
-    Logger.debug "CALLED send_query/2"
-    Logger.debug "STATEMENT: #{inspect statement}"
-
     msg = msg_sql(query: statement)
 
     case msg_send(msg, s) do
@@ -385,9 +326,6 @@ defmodule Tds.Protocol do
   end
 
   def send_prepare(statement, params, s) do
-    Logger.debug "CALLED send_prepare/2"
-    Logger.debug "STATEMENT: #{inspect statement}"
-
     params = [
       %Tds.Parameter{name: "@handle", type: :integer, direction: :output, value: nil},
       %Tds.Parameter{name: "@params", type: :string, value: params},
@@ -407,9 +345,6 @@ defmodule Tds.Protocol do
   end
 
   def send_transaction(command, s) do
-    Logger.debug "CALLED send_transaction/2"
-    Logger.debug "COMMAND: #{inspect command}"
-
     msg = msg_transmgr(command: command)
 
     case msg_send(msg, s) do
@@ -431,10 +366,6 @@ defmodule Tds.Protocol do
   #end
 
   def send_param_query(%Query{handle: handle} = query, params, s) do
-    Logger.debug "CALLED send_param_query/3"
-    Logger.debug "QUERY: #{inspect query}"
-    Logger.debug "PARAMS: #{inspect params}"
-
     params = [
       %Tds.Parameter{name: "@handle", type: :integer, direction: :input, value: handle}
       | params
@@ -453,10 +384,6 @@ defmodule Tds.Protocol do
     end
   end
   def send_param_query(%Query{handle: handle} = query, params, %{transaction: :started} = s) do
-    Logger.debug "CALLED send_param_query/3 STARTED"
-    Logger.debug "QUERY: #{inspect query}"
-    Logger.debug "PARAMS: #{inspect params}"
-
     params = [
       %Tds.Parameter{name: "@handle", type: :integer, direction: :input, value: handle}
       | params
@@ -476,10 +403,6 @@ defmodule Tds.Protocol do
   end
 
   def send_close(%Query{handle: handle} = query, params, s) do
-    Logger.debug "CALLED send_close/3"
-    Logger.debug "QUERY: #{inspect query}"
-    Logger.debug "PARAMS: #{inspect params}"
-
     params = [
       %Tds.Parameter{name: "@handle", type: :integer, direction: :input, value: handle}
     ]
@@ -541,11 +464,6 @@ defmodule Tds.Protocol do
   ## executing
 
   def message(:executing, msg_sql_result(columns: columns, rows: rows, done: done), %{} = s) do
-    Logger.debug "CALLED message/3 MSG_SQL_RESULT"
-    Logger.debug "COLUMNS: #{inspect columns}"
-    Logger.debug "ROWS: #{inspect rows}"
-    Logger.debug "DONE: #{inspect done}"
-
     if columns != nil do
       columns = Enum.reduce(columns, [], fn (col, acc) -> [col[:name]|acc] end) |> Enum.reverse
     end
@@ -563,18 +481,12 @@ defmodule Tds.Protocol do
   end
 
   def message(:executing, msg_trans(trans: trans), %{} = s) do
-    Logger.debug "CALLED message/3 MSG_TRANS"
-    Logger.debug "TRANS: #{inspect trans}"
-
     result = %Tds.Result{columns: [], rows: [], num_rows: 0}
 
     { :ok, %{s | state: :ready, result: result, env: %{trans: trans}} }
   end
 
   def message(:executing, msg_prepared(params: params), %{} = s) do
-    Logger.debug "CALLED message/3 MSG_PREPARED"
-    Logger.debug "PARAMS: #{inspect params}"
-
     {"@handle", handle} = params
 
     result = %Tds.Result{columns: [], rows: [], num_rows: 0}
@@ -585,8 +497,6 @@ defmodule Tds.Protocol do
 
   ## Error
   def message(_, msg_error(e: e), %{} = s) do
-    Logger.debug "WTF message ERROR #{inspect e}"
-
     error = %Tds.Error{mssql: e}
 
     { :error, error, %{s | pak_header: "", tail: ""} }

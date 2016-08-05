@@ -6,7 +6,6 @@ defmodule Tds.Messages do
   alias Tds.Types
 
   require Bitwise
-  require Logger
 
   defrecord :msg_prelogin, [:params]
   defrecord :msg_login, [:params]
@@ -90,10 +89,6 @@ defmodule Tds.Messages do
   end
 
   def parse(:executing, @tds_pack_reply, _header, tail) do
-    Logger.debug "CALLED parse/4"
-    Logger.debug "HEADER: #{inspect _header}"
-    Logger.debug "TAIL: #{inspect tail}"
-
     tokens = []
     tokens = decode_tokens(tail, tokens)
 
@@ -353,8 +348,6 @@ defmodule Tds.Messages do
     # We can't use the RPC name's identifier here and no one rly knows why.
     # This best explanation I can find is below from FreeTds docs:
     # sp_execute seems to have some problems, even MS ODBC use name version instead of number.
-    Logger.debug "CALLED encode_rpc/2 :sp_execute"
-    Logger.debug "PARAMS: #{inspect params}"
 
     rpc_size = byte_size("sp_execute")
     rpc_name = to_little_ucs2("sp_execute")
@@ -367,10 +360,6 @@ defmodule Tds.Messages do
   # Finished processing params
   defp encode_rpc_params([], ret), do: ret
   defp encode_rpc_params([%Tds.Parameter{} = param | tail], ret) do
-    Logger.debug "CALLED encode_rpc_params/2"
-    Logger.debug "PARAM: #{inspect param}"
-    Logger.debug "TAIL: #{inspect tail}"
-
     p = encode_rpc_param(param)
     encode_rpc_params(tail, ret <> p)
   end

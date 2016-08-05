@@ -31,9 +31,29 @@ defmodule Tds.Parameter do
   end
   def prepared_params(params) do
     params
+    |> name(0)
     |> Enum.map(&fix_data_type/1)
     |> Enum.map(&Types.encode_param_descriptor/1)
     |> Enum.join(", ")
+  end
+
+  def name(params, name) do
+    do_name(params, name, [])
+  end
+
+  def do_name([param | tail], name, acc) do
+    param = case param do
+      %Tds.Parameter{} -> param
+      raw_param ->
+        name = name + 1
+        fix_data_type(raw_param, name)
+    end
+
+    do_name(tail, name, [param | acc])
+  end
+
+  def do_name([], _, acc) do
+    acc
   end
 
   def fix_data_type(%Tds.Parameter{type: type, value: value} = param) do
@@ -89,5 +109,9 @@ defmodule Tds.Parameter do
   end
   def fix_data_type(%Tds.Parameter{value: {{_,_,_},{_,_,_,},_}} = param) do
     %{param | type: :datetimeoffset}
+  end
+  def fix_data_type(raw_param, acc) do
+    param = %Tds.Parameter{name: "@#{acc}", value: raw_param}
+    fix_data_type(param)
   end
 end

@@ -2,8 +2,6 @@ defmodule Tds do
 
   alias Tds.Query
 
-  require Logger
-
   @timeout 5000
 
   def start_link(opts \\ []) do
@@ -11,11 +9,6 @@ defmodule Tds do
   end
 
   def query(pid, statement, params, opts \\ []) do
-    Logger.debug "CALLED query/3"
-    Logger.debug "QUERY: #{inspect statement}"
-    Logger.debug "PARAMS: #{inspect params}"
-    Logger.debug "OPTS: #{inspect opts}"
-
     query = %Query{statement: statement}
     opts = Keyword.put_new(opts, :parameters, params)
 
@@ -25,11 +18,6 @@ defmodule Tds do
     end
   end
   def query!(pid, statement, params, opts \\ []) do
-    Logger.debug "CALLED query!/3"
-    Logger.debug "QUERY: #{inspect statement}"
-    Logger.debug "PARAMS: #{inspect params}"
-    Logger.debug "OPTS: #{inspect opts}"
-
     query = %Query{statement: statement}
     opts = Keyword.put_new(opts, :parameters, params)
 
@@ -40,10 +28,6 @@ defmodule Tds do
   end
 
   def prepare(pid, statement, opts \\ []) do
-    Logger.debug "CALLED prepare/2"
-    Logger.debug "STATEMENT: #{inspect statement}"
-    Logger.debug "OPTS: #{inspect opts}"
-
     query = %Query{statement: statement}
 
     case DBConnection.prepare(pid, query, opts) do
@@ -52,10 +36,6 @@ defmodule Tds do
     end
   end
   def prepare!(pid, statement, opts \\ []) do
-    Logger.debug "CALLED prepare!/2"
-    Logger.debug "STATEMENT: #{inspect statement}"
-    Logger.debug "OPTS: #{inspect opts}"
-
     query = %Query{statement: statement}
 
     case DBConnection.prepare(pid, query, opts) do
@@ -65,20 +45,12 @@ defmodule Tds do
   end
 
   def execute(pid, query, params, opts \\ []) do
-    Logger.debug "CALLED execute/3"
-    Logger.debug "QUERY: #{inspect query}"
-    Logger.debug "OPTS: #{inspect opts}"
-
     case DBConnection.execute(pid, query, params, opts) do
       {:ok, result} -> {:ok, result}
       {:error, err} -> {:error, err}
     end
   end
   def execute!(pid, query, params, opts \\ []) do
-    Logger.debug "CALLED execute!/3"
-    Logger.debug "QUERY: #{inspect query}"
-    Logger.debug "OPTS: #{inspect opts}"
-
     case DBConnection.execute(pid, query, params, opts) do
       {:ok, result} -> result
       {:error, err} -> err.mssql.msg_text
@@ -86,20 +58,12 @@ defmodule Tds do
   end
 
   def close(pid, query, opts \\ []) do
-    Logger.debug "CALLED close/2"
-    Logger.debug "QUERY: #{inspect query}"
-    Logger.debug "OPTS: #{inspect opts}"
-
     case DBConnection.close(pid, query, opts) do
       {:ok, result} -> {:ok, result}
       {:error, err} -> {:error, err}
     end
   end
   def close!(pid, query, opts \\ []) do
-    Logger.debug "CALLED close!/2"
-    Logger.debug "QUERY: #{inspect query}"
-    Logger.debug "OPTS: #{inspect opts}"
-
     case DBConnection.close(pid, query, opts) do
       {:ok, result} -> result
       {:error, err} -> err.mssql.msg_text
@@ -107,10 +71,6 @@ defmodule Tds do
   end
 
   def transaction(pid, fun, opts \\ []) do
-    Logger.debug "CALLED transaction/2"
-    Logger.debug "QUERY: #{inspect fun}"
-    Logger.debug "OPTS: #{inspect opts}"
-
      case DBConnection.transaction(pid, fun, opts) do
        {:ok, result} -> result
        err -> err

@@ -25,7 +25,19 @@ defmodule Tds.Query do
     end
 
     def decode(query, result, opts) do
-      result
+      mapper = opts[:decode_mapper] || fn x -> x end
+      %Tds.Result{rows: rows} = result
+      rows = do_decode(rows, mapper, [])
+      %Tds.Result{result | rows: rows}
+    end
+
+    def do_decode([row | rows], mapper, decoded) do
+      decoded = [mapper.(row) | decoded]
+      do_decode(rows, mapper, decoded)
+    end
+
+    def do_decode(_, _, decoded) do
+      decoded
     end
 
     def parse(params, _) do

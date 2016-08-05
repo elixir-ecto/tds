@@ -1,5 +1,4 @@
 defmodule Tds.Types do
-  require Logger
   import Tds.BinaryUtils
   import Tds.Utils
 
@@ -635,9 +634,6 @@ defmodule Tds.Types do
   end
 
   def encode_string_type(%Parameter{value: value}) do
-    Logger.debug "CALLED encode_string_type/1"
-    Logger.debug "VALUE #{inspect value}"
-
     collation = <<0x00, 0x00, 0x00, 0x00, 0x00>>
     length =
     if value != nil do
