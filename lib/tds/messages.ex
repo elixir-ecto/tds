@@ -6,6 +6,7 @@ defmodule Tds.Messages do
   alias Tds.Types
 
   require Bitwise
+  require Logger
 
   defrecord :msg_prelogin, [:params]
   defrecord :msg_login, [:params]
@@ -13,9 +14,11 @@ defmodule Tds.Messages do
   defrecord :msg_ready, [:status]
   defrecord :msg_sql, [:query]
   defrecord :msg_trans, [:trans]
+  defrecord :msg_transmgr, [:command]
   defrecord :msg_sql_result, [:columns, :rows, :done]
   defrecord :msg_sql_empty, []
   defrecord :msg_rpc, [:proc, :query, :params]
+  defrecord :msg_prepared, [:params]
   defrecord :msg_error, [:e]
   defrecord :msg_attn, []
 
@@ -87,6 +90,10 @@ defmodule Tds.Messages do
   end
 
   def parse(:executing, @tds_pack_reply, _header, tail) do
+    Logger.debug "CALLED parse/4"
+    Logger.debug "HEADER: #{inspect _header}"
+    Logger.debug "TAIL: #{inspect tail}"
+
     tokens = []
     tokens = decode_tokens(tail, tokens)
 
@@ -96,7 +103,11 @@ defmodule Tds.Messages do
       [done: %{}, trans: <<trans::binary>>] ->
         msg_trans(trans: trans)
       tokens ->
-        msg_sql_result(columns: tokens[:columns], rows: tokens[:rows], done: tokens[:done])
+        if Keyword.has_key?(tokens, :parameters) do
+          msg_prepared(params: tokens[:parameters])
+        else
+          msg_sql_result(columns: tokens[:columns], rows: tokens[:rows], done: tokens[:done])
+        end
     end
   end
 
@@ -271,13 +282,95 @@ defmodule Tds.Messages do
     # pak
   end
 
+  defp encode(msg_transmgr(command: "TM_COMMIT_XACT"), %{trans: trans}) do
+    q_ucs = <<7::little-size(2)-unit(8)>>
+    req_type = q_ucs
+
+    #Transaction Descriptor header
+    header_type = <<2::little-size(2)-unit(8)>>
+    trans_size = byte_size(trans)
+    padding = 8 - trans_size
+    transaction_descriptor = trans <> <<0::size(padding)-unit(8)>>
+    outstanding_request_count = <<1::little-size(4)-unit(8)>>
+    td_header = header_type <> transaction_descriptor <> outstanding_request_count
+    td_header_len = byte_size(td_header) + 4
+    td_header = <<td_header_len::little-size(4)-unit(8)>> <> td_header
+
+    headers = td_header
+    total_length = byte_size(headers) + 4
+    all_headers = <<total_length::little-size(32)>> <> headers
+    data = all_headers <> q_ucs <> <<0::size(2)-unit(8)>>
+    encode_packets(0x0E, data, [])
+  end
+  defp encode(msg_transmgr(command: "TM_BEGIN_XACT"), %{trans: trans}) do
+    q_ucs = <<5::little-size(2)-unit(8)>>
+    req_type = q_ucs
+
+    #Transaction Descriptor header
+    header_type = <<2::little-size(2)-unit(8)>>
+    trans_size = byte_size(trans)
+    padding = 8 - trans_size
+    transaction_descriptor = trans <> <<0::size(padding)-unit(8)>>
+    outstanding_request_count = <<1::little-size(4)-unit(8)>>
+    td_header = header_type <> transaction_descriptor <> outstanding_request_count
+    td_header_len = byte_size(td_header) + 4
+    td_header = <<td_header_len::little-size(4)-unit(8)>> <> td_header
+
+    headers = td_header
+    total_length = byte_size(headers) + 4
+    all_headers = <<total_length::little-size(32)>> <> headers
+    data = all_headers <> q_ucs <> <<0::size(2)-unit(8)>>
+    encode_packets(0x0E, data, [])
+  end
+  defp encode(msg_transmgr(command: "TM_ROLLBACK_XACT"), %{trans: trans}) do
+    q_ucs = <<8::little-size(2)-unit(8)>>
+    req_type = q_ucs
+
+    #Transaction Descriptor header
+    header_type = <<2::little-size(2)-unit(8)>>
+    trans_size = byte_size(trans)
+    padding = 8 - trans_size
+    transaction_descriptor = trans <> <<0::size(padding)-unit(8)>>
+    outstanding_request_count = <<1::little-size(4)-unit(8)>>
+    td_header = header_type <> transaction_descriptor <> outstanding_request_count
+    td_header_len = byte_size(td_header) + 4
+    td_header = <<td_header_len::little-size(4)-unit(8)>> <> td_header
+
+    headers = td_header
+    total_length = byte_size(headers) + 4
+    all_headers = <<total_length::little-size(32)>> <> headers
+    data = all_headers <> q_ucs <> <<0::size(2)-unit(8)>>
+    encode_packets(0x0E, data, [])
+  end
+
   defp encode_rpc(:sp_executesql, params) do
     <<0xFF, 0xFF, @tds_sp_executesql::little-size(2)-unit(8), 0x00, 0x00>> <> encode_rpc_params(params, "")
+  end
+  defp encode_rpc(:sp_prepare, params) do
+    <<0xFF, 0xFF, @tds_sp_prepare::little-size(2)-unit(8), 0x00, 0x00>> <> encode_rpc_params(params, "")
+  end
+  defp encode_rpc(:sp_execute, params) do
+    # We can't use the RPC name's identifier here and no one rly knows why.
+    # This best explanation I can find is below from FreeTds docs:
+    # sp_execute seems to have some problems, even MS ODBC use name version instead of number.
+    Logger.debug "CALLED encode_rpc/2 :sp_execute"
+    Logger.debug "PARAMS: #{inspect params}"
+
+    rpc_size = byte_size("sp_execute")
+    rpc_name = to_little_ucs2("sp_execute")
+    <<rpc_size::little-size(16)>> <> rpc_name <> <<0x00, 0x00>> <> encode_rpc_params(params, "")
+  end
+  defp encode_rpc(:sp_unprepare, params) do
+    <<0xFF, 0xFF, @tds_sp_unprepare::little-size(2)-unit(8), 0x00, 0x00>> <> encode_rpc_params(params, "")
   end
 
   # Finished processing params
   defp encode_rpc_params([], ret), do: ret
   defp encode_rpc_params([%Tds.Parameter{} = param | tail], ret) do
+    Logger.debug "CALLED encode_rpc_params/2"
+    Logger.debug "PARAM: #{inspect param}"
+    Logger.debug "TAIL: #{inspect tail}"
+
     p = encode_rpc_param(param)
     encode_rpc_params(tail, ret <> p)
   end
@@ -286,7 +379,7 @@ defmodule Tds.Messages do
     p_name = to_little_ucs2(name)
     p_flags = param |> Tds.Parameter.option_flags
     {type_code, type_data, type_attr} = Types.encode_data_type(param)
-    p_meta_data = <<byte_size(p_name)>> <> to_little_ucs2(p_name) <> p_flags <> type_data
+    p_meta_data = <<byte_size(name)>> <> p_name <> p_flags <> type_data
     p_meta_data <> Types.encode_data(type_code, param.value, type_attr)
   end
 

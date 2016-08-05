@@ -16,7 +16,7 @@ defmodule Tds.Mixfile do
   #
   # Type `mix help compile.app` for more information
   def application do
-    [applications: [:logger]]
+    [applications: [:logger, :db_connection]]
   end
 
   # Dependencies can be Hex packages:
@@ -31,6 +31,7 @@ defmodule Tds.Mixfile do
   defp deps do
     [
       {:decimal, "~> 1.1"},
+      {:db_connection, "~> 1.0-rc"}
     ]
   end
 

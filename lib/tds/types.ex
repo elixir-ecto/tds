@@ -1,5 +1,5 @@
 defmodule Tds.Types do
-  #require Logger
+  require Logger
   import Tds.BinaryUtils
   import Tds.Utils
 
@@ -635,6 +635,8 @@ defmodule Tds.Types do
   end
 
   def encode_string_type(%Parameter{value: value}) do
+    Logger.debug "CALLED encode_string_type/1"
+    Logger.debug "VALUE #{inspect value}"
 
     collation = <<0x00, 0x00, 0x00, 0x00, 0x00>>
     length =
@@ -667,8 +669,9 @@ defmodule Tds.Types do
     length =
     if value == nil do
       attributes = attributes
-        |> Keyword.put(:length, 1)
-      <<0x01::int8>>
+        |> Keyword.put(:length, 4)
+      value_size = int_type_size(value)
+      <<value_size>>
     else
       value_size = int_type_size(value)
       # cond do
@@ -795,13 +798,16 @@ defmodule Tds.Types do
         if length > 4000, do: length = "max"
         "nvarchar(#{length})"
       :integer ->
-        if value >= 0 do
-          "bigint"
-        else
-          precision = value
-            |> Integer.to_string
-            |> String.length
-          "decimal(#{precision-1}, 0)"
+        cond do
+          value == 0 ->
+            "int"
+          value >= 1 ->
+            "bigint"
+          true ->
+            precision = value
+              |> Integer.to_string
+              |> String.length
+            "decimal(#{precision-1}, 0)"
         end
       :decimal -> encode_decimal_descriptor(param)
       :float -> encode_float_descriptor(param)
@@ -1165,7 +1171,8 @@ defmodule Tds.Types do
     encode_plp_chunk(size-chunk_size, data, buf <> plp)
   end
 
-  defp int_type_size(int) when int in 0..255, do: 1
+  defp int_type_size(int) when int == nil, do: 4
+  defp int_type_size(int) when int in 0..255, do: 4
   defp int_type_size(int) when int in -32768..32767, do: 2
   defp int_type_size(int) when int in -2147483648..2147483647, do: 4
   defp int_type_size(int) when int in -9223372036854775808..9223372036854775807, do: 8

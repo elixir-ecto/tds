@@ -1,17 +1,9 @@
 defmodule LoginTest do
   use ExUnit.Case, async: true
-  alias Tds.Connection, as: Conn
 
   test "Login with sql server authentication" do
-    opts = [
-      hostname: "sqlserver.local",
-      username: "mssql",
-      password: "mssql",
-      database: "test"
-    ]
+    opts = Application.fetch_env!(:mssql, :opts)
 
-    assert {:ok, pid} = Conn.start_link(opts)
-    assert :ok = Conn.stop(pid)
-
+    assert {:ok, pid} = Tds.start_link(opts)
   end
 end

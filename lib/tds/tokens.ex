@@ -4,11 +4,14 @@ defmodule Tds.Tokens do
 
   alias Tds.Types
 
+  require Logger
+
   @tds_token_returnstatus   0x79 # 0x79
   @tds_token_colmetadata    0x81 # 0x81
   @tds_token_order          0xA9 # 0xA9
   @tds_token_error          0xAA # 0xAA
   @tds_token_info           0xAB # 0xAB
+  @tds_token_returnvalue    0xAC
   @tds_token_loginack       0xAD # 0xAD
   @tds_token_row            0xD1 # 0xD1
   @tds_token_nbcrow         0xD2 # 0xD1
@@ -28,14 +31,56 @@ defmodule Tds.Tokens do
 
 
   ## Decode Token Stream
-  def decode_tokens(tail, tokens) when tail == "" or tail == nil, do: tokens
+  def decode_tokens(tail, tokens) when tail == "" or tail == nil do
+    Logger.debug "TOKENS: #{inspect tokens}"
+    tokens
+  end
+
   def decode_tokens(<<tail::binary>>, tokens) do
     {tokens, tail} = decode_token(tail, tokens)
     decode_tokens(tail, tokens)
   end
 
+  defp decode_token(<<@tds_token_returnvalue, tail::binary>>, tokens) do
+    Logger.debug "HIT RETURNVALUE"
+    Logger.debug "TAIL: #{inspect tail}"
+
+    <<ord::little-unsigned-16, length::size(8), rest::binary>> = tail
+
+    Logger.debug "SIZE: #{inspect length}"
+
+    length = length * 2
+
+    <<name::binary-size(length)-unit(8), rest::binary>> = rest
+    name = ucs2_to_utf(name)
+
+    Logger.debug "NAME: #{inspect name}"
+
+    <<status::size(8), usertype::size(32), flags::size(16), datatype::size(8), rest::binary>> = rest
+
+    Logger.debug "DATATYPE: #{inspect datatype}"
+
+    datatype_size = retval_typ_size(datatype)
+
+    Logger.debug "DATATYPE SIZE: #{inspect datatype_size}"
+
+    <<garbage::binary-size(2), ret_val::size(datatype_size), empty::binary-size(3), tail::binary>> = rest
+
+    {[parameters: {name, ret_val}]++tokens, tail}
+  end
   defp decode_token(<<@tds_token_returnstatus, _value::little-size(32), tail::binary>>, tokens) do
+    Logger.debug "HIT RETURNSTATUS"
+    Logger.debug "VALUE: #{inspect _value}"
     {tokens, tail}
+  end
+
+  def retval_typ_size(38) do
+    # 0x26 - SYBINTN - 1
+    8
+  end
+  def retval_typ_size(dec) do
+    # Undefined
+    raise Tds.Error, "Unknown datatype parsed when decoding return value: #{dec}"
   end
 
   # COLMETADATA
@@ -151,6 +196,9 @@ defmodule Tds.Tokens do
 
   ## DONE
   defp decode_token(<<@tds_token_done, status::int16, cur_cmd::binary(2), row_count::little-size(8)-unit(8), _tail::binary>>, tokens) do
+    Logger.debug "HIT TOKENDONE"
+    Logger.debug "HAS A TAIL YO: #{inspect _tail}"
+
     case tokens do
       [done: done] ->
 
@@ -165,6 +213,9 @@ defmodule Tds.Tokens do
 
   ## DONEPROC
   defp decode_token(<<@tds_token_doneproc, status::int16, cur_cmd::binary(2), row_count::little-size(8)-unit(8), _tail::binary>>, tokens) do
+    Logger.debug "HIT TOKENDONEPROC"
+    Logger.debug "HAS A TAIL YO: #{inspect _tail}"
+
     case tokens do
       [done: done] ->
         cond do
@@ -177,15 +228,18 @@ defmodule Tds.Tokens do
   end
 
   ## DONEINPROC
-  defp decode_token(<<@tds_token_doneinproc, status::int16, cur_cmd::binary(2), row_count::little-size(8)-unit(8), _something::binary-size(5), _tail::binary>>, tokens) do
+  defp decode_token(<<@tds_token_doneinproc, status::int16, cur_cmd::binary(2), row_count::little-size(8)-unit(8), _something::binary-size(5), tail::binary>>, tokens) do
+    Logger.debug "HIT TOKENDONEINPROC"
+    Logger.debug "HAS A TAIL YO: #{inspect tail}"
+
     case tokens do
       [done: done] ->
         cond do
           row_count > done.rows -> {[done: %{status: status, cmd: cur_cmd, rows: row_count}] ++ tokens, nil}
-          true -> {tokens, nil}
+          true -> {tokens, tail}
         end
         {tokens, nil}
-      _ ->  {[done: %{status: status, cmd: cur_cmd, rows: row_count}] ++ tokens, nil}
+      _ ->  {[done: %{status: status, cmd: cur_cmd, rows: row_count}] ++ tokens, tail}
     end
   end
 

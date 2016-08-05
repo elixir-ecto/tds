@@ -38,7 +38,7 @@ defmodule Tds.Utils do
 
   def error(error, s) do
     reply(error, s)
-    {:stop, error, s}
+    {:error, error}
   end
 
   def reply(reply, %{queue: queue}) do
