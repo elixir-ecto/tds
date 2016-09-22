@@ -1,2 +1,2 @@
-%{"decimal": {:hex, :decimal, "1.1.0"},
+%{"decimal": {:hex, :decimal, "1.1.0", "3333732f17a90ff3057d7ab8c65f0930ca2d67e15cca812a91ead5633ed472fe", [:mix], []},
   "timex": {:hex, :timex, "0.13.4"}}
