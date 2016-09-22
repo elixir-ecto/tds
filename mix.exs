@@ -5,10 +5,10 @@ defmodule Tds.Mixfile do
     [app: :tds,
      version: "0.5.4",
      elixir: "~> 1.0",
-     deps: deps,
+     deps: deps(),
      source_url: "https://github.com/livehelpnow/tds",
-     description: description,
-     package: package
+     description: description(),
+     package: package()
      ]
   end
 
