@@ -3,7 +3,7 @@ defmodule Tds.Mixfile do
 
   def project do
     [app: :tds,
-     version: "0.5.4",
+     version: "0.1.0-alpha",
      elixir: "~> 1.0",
      deps: deps,
      source_url: "https://github.com/livehelpnow/tds",
@@ -37,12 +37,12 @@ defmodule Tds.Mixfile do
 
   defp description do
     """
-    MSSQL / TDS Driver for Ecto.
+    MSSQL / TDS Driver for Ecto 2.0
     """
   end
 
   defp package do
-    [maintainers: ["Justin Schneck"],
+    [maintainers: ["Thomas Gentry"],
      licenses: ["Apache 2.0"],
      links: %{"Github" => "https://github.com/livehelpnow/tds"}]
   end
