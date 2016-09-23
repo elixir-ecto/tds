@@ -2,24 +2,27 @@
 
 MSSQL / TDS Database driver for Elixir.
 
+This branch is an alpha version that currently supports Ecto 2.0. It has implemented the [db_connection](https://github.com/elixir-ecto/db_connection) behaviour, and added support for transactions and prepared queries.
+Please check out the issues for a more complete overview. This branch should not yet be considered stable or used in production.
+
 ## Usage
 
 Add Tds as a dependency in your `mix.exs` file.
 
 ```elixir
 def deps do
-  [{:tds, "~> 0.2"} ]
+  [{:tds, "~> 0.1.0-alpha", git: "https://github.com/livehelpnow/tds", branch: "ecto2"}]
 end
 ```
 
 After you are done, run `mix deps.get` in your shell to fetch and compile Tds. Start an interactive Elixir shell with `iex -S mix`.
 
 ```iex
-iex> {:ok, pid} = Tds.Connection.start_link([hostname: "localhost", username: "test_user", password: "test_password", database: "test_db", port: 4000])
+iex> {:ok, pid} = Tds.start_link([hostname: "localhost", username: "test_user", password: "test_password", database: "test_db", port: 4000])
 {:ok, #PID<0.69.0>}
 iex> Tds.Connection.query!(pid, "SELECT 'Some Awesome Text' AS MyColumn", [])
 %Tds.Result{columns: ["MyColumn"], rows: [{"Some Awesome Text"}], num_rows: 1}}
-iex> Tds.Connection.query!(pid, "INSERT INTO MyTable (MyColumn) VALUES (@my_value)", [%Tds.Parameter{name: "@my_value", value: "My Actual Value"}])
+iex> Tds.query!(pid, "INSERT INTO MyTable (MyColumn) VALUES (@my_value)", [%Tds.Parameter{name: "@my_value", value: "My Actual Value"}])
 %Tds.Result{columns: nil, rows: nil, num_rows: 1}}
 ```
 
@@ -74,12 +77,12 @@ Thanks to ericmj, this driver takes a lot of inspiration from postgrex.
 https://github.com/ericmj/
 
 
-Also thanks to everyone in the Elixir Gogle group and on the Elixir IRC Channel
+Also thanks to everyone in the Elixir Google group and on the Elixir IRC Channel
 
 
 ## License
 
-   Copyright 2014, 2015 LiveHelpNow
+   Copyright 2014, 2015, 2016 LiveHelpNow
 
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
