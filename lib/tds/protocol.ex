@@ -136,21 +136,24 @@ defmodule Tds.Protocol do
     port      = s.itcp || opts[:port] || System.get_env("MSSQLPORT") || 1433
     if is_binary(port), do: {port, _} = Integer.parse(port)
     timeout   = opts[:timeout] || @timeout
-    sock_opts = [{:active, :once}, :binary, {:packet, :raw}, {:delay_send, false}] ++ (opts[:socket_options] || [])
+    sock_opts = [{:active, false}, :binary, {:packet, :raw}, {:delay_send, false}] ++ (opts[:socket_options] || [])
 
     s = %{s | opts: opts}
 
     case :gen_tcp.connect(host, port, sock_opts, timeout) do
       {:ok, sock} ->
         s = put_in s.sock, {:gen_tcp, sock}
+
         # A suitable :buffer is only set if :recbuf is included in
         # :socket_options.
         {:ok, [sndbuf: sndbuf, recbuf: recbuf, buffer: buffer]} =
           :inet.getopts(sock, [:sndbuf, :recbuf, :buffer])
+          
         buffer = buffer
-          |> max(sndbuf)
-          |> max(recbuf)
-        :ok = :inet.setopts(sock, [buffer: buffer, active: :once])
+        |> max(sndbuf)
+        |> max(recbuf)
+
+        :ok = :inet.setopts(sock, buffer: buffer)
         login(%{s | opts: opts, sock: {:gen_tcp, sock}})
       {:error, error} ->
         error(%Tds.Error{message: "tcp connect: #{error}"}, s)
@@ -442,9 +445,7 @@ defmodule Tds.Protocol do
   end
 
   def message(:login, msg_login_ack(), %{opts: opts, sock: {mod, sock}} = s) do
-
     s = %{s | opts: clean_opts(opts)}
-    :inet.setopts(sock, active: false)
 
     send_query("""
           SET ANSI_NULLS ON;
@@ -544,8 +545,6 @@ defmodule Tds.Protocol do
   end
 
   defp login_send(msg, %{sock: {mod, sock}, env: env} = s) do
-    :inet.setopts(sock, active: false)
-
     paks = encode_msg(msg, env)
     Enum.each(paks, fn(pak) ->
       mod.send(sock, pak)
