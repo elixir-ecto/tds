@@ -7,6 +7,8 @@ defmodule Tds.Protocol do
   alias Tds.Parameter
   alias Tds.Query
 
+  require Logger
+
   @behaviour DBConnection
 
   @timeout 5000
@@ -56,24 +58,19 @@ defmodule Tds.Protocol do
   end
 
   def ping(s) do
-    #Logger.debug "CALLED ping/1"
-    #Logger.debug "STATE: #{inspect s}"
 
-    #case send_attn(%{s | pak_header: "", pak_data: "", tail: "", state: :attn}) do
-    #  {:ok, s} ->
-    #    {:ok, s}
-    #  err ->
-    #    {:disconnect, %Tds.Error{message: "attn error: #{err}"}}
-    #end
+    {:ok, s}
+  end
+  
+  def checkout(%{sock: {mod, sock}} = s) do
+    :ok = :inet.setopts(sock, [active: false])
 
     {:ok, s}
   end
 
-  def checkout(s) do
-    {:ok, s}
-  end
+  def checkin(%{sock: {mod, sock}} = s) do
+    :ok = :inet.setopts(sock, [active: :once])
 
-  def checkin(s) do
     {:ok, s}
   end
 
@@ -209,6 +206,8 @@ defmodule Tds.Protocol do
   end
 
   def handle_info(msg, s) do
+    Logger.debug "Unhandled info: #{inspect msg}"
+
     {:ok, s}
   end
 
@@ -564,6 +563,13 @@ defmodule Tds.Protocol do
   #    {:error, reason} ->
   #      {:error, %Tds.Error{message: "tcp send: #{reason}"} , s}
   #  end
+  #end
+  #
+  #case send_attn(%{s | pak_header: "", pak_data: "", tail: "", state: :attn}) do
+  #  {:ok, s} ->
+  #    {:ok, s}
+  #  err ->
+  #    {:disconnect, %Tds.Error{message: "attn error: #{err}"}}
   #end
 
   defp clean_opts(opts) do
