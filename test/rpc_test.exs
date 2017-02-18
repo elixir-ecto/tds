@@ -104,13 +104,13 @@ defmodule RPCTest do
       %Tds.Parameter{name: "@1", value: nil, type: :string}
     ]
     assert :ok = query(sql, params)
-    #assert [{nil}, {nil}, {nil}] = query("SELECT nchar FROM TestTable WHERE nchar IS NULL ORDER BY nchar", [])
+    assert [[nil], [nil], [nil], [nil]] = query("SELECT nchar FROM TestTable WHERE nchar IS NULL ORDER BY nchar", [])
     assert :ok = query("DROP TABLE dbo.TestTable", [])
   end
 
-  # test "Descriptors", context do
-  #   assert [{1.0}] = query("SELECT @1", [%Parameter{name: "@1", value: 1.0}])
-  # end
+  test "Descriptors", context do
+    assert [[1.0]] = query("SELECT @1", [%Parameter{name: "@1", value: 1.0}])
+  end
 
   test "Char to binary encoding", context do
     query("DROP TABLE dbo.TestTable2", [])

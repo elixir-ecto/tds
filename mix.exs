@@ -3,7 +3,7 @@ defmodule Tds.Mixfile do
 
   def project do
     [app: :tds,
-     version: "0.1.0-alpha",
+     version: "0.6.0-alpha",
      elixir: "~> 1.0",
      deps: deps,
      source_url: "https://github.com/livehelpnow/tds",
@@ -30,8 +30,8 @@ defmodule Tds.Mixfile do
   # Type `mix help deps` for more examples and options
   defp deps do
     [
-      {:decimal, "~> 1.1"},
-      {:db_connection, "~> 1.0-rc"}
+      {:decimal, "~> 1.2"},
+      {:db_connection, "~> 1.1"}
     ]
   end
 

@@ -1,4 +1,4 @@
-%{"connection": {:hex, :connection, "1.0.3", "3145f7416be3df248a4935f24e3221dc467c1e3a158d62015b35bd54da365786", [:mix], []},
-  "db_connection": {:hex, :db_connection, "1.0.0-rc.3", "d9ceb670fe300271140af46d357b669983cd16bc0d01206d7d3222dde56cf038", [:mix], [{:sbroker, "~> 1.0.0-beta.3", [hex: :sbroker, optional: true]}, {:poolboy, "~> 1.5", [hex: :poolboy, optional: true]}, {:connection, "~> 1.0.2", [hex: :connection, optional: false]}]},
-  "decimal": {:hex, :decimal, "1.1.0", "3333732f17a90ff3057d7ab8c65f0930ca2d67e15cca812a91ead5633ed472fe", [:mix], []},
+%{"connection": {:hex, :connection, "1.0.4", "a1cae72211f0eef17705aaededacac3eb30e6625b04a6117c1b2db6ace7d5976", [:mix], []},
+  "db_connection": {:hex, :db_connection, "1.1.0", "b2b88db6d7d12f99997b584d09fad98e560b817a20dab6a526830e339f54cdb3", [:mix], [{:connection, "~> 1.0.2", [hex: :connection, optional: false]}, {:poolboy, "~> 1.5", [hex: :poolboy, optional: true]}, {:sbroker, "~> 1.0", [hex: :sbroker, optional: true]}]},
+  "decimal": {:hex, :decimal, "1.3.1", "157b3cedb2bfcb5359372a7766dd7a41091ad34578296e951f58a946fcab49c6", [:mix], []},
   "timex": {:hex, :timex, "0.13.4"}}
