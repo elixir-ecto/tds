@@ -22,35 +22,35 @@ defmodule Tds.Messages do
   defrecord :msg_attn, []
 
   ## TDS Versions
-  @tds_ver_70     0x70000000
-  @tds_ver_71     0x71000000
-  @tds_ver_71rev1 0x71000001
-  @tds_ver_72     0x72090002
-  @tds_ver_73A    0x730A0003
-  @tds_ver_73     @tds_ver_73A
-  @tds_ver_73B    0x730B0003
-  @tds_ver_74     0x74000004
+  #@tds_ver_70     0x70000000
+  #@tds_ver_71     0x71000000
+  #@tds_ver_71rev1 0x71000001
+  #@tds_ver_72     0x72090002
+  #@tds_ver_73A    0x730A0003
+  #@tds_ver_73     @tds_ver_73A
+  #@tds_ver_73B    0x730B0003
+  #@tds_ver_74     0x74000004
 
   ## Microsoft Stored Procedures
-  @tds_sp_cursor 1
-  @tds_sp_cursoropen 2
-  @tds_sp_cursorprepare 3
-  @tds_sp_cursorexecute 4
-  @tds_sp_cursorprepexec 5
-  @tds_sp_cursorunprepare 6
-  @tds_sp_cursorfetch 7
-  @tds_sp_cursoroption 8
-  @tds_sp_cursorclose 9
+  #@tds_sp_cursor 1
+  #@tds_sp_cursoropen 2
+  #@tds_sp_cursorprepare 3
+  #@tds_sp_cursorexecute 4
+  #@tds_sp_cursorprepexec 5
+  #@tds_sp_cursorunprepare 6
+  #@tds_sp_cursorfetch 7
+  #@tds_sp_cursoroption 8
+  #@tds_sp_cursorclose 9
   @tds_sp_executesql 10
   @tds_sp_prepare 11
-  @tds_sp_execute 12
-  @tds_sp_prepexec 13
-  @tds_sp_prepexecrpc 14
+  #@tds_sp_execute 12
+  #@tds_sp_prepexec 13
+  #@tds_sp_prepexecrpc 14
   @tds_sp_unprepare 15
 
   # Parameter Flags
-  @fByRefValue 1
-  @fDefaultValue 2
+  #@fByRefValue 1
+  #@fDefaultValue 2
 
   ## Packet Size
   @tds_pack_data_size 4088
@@ -58,26 +58,26 @@ defmodule Tds.Messages do
   @tds_pack_size (@tds_pack_header_size + @tds_pack_data_size)
 
   ## Packet Types
-  @tds_pack_sqlbatch    1
-  @tds_pack_rpcRequest  3
+  #@tds_pack_sqlbatch    1
+  #@tds_pack_rpcRequest  3
   @tds_pack_reply       4
   @tds_pack_cancel      6
-  @tds_pack_bulkloadbcp 7
-  @tds_pack_transmgrreq 14
-  @tds_pack_normal      15
-  @tds_pack_login7      16
-  @tds_pack_sspimessage 17
-  @tds_pack_prelogin    18
+  #@tds_pack_bulkloadbcp 7
+  #@tds_pack_transmgrreq 14
+  #@tds_pack_normal      15
+  #@tds_pack_login7      16
+  #@tds_pack_sspimessage 17
+  #@tds_pack_prelogin    18
 
   ## Prelogin Fields
   # http://msdn.microsoft.com/en-us/library/dd357559.aspx
-  @tds_prelogin_version     0
-  @tds_prelogin_encryption  1
-  @tds_prelogin_instopt     2
-  @tds_prelogin_threadid    3
-  @tds_prelogin_mars        4
-  @tds_prelogin_traceid     5
-  @tds_prelogin_terminator  0xFF
+  #@tds_prelogin_version     0
+  #@tds_prelogin_encryption  1
+  #@tds_prelogin_instopt     2
+  #@tds_prelogin_threadid    3
+  #@tds_prelogin_mars        4
+  #@tds_prelogin_traceid     5
+  #@tds_prelogin_terminator  0xFF
 
 
 
@@ -279,7 +279,7 @@ defmodule Tds.Messages do
 
   defp encode(msg_transmgr(command: "TM_COMMIT_XACT"), %{trans: trans}) do
     q_ucs = <<7::little-size(2)-unit(8)>>
-    req_type = q_ucs
+    _req_type = q_ucs
 
     #Transaction Descriptor header
     header_type = <<2::little-size(2)-unit(8)>>
@@ -299,7 +299,7 @@ defmodule Tds.Messages do
   end
   defp encode(msg_transmgr(command: "TM_BEGIN_XACT"), %{trans: trans}) do
     q_ucs = <<5::little-size(2)-unit(8)>>
-    req_type = q_ucs
+    _req_type = q_ucs
 
     #Transaction Descriptor header
     header_type = <<2::little-size(2)-unit(8)>>
@@ -319,7 +319,7 @@ defmodule Tds.Messages do
   end
   defp encode(msg_transmgr(command: "TM_ROLLBACK_XACT"), %{trans: trans}) do
     q_ucs = <<8::little-size(2)-unit(8)>>
-    req_type = q_ucs
+    _req_type = q_ucs
 
     #Transaction Descriptor header
     header_type = <<2::little-size(2)-unit(8)>>

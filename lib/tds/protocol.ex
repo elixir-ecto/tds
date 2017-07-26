@@ -12,6 +12,7 @@ defmodule Tds.Protocol do
   @behaviour DBConnection
 
   @timeout 5000
+  @sock_opts [packet: :raw, mode: :binary, active: false, recbuf: 4096]
 
   defstruct [
     sock: nil,
@@ -36,7 +37,7 @@ defmodule Tds.Protocol do
     |> Keyword.put_new(:hostname, System.get_env("MSSQLHOST") || "localhost")
     |> Enum.reject(fn {_k,v} -> is_nil(v) end)
 
-    timeout = opts[:timeout] || @timeout
+    _timeout = opts[:timeout] || @timeout
     s = %__MODULE__{}
 
     case opts[:instance] do
@@ -61,20 +62,20 @@ defmodule Tds.Protocol do
 
     {:ok, s}
   end
-  
-  def checkout(%{sock: {mod, sock}} = s) do
+
+  def checkout(%{sock: {_mod, sock}} = s) do
     :ok = :inet.setopts(sock, [active: false])
 
     {:ok, s}
   end
 
-  def checkin(%{sock: {mod, sock}} = s) do
+  def checkin(%{sock: {_mod, sock}} = s) do
     :ok = :inet.setopts(sock, [active: :once])
 
     {:ok, s}
   end
 
-  def handle_execute(%Query{statement: statement} = query, params, opts, %{sock: sock} = s) do
+  def handle_execute(%Query{statement: statement} = query, params, opts, %{sock: _sock} = s) do
     params = opts[:parameters] || params
 
     if params != [] do
@@ -84,24 +85,24 @@ defmodule Tds.Protocol do
     end
   end
 
-  def handle_prepare(%{statement: statement}, opts, %{sock: sock} = s) do
+  def handle_prepare(%{statement: statement}, opts, %{sock: _sock} = s) do
     params = opts[:parameters]
     |> Parameter.prepared_params
 
     send_prepare(statement, params, s)
   end
 
-  def handle_close(query, opts, %{sock: sock} = s) do
+  def handle_close(query, opts, %{sock: _sock} = s) do
     params = opts[:parameters]
 
     send_close(query, params, s)
   end
 
-  def handle_begin(opts, %{sock: sock} = s) do
+  def handle_begin(_opts, %{sock: _sock} = s) do
     send_transaction("TM_BEGIN_XACT", %{s | transaction: :started})
   end
 
-  def handle_commit(opts, %{transaction: status} = s) do
+  def handle_commit(_opts, %{transaction: status} = s) do
     case status do
       :failed ->
         handle_rollback([], s)
@@ -110,7 +111,7 @@ defmodule Tds.Protocol do
     end
   end
 
-  def handle_rollback(opts, %{sock: sock} = s) do
+  def handle_rollback(_opts, %{sock: _sock} = s) do
     send_transaction("TM_ROLLBACK_XACT", %{s | transaction: :failed})
   end
 
@@ -134,27 +135,27 @@ defmodule Tds.Protocol do
     host      = Keyword.fetch!(opts, :hostname)
     host      = if is_binary(host), do: String.to_char_list(host), else: host
     port      = s.itcp || opts[:port] || System.get_env("MSSQLPORT") || 1433
-    if is_binary(port), do: {port, _} = Integer.parse(port)
+    {port, _}      = if is_binary(port), do: Integer.parse(port), else: {port, nil}
     timeout   = opts[:timeout] || @timeout
-    sock_opts = [{:active, false}, :binary, {:packet, :raw}, {:delay_send, false}] ++ (opts[:socket_options] || [])
+    sock_opts = @sock_opts ++ (opts[:socket_options] || [])
 
     s = %{s | opts: opts}
 
     case :gen_tcp.connect(host, port, sock_opts, timeout) do
       {:ok, sock} ->
-        s = put_in s.sock, {:gen_tcp, sock}
+        #s = put_in s.sock, {:gen_tcp, sock}
 
         # A suitable :buffer is only set if :recbuf is included in
         # :socket_options.
         {:ok, [sndbuf: sndbuf, recbuf: recbuf, buffer: buffer]} =
           :inet.getopts(sock, [:sndbuf, :recbuf, :buffer])
-          
+
         buffer = buffer
         |> max(sndbuf)
         |> max(recbuf)
 
         :ok = :inet.setopts(sock, buffer: buffer)
-        login(%{s | opts: opts, sock: {:gen_tcp, sock}})
+        login(%{s | sock: {:gen_tcp, sock}})
       {:error, error} ->
         error(%Tds.Error{message: "tcp connect: #{error}"}, s)
     end
@@ -227,12 +228,15 @@ defmodule Tds.Protocol do
   end
 
   #shift 8 bytes while in attention state, Protocol updates state
-  defp new_data(<<_b::size(1)-unit(8), tail::binary>>, %{state: :attn} = s), do: new_data(tail, s)
+  defp new_data(<<_b::size(1)-unit(8), tail::binary>>, %{state: :attn} = s) do
+    new_data(tail, s)
+  end
 
   #no packet header yet
   defp new_data(<<data::binary>>, %{pak_header: ""} = s) do
     if byte_size(data) >= 8 do
       #assume incoming data starts with packet header, if it's long enough
+      #Logger.debug "S: #{inspect s}"
       <<pak_header::binary(8), tail::binary>> = data
       new_data(tail, %{s | pak_header: pak_header})
     else
@@ -267,7 +271,7 @@ defmodule Tds.Protocol do
             #not the last packet of message, more packets coming with new packet header
             new_data(tail, %{s | pak_header: "", pak_data: pak_data <> data})
         end
-      _ ->
+      data ->
         #size specified in packet header still unsatisfied, wait for more data
         {:ok, %{s | tail: data, pak_header: pak_header}}
     end
@@ -275,7 +279,7 @@ defmodule Tds.Protocol do
 
   defp flush(%{sock: sock} = s) do
     receive do
-      {:tcp, ^sock, data} ->
+      {:tcp, ^sock, _data} ->
         new_data(sock, s)
         {:ok, s}
       {:tcp_closed, ^sock} ->
@@ -367,25 +371,7 @@ defmodule Tds.Protocol do
   #  {:ok, %{s | statement: nil, state: :ready}}
   #end
 
-  def send_param_query(%Query{handle: handle} = query, params, s) do
-    params = [
-      %Tds.Parameter{name: "@handle", type: :integer, direction: :input, value: handle}
-      | params
-    ]
-
-    # msg = msg_rpc(proc: :sp_executesql, params: params)
-    msg = msg_rpc(proc: :sp_execute, params: params)
-
-    case msg_send(msg, s) do
-      {:ok, %{result: result} = s} ->
-        {:ok, result, %{s | state: :ready}}
-      {:error, err, %{transaction: :started} = s} ->
-        {:error, err, %{s | transaction: :failed}}
-      err ->
-        err
-    end
-  end
-  def send_param_query(%Query{handle: handle} = query, params, %{transaction: :started} = s) do
+  def send_param_query(%Query{handle: handle} = _query, params, %{transaction: :started} = s) do
     params = [
       %Tds.Parameter{name: "@handle", type: :integer, direction: :input, value: handle}
       | params
@@ -403,8 +389,26 @@ defmodule Tds.Protocol do
         err
     end
   end
+  def send_param_query(%Query{handle: handle} = _query, params, s) do
+    params = [
+      %Tds.Parameter{name: "@handle", type: :integer, direction: :input, value: handle}
+      | params
+    ]
 
-  def send_close(%Query{handle: handle} = query, params, s) do
+    # msg = msg_rpc(proc: :sp_executesql, params: params)
+    msg = msg_rpc(proc: :sp_execute, params: params)
+
+    case msg_send(msg, s) do
+      {:ok, %{result: result} = s} ->
+        {:ok, result, %{s | state: :ready}}
+      {:error, err, %{transaction: :started} = s} ->
+        {:error, err, %{s | transaction: :failed}}
+      err ->
+        err
+    end
+  end
+
+  def send_close(%Query{handle: handle} = _query, _params, s) do
     params = [
       %Tds.Parameter{name: "@handle", type: :integer, direction: :input, value: handle}
     ]
@@ -444,7 +448,7 @@ defmodule Tds.Protocol do
 
   end
 
-  def message(:login, msg_login_ack(), %{opts: opts, sock: {mod, sock}} = s) do
+  def message(:login, msg_login_ack(), %{opts: opts, sock: {_mod, _sock}} = s) do
     s = %{s | opts: clean_opts(opts)}
 
     send_query("""
@@ -464,16 +468,16 @@ defmodule Tds.Protocol do
   ## executing
 
   def message(:executing, msg_sql_result(columns: columns, rows: rows, done: done), %{} = s) do
+    columns =
     if columns != nil do
-      columns = Enum.reduce(columns, [], fn (col, acc) -> [col[:name]|acc] end) |> Enum.reverse
+      Enum.reduce(columns, [], fn (col, acc) -> [col[:name]|acc] end) |> Enum.reverse
+    else
+      columns
     end
     num_rows = done.rows;
-    if rows != nil do
-      rows = Enum.reverse rows
-    end
-    if num_rows == 0 && rows == nil do
-      rows = []
-    end
+    rows =
+    if rows != nil, do:  Enum.reverse(rows), else: rows
+    rows = if num_rows == 0 && rows == nil, do: [], else: rows
 
     result = %Tds.Result{columns: columns, rows: rows, num_rows: num_rows}
 
