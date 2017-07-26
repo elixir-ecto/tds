@@ -529,9 +529,25 @@ defmodule Tds.Protocol do
       mod.send(sock, pak)
     end)
 
+    msg_recv(s, <<>>, nil)
+  end
+
+  def msg_recv(%{sock: {mod, sock}} = s, buffer, org_size) do
     case :gen_tcp.recv(sock, 0) do
-      {:ok, msg} ->
-        new_data(msg, %{s | state: :executing, pak_header: ""})
+      {:ok, <<pak_header::binary(8), _tail::binary>> = msg} ->
+        <<_type::int8, _status::int8, size::int16, _head_rem::int32>> = pak_header
+
+        org_size = if org_size != nil, do: org_size, else: size
+
+        msg = buffer <> msg
+        bs = byte_size(msg)
+        bs = bs + byte_size(buffer)
+
+        if bs < org_size do
+          msg_recv(s, msg, org_size)
+        else
+          new_data(msg, %{s | state: :executing, pak_header: ""})
+        end
       {:error, exception} ->
         {:disconnect, exception, s}
     end
