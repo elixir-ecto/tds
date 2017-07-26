@@ -5,10 +5,10 @@ defmodule Tds.Mixfile do
     [app: :tds,
      version: "0.1.0-alpha",
      elixir: "~> 1.0",
-     deps: deps,
+      deps: deps(),
      source_url: "https://github.com/livehelpnow/tds",
-     description: description,
-     package: package
+      description: description(),
+      package: package()
      ]
   end
 
@@ -16,7 +16,7 @@ defmodule Tds.Mixfile do
   #
   # Type `mix help compile.app` for more information
   def application do
-    [applications: [:logger, :db_connection]]
+    [applications: [:logger, :db_connection, :decimal]]
   end
 
   # Dependencies can be Hex packages:
@@ -30,8 +30,8 @@ defmodule Tds.Mixfile do
   # Type `mix help deps` for more examples and options
   defp deps do
     [
-      {:decimal, "~> 1.1"},
-      {:db_connection, "~> 1.0-rc"}
+      {:decimal, "~> 1.4"},
+      {:db_connection, "~> 1.1"}
     ]
   end
 
@@ -42,7 +42,7 @@ defmodule Tds.Mixfile do
   end
 
   defp package do
-    [maintainers: ["Thomas Gentry"],
+    [maintainers: ["Eric Witchin"],
      licenses: ["Apache 2.0"],
      links: %{"Github" => "https://github.com/livehelpnow/tds"}]
   end
