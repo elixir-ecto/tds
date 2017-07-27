@@ -60,7 +60,7 @@ defmodule Tds.Connection do
 
   defp call_proc(pid, message, timeout) do
     case GenServer.call(pid, message, timeout) do
-      %Tds.Result{} = res -> {:ok, res}
+      res when is_list(res) -> {:ok, res}
       %Tds.Error{} = err  ->
         {:error, err}
     end
