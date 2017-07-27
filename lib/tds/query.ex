@@ -4,10 +4,10 @@ defmodule Tds.Query do
   defstruct [:statement, :handle]
 
   defimpl DBConnection.Query, for: Tds.Query do
-    def encode(statement, [], opts) do
+    def encode(_statement, [], _opts) do
       []
     end
-    def encode(%Tds.Query{statement: statement, handle: handle}, params, opts) do
+    def encode(%Tds.Query{statement: statement, handle: handle}, params, _opts) do
       case handle do
         nil ->
           param_desc = params |> Enum.map(fn(%Parameter{} = param) ->
@@ -24,7 +24,7 @@ defmodule Tds.Query do
       end
     end
 
-    def decode(query, result, opts) do
+    def decode(_query, result, opts) do
       mapper = opts[:decode_mapper] || fn x -> x end
       %Tds.Result{rows: rows} = result
       rows = do_decode(rows, mapper, [])

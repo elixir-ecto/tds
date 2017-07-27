@@ -2,6 +2,8 @@ defmodule Tds.Tokens do
   import Tds.BinaryUtils
   import Tds.Utils
 
+  require Logger
+
   alias Tds.Types
 
   @tds_token_returnstatus   0x79 # 0x79
@@ -10,18 +12,18 @@ defmodule Tds.Tokens do
   @tds_token_error          0xAA # 0xAA
   @tds_token_info           0xAB # 0xAB
   @tds_token_returnvalue    0xAC
-  @tds_token_loginack       0xAD # 0xAD
+  #@tds_token_loginack       0xAD # 0xAD
   @tds_token_row            0xD1 # 0xD1
   @tds_token_nbcrow         0xD2 # 0xD1
   @tds_token_envchange      0xE3 # 0xE3
-  @tds_token_sspi           0xED # 0xED
+  #@tds_token_sspi           0xED # 0xED
   @tds_token_done           0xFD # 0xFD
   @tds_token_doneproc       0xFE # 0xFE
   @tds_token_doneinproc     0xFF # 0xFF
 
   @tds_envtype_database       1
-  @tds_envtype_language       2
-  @tds_envtype_charset        3
+  #@tds_envtype_language       2
+  #@tds_envtype_charset        3
   @tds_envtype_packetsize     4
   @tds_envtype_begintrans     8
   @tds_envtype_committrans    9
@@ -32,30 +34,9 @@ defmodule Tds.Tokens do
   def decode_tokens(tail, tokens) when tail == "" or tail == nil do
     tokens
   end
-
   def decode_tokens(<<tail::binary>>, tokens) do
     {tokens, tail} = decode_token(tail, tokens)
     decode_tokens(tail, tokens)
-  end
-
-  defp decode_token(<<@tds_token_returnvalue, tail::binary>>, tokens) do
-    <<ord::little-unsigned-16, length::size(8), rest::binary>> = tail
-
-    length = length * 2
-
-    <<name::binary-size(length)-unit(8), rest::binary>> = rest
-    name = ucs2_to_utf(name)
-
-    <<status::size(8), usertype::size(32), flags::size(16), datatype::size(8), rest::binary>> = rest
-
-    datatype_size = retval_typ_size(datatype)
-
-    <<garbage::binary-size(2), ret_val::size(datatype_size), empty::binary-size(3), tail::binary>> = rest
-
-    {[parameters: {name, ret_val}]++tokens, tail}
-  end
-  defp decode_token(<<@tds_token_returnstatus, _value::little-size(32), tail::binary>>, tokens) do
-    {tokens, tail}
   end
 
   def retval_typ_size(38) do
@@ -67,20 +48,37 @@ defmodule Tds.Tokens do
     raise Tds.Error, "Unknown datatype parsed when decoding return value: #{dec}"
   end
 
+  defp decode_token(<<@tds_token_returnvalue, tail::binary>>, tokens) do
+    <<_ord::little-unsigned-16, length::size(8), rest::binary>> = tail
+
+    length = length * 2
+
+    <<name::binary-size(length)-unit(8), rest::binary>> = rest
+    name = ucs2_to_utf(name)
+
+    <<_status::size(8), _usertype::size(32), _flags::size(16), datatype::size(8), rest::binary>> = rest
+
+    datatype_size = retval_typ_size(datatype)
+
+    <<_garbage::binary-size(2), ret_val::size(datatype_size), _empty::binary-size(3), tail::binary>> = rest
+
+    {[parameters: {name, ret_val}]++tokens, tail}
+  end
+  defp decode_token(<<@tds_token_returnstatus, _value::little-size(32), tail::binary>>, tokens) do
+    {tokens, tail}
+  end
   # COLMETADATA
   defp decode_token(<<@tds_token_colmetadata, column_count::little-2*8, tail::binary>>, tokens) do
     columns = []
     {columns, tail} = decode_columns(tail, columns, column_count)
     {[columns: columns]++tokens, tail}
   end
-
   # ORDER
   defp decode_token(<<@tds_token_order, length::little-unsigned-16, tail::binary>>, tokens) do
     length = trunc(length / 2)
     {columns, tail} = decode_column_order(tail, length, [])
     {[order: columns]++tokens, tail}
   end
-
   # ERROR
   defp decode_token(<<@tds_token_error, length::little-size(16), number::little-size(32), state, class,
       msg_len::little-size(16), msg::binary-size(msg_len)-unit(16),
@@ -103,7 +101,6 @@ defmodule Tds.Tokens do
     # Logger.debug "SQL Error: #{inspect e}"
     {[error: e], nil}
   end
-
   defp decode_token(<<@tds_token_info, length::little-size(16), number::little-size(32), state, class,
       msg_len::little-size(16), msg::binary-size(msg_len)-unit(16),
       sn_len, server_name::binary-size(sn_len)-unit(16),
@@ -123,8 +120,6 @@ defmodule Tds.Tokens do
     info_token = Keyword.get(tokens, :info, [])
     {[[i | info_token] | tokens], tail}
   end
-
-
   ## ROW
   defp decode_token(<<@tds_token_row, tail::binary>>, tokens) do
     column_count = Enum.count tokens[:columns]
@@ -133,13 +128,12 @@ defmodule Tds.Tokens do
     tokens = Keyword.update(tokens, :rows, [row], fn(_x) -> [row|tokens[:rows]] end)
     {tokens, tail}
   end
-
   ## NBC ROW
   defp decode_token(<<@tds_token_nbcrow, tail::binary>>, tokens) do
     column_count = Enum.count tokens[:columns]
     {bitmap_bytes, _} = column_count / 8
       |> Float.ceil
-      |> Float.to_char_list([decimals: 0])
+      |> :erlang.float_to_list([decimals: 0])
       |> to_string
       |> Integer.parse
 
@@ -150,7 +144,6 @@ defmodule Tds.Tokens do
     tokens = Keyword.update(tokens, :rows, [row], fn(_x) -> [row|tokens[:rows]] end)
     {tokens, tail}
   end
-
   defp decode_token(<<@tds_token_envchange, _length::little-unsigned-16, env_type::unsigned-8, tail::binary>>, tokens) do
     token = case env_type do
       @tds_envtype_database ->
@@ -177,7 +170,6 @@ defmodule Tds.Tokens do
     end
     {token ++ tokens, tail}
   end
-
   ## DONE
   defp decode_token(<<@tds_token_done, status::int16, cur_cmd::binary(2), row_count::little-size(8)-unit(8), _tail::binary>>, tokens) do
     case tokens do
@@ -191,7 +183,6 @@ defmodule Tds.Tokens do
       _ ->  {[done: %{status: status, cmd: cur_cmd, rows: row_count}] ++ tokens, nil}
     end
   end
-
   ## DONEPROC
   defp decode_token(<<@tds_token_doneproc, status::int16, cur_cmd::binary(2), row_count::little-size(8)-unit(8), _tail::binary>>, tokens) do
     case tokens do
@@ -204,7 +195,6 @@ defmodule Tds.Tokens do
       _ ->  {[done: %{status: status, cmd: cur_cmd, rows: row_count}] ++ tokens, nil}
     end
   end
-
   ## DONEINPROC
   defp decode_token(<<@tds_token_doneinproc, status::int16, cur_cmd::binary(2), row_count::little-size(8)-unit(8), _something::binary-size(5), tail::binary>>, tokens) do
     case tokens do

@@ -1,6 +1,6 @@
 defmodule Tds.Parameter do
   alias Tds.Types
-  alias Tds.Parameter
+  #alias Tds.Parameter
   alias Tds.DateTime
   alias Tds.DateTime2
 
@@ -42,11 +42,10 @@ defmodule Tds.Parameter do
   end
 
   def do_name([param | tail], name, acc) do
-    param = case param do
+    param =
+    case param do
       %Tds.Parameter{} -> param
-      raw_param ->
-        name = name + 1
-        fix_data_type(raw_param, name)
+      raw_param -> fix_data_type(raw_param, name+1)
     end
 
     do_name(tail, name, [param | acc])
@@ -56,7 +55,7 @@ defmodule Tds.Parameter do
     acc
   end
 
-  def fix_data_type(%Tds.Parameter{type: type, value: value} = param) do
+  def fix_data_type(%Tds.Parameter{type: _type, value: _value} = param) do
     param
   end
   def fix_data_type(%Tds.Parameter{value: value} = param)

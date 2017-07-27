@@ -2,7 +2,7 @@ defmodule Tds.Error do
   defexception [:message, :mssql]
 
   def message(e) do
-    msg = 
+    msg =
     if kw = e.mssql do
       "#{kw[:line_number]} (#{kw[:number]}): #{kw[:msg_text]}"
     end
