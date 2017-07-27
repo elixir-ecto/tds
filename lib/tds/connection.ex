@@ -116,8 +116,10 @@ defmodule Tds.Connection do
   def handle_call({:connect, opts}, from, %{queue: queue} = s) do
     host      = Keyword.fetch!(opts, :hostname)
     host      = if is_binary(host), do: String.to_char_list(host), else: host
-    port      = s[:itcp] || opts[:port] || System.get_env("MSSQLPORT") || 1433
-    if is_binary(port), do: {port, _} = Integer.parse(port)
+
+    port      = port(s, opts)
+                |> parse_port 
+
     timeout   = opts[:timeout] || @timeout
     sock_opts = [{:active, :once}, :binary, {:packet, :raw}, {:delay_send, false}] ++ (opts[:socket_options] || [])
 
@@ -171,17 +173,18 @@ defmodule Tds.Connection do
   end
 
   def handle_info({:DOWN, ref, :process, _, _}, s) do
-    case :queue.out(s.queue) do
-      {{:value, {_,_,^ref}}, _queue} ->
-        {_, s} = command(:attn, s)
-      {:empty, _} -> nil
-      {_, _queue} ->
-        queue = s.queue
-          |> :queue.to_list
-          |> Enum.reject(fn({_, _, r}) -> r == ref end)
-          |> :queue.from_list
-        s = %{s | queue: queue}
-    end
+    s = case :queue.out(s.queue) do
+          {{:value, {_,_,^ref}}, _queue} ->
+            {_, s} = command(:attn, s)
+            s
+          {:empty, _} -> s
+          {_, _queue} ->
+            queue = s.queue
+            |> :queue.to_list
+            |> Enum.reject(fn({_, _, r}) -> r == ref end)
+            |> :queue.from_list
+            %{s | queue: queue}
+        end
     {:noreply, s}
   end
 
@@ -274,6 +277,15 @@ defmodule Tds.Connection do
     attn_timer_ref = :erlang.start_timer(timeout, self(), :command)
     Protocol.send_attn(%{s | attn_timer: attn_timer_ref, pak_header: "", pak_data: "", tail: "", state: :attn})
   end
+
+  defp port(s, opts), do: s[:itcp] || opts[:port] || System.get_env("MSSQLPORT") || 1433
+
+  defp parse_port(port) when is_binary port do
+     {port, _} = Integer.parse(port)
+    port
+  end
+
+  defp parse_port(port), do: port 
 
   #no data to process
   defp new_data(<<_data::0>>, s) do

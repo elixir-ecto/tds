@@ -123,30 +123,32 @@ defmodule Tds.Tokens do
   end
 
   defp decode_token(<<@tds_token_envchange, _length::little-unsigned-16, env_type::unsigned-8, tail::binary>>, tokens) do
-    token = case env_type do
+    {token, new_tail} = case env_type do
       @tds_envtype_database ->
         <<new_value_size::unsigned-8,
           new_value::binary-little-size(new_value_size)-unit(8),
           old_value_size::unsigned-8,
           _old_value::binary-little-size(old_value_size)-unit(8),
-          tail::binary>> = tail
+          new_tail::binary>> = tail
+          {[], new_tail}
       @tds_envtype_packetsize ->
         <<new_value_size::unsigned-8,
           new_value::binary-little-size(new_value_size)-unit(8),
           old_value_size::unsigned-8,
           _old_value::binary-little-size(old_value_size)-unit(8),
-          tail::binary>> = tail
+          new_tail::binary>> = tail
+          {[], new_tail}
       @tds_envtype_begintrans ->
-        <<value_size::unsigned-8, new_value::binary-little-size(value_size)-unit(8), 0x00, tail::binary>> = tail
-        [trans: new_value]
+        <<value_size::unsigned-8, new_value::binary-little-size(value_size)-unit(8), 0x00, new_tail::binary>> = tail
+        {[trans: new_value], new_tail}
       @tds_envtype_committrans ->
-        <<0x00, value_size::unsigned-8, _old_value::binary-little-size(value_size)-unit(8), tail::binary>> = tail
-        [trans: <<0x00>>]
+        <<0x00, value_size::unsigned-8, _old_value::binary-little-size(value_size)-unit(8), new_tail::binary>> = tail
+        {[trans: <<0x00>>], new_tail}
       @tds_envtype_rollbacktrans ->
-        <<0x00, value_size::unsigned-8, _old_value::binary-little-size(value_size)-unit(8), tail::binary>> = tail
-        [trans: <<0x00>>]
+        <<0x00, value_size::unsigned-8, _old_value::binary-little-size(value_size)-unit(8), new_tail::binary>> = tail
+        {[trans: <<0x00>>], new_tail}
     end
-    {token ++ tokens, tail}
+    {token ++ tokens, new_tail}
   end
 
   ## DONE
