@@ -1,6 +1,5 @@
 ExUnit.start()
 
-
 defmodule Tds.TestHelper do
   require Logger
   defmacro query(stat, params, opts \\ []) do
