@@ -12,6 +12,7 @@ defmodule Tds.Protocol do
   @behaviour DBConnection
 
   @timeout 5000
+  @max_packet 4 * 1024
   @sock_opts [packet: :raw, mode: :binary, active: false, recbuf: 4096]
 
   defstruct [
@@ -149,7 +150,7 @@ defmodule Tds.Protocol do
         # :socket_options.
         {:ok, [sndbuf: sndbuf, recbuf: recbuf, buffer: buffer]} =
           :inet.getopts(sock, [:sndbuf, :recbuf, :buffer])
-
+        
         buffer = buffer
         |> max(sndbuf)
         |> max(recbuf)
@@ -194,8 +195,8 @@ defmodule Tds.Protocol do
 
   def handle_info({:tcp, _, _data}, %{sock: {mod, sock}, opts: opts, state: :prelogin} = s) do
     case mod do
-      :gen_tcp -> :inet.setopts(sock, active: :once)
-      :ssl     -> :ssl.setopts(sock, active: :once)
+      :gen_tcp -> :inet.setopts(sock, active: false)
+      :ssl     -> :ssl.setopts(sock, active: false)
     end
 
     login(%{s | opts: opts, sock: {mod, sock}})
@@ -528,26 +529,37 @@ defmodule Tds.Protocol do
     Enum.each(paks, fn(pak) ->
       mod.send(sock, pak)
     end)
-
-    msg_recv(s, <<>>, nil)
+    <<>>
+    |> msg_recv(s)
+    |> new_data(%{s | state: :executing, pak_header: ""})    
+  end
+  
+  defp msg_recv(buffer, %{sock: {mod, sock}} = s) do
+    case mod.recv(sock, 8) do
+      # there is more tds packages after this one
+      {:ok, <<_type::int8, 0x00, length::int16, _spid::int16, _package::int8, _window::int8>> = header}  ->
+        buffer <> header
+        |> package_recv(s, length - 8)
+        |> msg_recv(s)
+      # this heder belongs to last package
+      {:ok, <<_type::int8, 0x01, length::int16, _spid::int16, _package::int8, _window::int8>> = header} ->
+        buffer <> header
+        |> package_recv(s, length - 8)
+      {:ok, _} ->
+        raise("Other statuses todo!")    
+      {:error, exception} ->
+        {:disconnect, exception, s}
+    end
   end
 
-  def msg_recv(%{sock: {mod, sock}} = s, buffer, org_size) do
-    case :gen_tcp.recv(sock, 0) do
-      {:ok, <<pak_header::binary(8), _tail::binary>> = msg} ->
-        <<_type::int8, _status::int8, size::int16, _head_rem::int32>> = pak_header
-
-        org_size = if org_size != nil, do: org_size, else: size
-
-        msg = buffer <> msg
-        bs = byte_size(msg)
-        bs = bs + byte_size(buffer)
-
-        if bs < org_size do
-          msg_recv(s, msg, org_size)
-        else
-          new_data(msg, %{s | state: :executing, pak_header: ""})
-        end
+  defp package_recv(buffer, %{sock: {mod, sock}} = s, length) do
+    case mod.recv(sock, min(length, @max_packet)) do
+      {:ok, data} when byte_size(data) < length ->
+        length = length - byte_size(data)
+        buffer <> data
+        |> package_recv(buffer, length)
+      {:ok, data} -> 
+        buffer <> data
       {:error, exception} ->
         {:disconnect, exception, s}
     end
