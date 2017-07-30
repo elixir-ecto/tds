@@ -4,10 +4,9 @@ config :logger, level: :info
 
 config :mssql,
   opts: [
-    hostname: "sql.server",
-    instance: "test",
-    username: "test_user",
-    password: "test_password",
+    hostname: "localhost",
+    username: "mssql",
+    password: "mssql",
     database: "test"
   ]
 

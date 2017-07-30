@@ -1245,29 +1245,31 @@ defmodule Tds.Types do
 
   #Time
   def decode_time(scale, <<fsec::binary>>) do
-    fsec =
-    cond do
-      scale in [0, 1, 2] ->
-        <<fsec::little-unsigned-24>>
-      scale in [3, 4] ->
-        <<fsec::little-unsigned-32>>
-      scale in [5, 6, 7] ->
-        <<fsec::little-unsigned-40>>
-    end
+    parsed_fsec = cond do
+                    scale in [0, 1, 2] ->
+                      <<parsed_fsec::little-unsigned-24>> = fsec
+                      parsed_fsec
+                    scale in [3, 4] ->
+                      <<parsed_fsec::little-unsigned-32>> = fsec
+                      parsed_fsec
+                    scale in [5, 6, 7] ->
+                      <<parsed_fsec::little-unsigned-40>> = fsec
+                      parsed_fsec
+                  end
 
     fs_per_sec = :math.pow(10, scale)
 
-    hour = (fsec / fs_per_sec / @secs_in_hour) |> trunc
-    fsec = fsec - (hour * @secs_in_hour * fs_per_sec)
+    hour = (parsed_fsec / fs_per_sec / @secs_in_hour) |> trunc
+    parsed_fsec = parsed_fsec - (hour * @secs_in_hour * fs_per_sec)
 
-    min = (fsec / fs_per_sec / @secs_in_min) |> trunc
-    fsec = fsec - (min * @secs_in_min * fs_per_sec)
+    min = (parsed_fsec / fs_per_sec / @secs_in_min) |> trunc
+    parsed_fsec = parsed_fsec - (min * @secs_in_min * fs_per_sec)
 
-    sec = (fsec / fs_per_sec) |> trunc
+    sec = (parsed_fsec / fs_per_sec) |> trunc
 
-    fsec = fsec - (sec * fs_per_sec) |> trunc
+    parsed_fsec = parsed_fsec - (sec * fs_per_sec) |> trunc
 
-    {hour, min, sec, fsec}
+    {hour, min, sec, parsed_fsec}
   end
 
 #time(n) is represented as one unsigned integer that represents the number of 10-n second increments since 12 AM within a day. The length, in bytes, of that integer depends on the scale n as follows:
