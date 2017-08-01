@@ -13,6 +13,10 @@ defmodule PLPTest do
   end
 
   test "Max and Large PLP returns", context do
+    # :dbg.tracer()
+    # :dbg.p(:all, :c)
+    # :dbg.tpl(Tds.Types, :encode_string_type, :x)
+
     query("DROP TABLE plp_test", [])
     query("""
       CREATE TABLE plp_test (
@@ -23,5 +27,7 @@ defmodule PLPTest do
     assert :ok == query("INSERT INTO plp_test VALUES(@1)",[%Tds.Parameter{name: "@1", value: data, type: :string}])
     assert [[data]] == query("SELECT text FROM plp_test",[])
     query("DROP TABLE plp_test", [])
+
+    # :dbg.stop_clear()
   end
 end

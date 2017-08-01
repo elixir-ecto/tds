@@ -640,7 +640,7 @@ defmodule Tds.Types do
       value = value |> to_little_ucs2
       value_size = byte_size(value)
       cond do
-        value_size == 0 or value_size > 8000 ->
+        value_size == 0 or value_size > 4000 ->
           <<0xFF, 0xFF>>
         true ->
           <<value_size::little-2*8>>
@@ -790,8 +790,8 @@ defmodule Tds.Types do
           else
             String.length(value)
           end
-        if length <= 0, do: 1, else: length
-        if length > 4000, do: "max", else: length
+        length = if length <= 0, do: 1, else: length
+        length = if length > 4000, do: "max", else: length
         "nvarchar(#{length})"
       :integer ->
         cond do

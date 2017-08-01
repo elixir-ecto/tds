@@ -195,8 +195,8 @@ defmodule Tds.Protocol do
 
   def handle_info({:tcp, _, _data}, %{sock: {mod, sock}, opts: opts, state: :prelogin} = s) do
     case mod do
-      :gen_tcp -> :inet.setopts(sock, active: false)
-      :ssl     -> :ssl.setopts(sock, active: false)
+      :gen_tcp -> :inet.setopts(sock, active: :once)
+      :ssl     -> :ssl.setopts(sock, active: :once)
     end
 
     login(%{s | opts: opts, sock: {mod, sock}})
