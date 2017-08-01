@@ -815,8 +815,8 @@ defmodule Tds.Types do
           else
             String.length(value)
           end
-        if length <= 0, do: 1, else: length
-        if length > 4000, do: "max", else: length
+        length = if length <= 0, do: 1, else: length
+        length = if length > 4000, do: "max", else: length
         "nvarchar(#{length})"
     end
 
