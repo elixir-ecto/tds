@@ -5,8 +5,8 @@ config :logger, level: :info
 config :mssql,
   opts: [
     hostname: "localhost",
-    username: "mssql",
-    password: "mssql",
+    username: "sa",
+    password: "some!Password",
     database: "test"
   ]
 
