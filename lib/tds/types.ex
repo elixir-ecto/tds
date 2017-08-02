@@ -794,12 +794,12 @@ defmodule Tds.Types do
         length = if length > 4000, do: "max", else: length
         "nvarchar(#{length})"
       :integer ->
-        cond do
-          value == 0 ->
+        case value do
+          0 ->
             "int"
-          value >= 1 ->
+          val when val >= 1 ->
             "bigint"
-          true ->
+          _ ->
             precision = value
               |> Integer.to_string
               |> String.length

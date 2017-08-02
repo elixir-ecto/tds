@@ -2,11 +2,13 @@ defmodule Tds.Mixfile do
   use Mix.Project
 
   def project do
-    [app: :tds,
-     version: "0.6.0-alpha",
-     elixir: "~> 1.0",
+    [ app: :tds,
+      version: "0.6.0-alpha",
+      elixir: "~> 1.0",
       deps: deps(),
-     source_url: "https://github.com/livehelpnow/tds",
+      test_coverage: [tool: ExCoveralls],
+      preferred_cli_env: ["coveralls": :test, "coveralls.detail": :test, "coveralls.post": :test, "coveralls.html": :test],
+      source_url: "https://github.com/livehelpnow/tds",
       description: description(),
       package: package()
      ]
@@ -31,7 +33,8 @@ defmodule Tds.Mixfile do
   defp deps do
     [
       {:decimal, "~> 1.4"},
-      {:db_connection, "~> 1.1"}
+      {:db_connection, "~> 1.1"},
+      {:excoveralls, "~> 0.7", only: :test}
     ]
   end
 
