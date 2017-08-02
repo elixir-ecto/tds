@@ -529,9 +529,13 @@ defmodule Tds.Protocol do
     Enum.each(paks, fn(pak) ->
       mod.send(sock, pak)
     end)
-    <<>>
-    |> msg_recv(s)
-    |> new_data(%{s | state: :executing, pak_header: ""})    
+    case msg_recv(<<>>, s) do
+      {:ok, buffer} ->
+        new_data(buffer, %{s | state: :executing, pak_header: ""})
+      {:disconnect, ex, _s} ->
+        raise ex
+    end
+        
   end
   
   defp msg_recv(buffer, %{sock: {mod, sock}} = s) do
