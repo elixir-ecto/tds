@@ -531,7 +531,7 @@ defmodule Tds.Protocol do
     end)
     case msg_recv(<<>>, s) do
       {:disconnect, :econnaborted, ex} ->
-        raise ex
+        {:error, ex}
       buffer ->
         new_data(buffer, %{s | state: :executing, pak_header: ""})
     end

@@ -26,6 +26,16 @@ defmodule DatetimeTest do
 
 
   test "datetime", context do
+
+    query("DROP TABLE date_test", [])
+    :ok == query("""
+      CREATE TABLE date_test (
+        created_at datetime NULL,
+        ver int NOT NULL
+        )
+    """, [])
+
+
     assert nil == Types.encode_datetime nil
     enc = Types.encode_datetime @datetime
     assert {@date, {15, 16, 23, 0}} == Types.decode_datetime enc
@@ -37,6 +47,11 @@ defmodule DatetimeTest do
     assert [[nil]] == query("SELECT @n1", [%Parameter{name: "@n1", value: nil, type: :datetime}])
     assert [[{{2015, 4, 8}, {15, 16, 23, 0}}]] == query("SELECT @n1", [%Parameter{name: "@n1", value: @datetime, type: :datetime}])
     assert [[{{2015, 4, 8}, {15, 16, 23, 123333}}]] == query("SELECT @n1", [%Parameter{name: "@n1", value: @datetime_fsec, type: :datetime}])
+    
+    assert :ok == query("INSERT INTO date_test VALUES (@1, @2)", [
+      %Parameter{name: "@1", value: nil, type: :datetime}, 
+      %Parameter{name: "@2", value: 0, type: :integer}])
+    query("DROP TABLE date_test", [])
   end
 
   test "smalldatetime", context do
