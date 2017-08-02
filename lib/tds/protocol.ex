@@ -530,10 +530,10 @@ defmodule Tds.Protocol do
       mod.send(sock, pak)
     end)
     case msg_recv(<<>>, s) do
-      {:ok, buffer} ->
-        new_data(buffer, %{s | state: :executing, pak_header: ""})
       {:disconnect, ex, _s} ->
         raise ex
+      buffer ->
+        new_data(buffer, %{s | state: :executing, pak_header: ""})
     end
         
   end
