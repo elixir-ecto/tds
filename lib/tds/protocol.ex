@@ -383,7 +383,7 @@ defmodule Tds.Protocol do
     # msg = msg_rpc(proc: :sp_executesql, params: params)
     msg = msg_rpc(proc: :sp_execute, params: params)
 
-    case msg_cast(msg, s) do
+    case msg_send(msg, s) do
       {:ok, %{result: result} = s} ->
         {:ok, result, %{s | state: :ready}}
       {:error, err, %{transaction: :started} = s} ->
