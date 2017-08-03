@@ -570,7 +570,7 @@ defmodule Tds.Protocol do
         {:disconnect, exception, s}
     end
   end
-
+  
   defp msg_cast(msg, %{sock: {mod, sock}, env: env} = s) do
     :inet.setopts(sock, active: false)
 
@@ -578,7 +578,9 @@ defmodule Tds.Protocol do
     Enum.each(paks, fn(pak) ->
       mod.send(sock, pak)
     end)
-
+    # NOTE: this method can not be used since it is not receiving packages from SQL server!
+    # TODO: add :gen_tcp.recv/flush since it should flush next package if there is such case where we don't care about
+    # what package contains. 
     {:ok, s}
   end
 
