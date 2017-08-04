@@ -258,6 +258,8 @@ defmodule Tds.Protocol do
             #status 1 means last packet of message
             #TODO Messages.parse does not use pak_header
             msg = parse(state, type, pak_header, pak_data <> data)
+            # TODO apparently if login fails, after msg is parsed function message cannot be matched!!!
+            # this need to be handled somehow
             case message(state, msg, s) do
               {:ok, s} ->
                 #message processed, reset header and msg buffer, then process tail
@@ -381,7 +383,7 @@ defmodule Tds.Protocol do
     # msg = msg_rpc(proc: :sp_executesql, params: params)
     msg = msg_rpc(proc: :sp_execute, params: params)
 
-    case msg_cast(msg, s) do
+    case msg_send(msg, s) do
       {:ok, %{result: result} = s} ->
         {:ok, result, %{s | state: :ready}}
       {:error, err, %{transaction: :started} = s} ->
@@ -529,9 +531,13 @@ defmodule Tds.Protocol do
     Enum.each(paks, fn(pak) ->
       mod.send(sock, pak)
     end)
-    <<>>
-    |> msg_recv(s)
-    |> new_data(%{s | state: :executing, pak_header: ""})    
+    case msg_recv(<<>>, s) do
+      {:disconnect, _ , ex} ->
+        {:error, ex}
+      buffer ->
+        new_data(buffer, %{s | state: :executing, pak_header: ""})
+    end
+        
   end
   
   defp msg_recv(buffer, %{sock: {mod, sock}} = s) do
@@ -564,7 +570,7 @@ defmodule Tds.Protocol do
         {:disconnect, exception, s}
     end
   end
-
+  
   defp msg_cast(msg, %{sock: {mod, sock}, env: env} = s) do
     :inet.setopts(sock, active: false)
 
@@ -572,7 +578,9 @@ defmodule Tds.Protocol do
     Enum.each(paks, fn(pak) ->
       mod.send(sock, pak)
     end)
-
+    # NOTE: this method can not be used since it is not receiving packages from SQL server!
+    # TODO: add :gen_tcp.recv/flush since it should flush next package if there is such case where we don't care about
+    # what package contains. 
     {:ok, s}
   end
 
