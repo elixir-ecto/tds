@@ -34,7 +34,8 @@ defmodule Tds.Mixfile do
     [
       {:decimal, "~> 1.4"},
       {:db_connection, "~> 1.1"},
-      {:excoveralls, "~> 0.7", only: :test}
+      {:excoveralls, "~> 0.7", only: :test},
+      {:ex_doc, ">= 0.0.0", only: :dev}
     ]
   end
 

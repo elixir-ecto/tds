@@ -11,7 +11,7 @@ Add Tds as a dependency in your `mix.exs` file.
 
 ```elixir
 def deps do
-  [{:tds, "~> 0.6.0"} ]
+  [{:tds, "~> 0.6.0-alpha"} ]
 end
 ```
 
