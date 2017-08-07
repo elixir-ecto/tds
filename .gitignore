@@ -1,4 +1,9 @@
+.elixir_ls
+.vscode
 /_build
 /deps
 erl_crash.dump
 *.ez
+cover/
+.idea/
+.code/

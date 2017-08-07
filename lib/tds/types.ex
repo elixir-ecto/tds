@@ -1,5 +1,4 @@
 defmodule Tds.Types do
-  #require Logger
   import Tds.BinaryUtils
   import Tds.Utils
 
@@ -8,10 +7,10 @@ defmodule Tds.Types do
   alias Tds.DateTime2
 
   @year_1900_days :calendar.date_to_gregorian_days({1900,1,1})
-  @days_in_month 30
+  #@days_in_month 30
   @secs_in_min 60
   @secs_in_hour 60 * @secs_in_min
-  @secs_in_day 24 * @secs_in_hour
+  #@secs_in_day 24 * @secs_in_hour
 
   @tds_data_type_null           0x1F
   @tds_data_type_tinyint        0x30
@@ -105,9 +104,9 @@ defmodule Tds.Types do
     @tds_data_type_variant
   ]
 
-  @tds_plp_marker 0xffff
+  #@tds_plp_marker 0xffff
   @tds_plp_null 0xffffffffffffffff
-  @tds_plp_unknown 0xfffffffffffffffe
+  #@tds_plp_unknown 0xfffffffffffffffe
 
   #
   #  Data Type Decoders
@@ -635,7 +634,6 @@ defmodule Tds.Types do
   end
 
   def encode_string_type(%Parameter{value: value}) do
-
     collation = <<0x00, 0x00, 0x00, 0x00, 0x00>>
     length =
     if value != nil do
@@ -664,11 +662,12 @@ defmodule Tds.Types do
   when value >= 0 do
     attributes = []
     type = @tds_data_type_intn
-    length =
+    {attributes, length} =
     if value == nil do
       attributes = attributes
-        |> Keyword.put(:length, 1)
-      <<0x01::int8>>
+        |> Keyword.put(:length, 4)
+      value_size = int_type_size(value)
+      {attributes, <<value_size>>}
     else
       value_size = int_type_size(value)
       # cond do
@@ -683,7 +682,7 @@ defmodule Tds.Types do
       # end
       attributes = attributes
         |> Keyword.put(:length, value_size)
-      <<value_size>>
+      {attributes, <<value_size>>}
     end
     data = <<type>> <> length
     {type, data, attributes}
@@ -791,17 +790,20 @@ defmodule Tds.Types do
           else
             String.length(value)
           end
-        if length <= 0, do: length = 1
-        if length > 4000, do: length = "max"
+        length = if length <= 0, do: 1, else: length
+        length = if length > 4000, do: "max", else: length
         "nvarchar(#{length})"
       :integer ->
-        if value >= 0 do
-          "bigint"
-        else
-          precision = value
-            |> Integer.to_string
-            |> String.length
-          "decimal(#{precision-1}, 0)"
+        case value do
+          0 ->
+            "int"
+          val when val >= 1 ->
+            "bigint"
+          _ ->
+            precision = value
+              |> Integer.to_string
+              |> String.length
+            "decimal(#{precision-1}, 0)"
         end
       :decimal -> encode_decimal_descriptor(param)
       :float -> encode_float_descriptor(param)
@@ -813,8 +815,8 @@ defmodule Tds.Types do
           else
             String.length(value)
           end
-        if length <= 0, do: length = 1
-        if length > 4000, do: length = "max"
+        length = if length <= 0, do: 1, else: length
+        length = if length > 4000, do: "max", else: length
         "nvarchar(#{length})"
     end
 
@@ -937,8 +939,9 @@ defmodule Tds.Types do
       end
     "decimal(#{precision}, #{scale})"
   end
-  def encode_decimal_descriptor(%Parameter{type: :decimal} = param) do
-    encode_decimal_descriptor(%{param | value: Decimal.new()})
+# Decimal.new/0 is undefined -- modifying params to hopefully fix
+  def encode_decimal_descriptor(%Parameter{type: :decimal, value: value} = param) do
+    encode_decimal_descriptor(%{param | value: Decimal.new(value)})
   end
 
   @doc """
@@ -1165,7 +1168,8 @@ defmodule Tds.Types do
     encode_plp_chunk(size-chunk_size, data, buf <> plp)
   end
 
-  defp int_type_size(int) when int in 0..255, do: 1
+  defp int_type_size(int) when int == nil, do: 4
+  defp int_type_size(int) when int in 0..255, do: 4
   defp int_type_size(int) when int in -32768..32767, do: 2
   defp int_type_size(int) when int in -2147483648..2147483647, do: 4
   defp int_type_size(int) when int in -9223372036854775808..9223372036854775807, do: 8
@@ -1174,10 +1178,10 @@ defmodule Tds.Types do
   Data Encoding DateTime Types
   """
   @year_1900_days :calendar.date_to_gregorian_days({1900,1,1})
-  @days_in_month 30
+  #@days_in_month 30
   @secs_in_min 60
   @secs_in_hour 60 * @secs_in_min
-  @secs_in_day 24 * @secs_in_hour
+  #@secs_in_day 24 * @secs_in_hour
   @max_time_scale 7
   @usecs_in_sec 1_000_000
 
@@ -1241,28 +1245,31 @@ defmodule Tds.Types do
 
   #Time
   def decode_time(scale, <<fsec::binary>>) do
-    cond do
-      scale in [0, 1, 2] ->
-        <<fsec::little-unsigned-24>> = fsec
-      scale in [3, 4] ->
-        <<fsec::little-unsigned-32>> = fsec
-      scale in [5, 6, 7] ->
-        <<fsec::little-unsigned-40>> = fsec
-    end
+    parsed_fsec = cond do
+                    scale in [0, 1, 2] ->
+                      <<parsed_fsec::little-unsigned-24>> = fsec
+                      parsed_fsec
+                    scale in [3, 4] ->
+                      <<parsed_fsec::little-unsigned-32>> = fsec
+                      parsed_fsec
+                    scale in [5, 6, 7] ->
+                      <<parsed_fsec::little-unsigned-40>> = fsec
+                      parsed_fsec
+                  end
 
     fs_per_sec = :math.pow(10, scale)
 
-    hour = (fsec / fs_per_sec / @secs_in_hour) |> trunc
-    fsec = fsec - (hour * @secs_in_hour * fs_per_sec)
+    hour = (parsed_fsec / fs_per_sec / @secs_in_hour) |> trunc
+    parsed_fsec = parsed_fsec - (hour * @secs_in_hour * fs_per_sec)
 
-    min = (fsec / fs_per_sec / @secs_in_min) |> trunc
-    fsec = fsec - (min * @secs_in_min * fs_per_sec)
+    min = (parsed_fsec / fs_per_sec / @secs_in_min) |> trunc
+    parsed_fsec = parsed_fsec - (min * @secs_in_min * fs_per_sec)
 
-    sec = (fsec / fs_per_sec) |> trunc
+    sec = (parsed_fsec / fs_per_sec) |> trunc
 
-    fsec = fsec - (sec * fs_per_sec) |> trunc
+    parsed_fsec = parsed_fsec - (sec * fs_per_sec) |> trunc
 
-    {hour, min, sec, fsec}
+    {hour, min, sec, parsed_fsec}
   end
 
 #time(n) is represented as one unsigned integer that represents the number of 10-n second increments since 12 AM within a day. The length, in bytes, of that integer depends on the scale n as follows:

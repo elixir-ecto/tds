@@ -1,6 +1,6 @@
 defmodule Tds.Utils do
 
-  alias Tds.Connection
+  #alias Tds.Connection
 
   def to_hex_list(x) when is_list(x) do
     Enum.map x, &( Base.encode16(<<&1>>))
@@ -38,7 +38,7 @@ defmodule Tds.Utils do
 
   def error(error, s) do
     reply(error, s)
-    {:stop, error, s}
+    {:error, error}
   end
 
   def reply(reply, %{queue: queue}) do
@@ -56,17 +56,18 @@ defmodule Tds.Utils do
     true
   end
 
-  def ready(%{queue: queue} = s) do
-    queue =
-      case :queue.out(queue) do
-      {{:value, {_, _, ref}}, q} ->
-        Process.demonitor(ref)
-        q
-      {:empty, q} ->
-        q
-    end
-    Connection.next(%{s | statement: "", queue: queue, state: :ready})
-  end
+#  Connection.next is undefined
+ # def ready(%{queue: queue} = s) do
+ #   queue =
+ #     case :queue.out(queue) do
+ #     {{:value, {_, _, ref}}, q} ->
+ #       Process.demonitor(ref)
+ #       q
+ #     {:empty, q} ->
+ #       q
+ #   end
+ #   Connection.next(%{s | statement: "", queue: queue, state: :ready})
+ # end
 
   def pow10(num,0), do: num
   def pow10(num,pow) when pow > 0 do

@@ -2,19 +2,14 @@ defmodule BinaryTest do
   import Tds.TestHelper
   require Logger
   use ExUnit.Case, async: true
-  alias Tds.Connection, as: Conn
   alias Tds.Parameter
 
   @tag timeout: 50000
 
   setup do
-    opts = [
-      hostname: "sqlserver.local",
-      username: "mssql",
-      password: "mssql",
-      database: "test"
-    ]
-    {:ok, pid} = Conn.start_link(opts)
+    opts = Application.fetch_env!(:mssql, :opts)
+    {:ok, pid} = Tds.start_link(opts)
+
     {:ok, [pid: pid]}
   end
 
