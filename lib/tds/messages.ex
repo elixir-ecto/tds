@@ -6,7 +6,7 @@ defmodule Tds.Messages do
   alias Tds.Types
 
   require Bitwise
-
+  require Logger
   defrecord :msg_prelogin, [:params]
   defrecord :msg_login, [:params]
   defrecord :msg_login_ack, [:type, :data]
@@ -84,14 +84,20 @@ defmodule Tds.Messages do
 
   ## Parsers
 
-  def parse(:login, @tds_pack_reply, _header, tail) do
-    msg_login_ack(type: 4, data: tail)
+  def parse(:login, @tds_pack_reply, header, tail) do
+    case tail do
+      <<170::little-size(8), _::binary>> ->
+        [error: error] = decode_tokens(tail, [])
+        msg_error(e: error)
+      _ -> 
+        msg_login_ack(type: 4, data: tail)
+    end
   end
 
   def parse(:executing, @tds_pack_reply, _header, tail) do
     tokens = []
     tokens = decode_tokens(tail, tokens)
-
+    
     case tokens do
       [error: error] ->
         msg_error(e: error)

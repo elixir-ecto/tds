@@ -156,7 +156,13 @@ defmodule Tds.Protocol do
         |> max(recbuf)
 
         :ok = :inet.setopts(sock, buffer: buffer)
-        login(%{s | sock: {:gen_tcp, sock}})
+        case login(%{s | sock: {:gen_tcp, sock}}) do
+          {:error, error, state} ->
+            :gen_tcp.close(sock)
+            {:error, error}
+          r -> 
+            r
+        end
       {:error, error} ->
         error(%Tds.Error{message: "tcp connect: #{error}"}, s)
     end
@@ -506,7 +512,6 @@ defmodule Tds.Protocol do
   ## Error
   def message(_, msg_error(e: e), %{} = s) do
     error = %Tds.Error{mssql: e}
-
     { :error, error, %{s | pak_header: "", tail: ""} }
   end
 
@@ -572,18 +577,18 @@ defmodule Tds.Protocol do
     end
   end
   
-  defp msg_cast(msg, %{sock: {mod, sock}, env: env} = s) do
-    :inet.setopts(sock, active: false)
+  # defp msg_cast(msg, %{sock: {mod, sock}, env: env} = s) do
+  #   :inet.setopts(sock, active: false)
 
-    paks = encode_msg(msg, env)
-    Enum.each(paks, fn(pak) ->
-      mod.send(sock, pak)
-    end)
-    # NOTE: this method can not be used since it is not receiving packages from SQL server!
-    # TODO: add :gen_tcp.recv/flush since it should flush next package if there is such case where we don't care about
-    # what package contains. 
-    {:ok, s}
-  end
+  #   paks = encode_msg(msg, env)
+  #   Enum.each(paks, fn(pak) ->
+  #     mod.send(sock, pak)
+  #   end)
+  #   # NOTE: this method can not be used since it is not receiving packages from SQL server!
+  #   # TODO: add :gen_tcp.recv/flush since it should flush next package if there is such case where we don't care about
+  #   # what package contains. 
+  #   {:ok, s}
+  # end
 
   defp login_send(msg, %{sock: {mod, sock}, env: env} = s) do
     paks = encode_msg(msg, env)
