@@ -251,13 +251,14 @@ defmodule Tds.Protocol do
     size = size - 8 #size includes packet header
 
     case data do
-      <<data::binary(size), tail::binary>> ->
+      <<package::binary(size), tail::binary>> ->
         #satisfied size specified in packet header
         case status do
           1 ->
             #status 1 means last packet of message
             #TODO Messages.parse does not use pak_header
-            msg = parse(state, type, pak_header, pak_data <> data)
+            
+            msg = parse(state, type, pak_header, pak_data <> package)
             # TODO apparently if login fails, after msg is parsed function message cannot be matched!!!
             # this need to be handled somehow
             case message(state, msg, s) do
@@ -563,7 +564,7 @@ defmodule Tds.Protocol do
       {:ok, data} when byte_size(data) < length ->
         length = length - byte_size(data)
         buffer <> data
-        |> package_recv(buffer, length)
+        |> package_recv(s, length)
       {:ok, data} -> 
         buffer <> data
       {:error, exception} ->
@@ -590,9 +591,12 @@ defmodule Tds.Protocol do
       mod.send(sock, pak)
     end)
 
-    {:ok, msg} = :gen_tcp.recv(sock, 0)
-
-    new_data(msg, %{s | state: :login})
+    case msg_recv(<<>>, s) do
+      {:disconnect, _ , ex} ->
+        {:error, ex}
+      buffer ->
+        new_data(buffer, %{s | state: :login})
+    end
   end
 
   #defp send_to_result(msg, s) do
