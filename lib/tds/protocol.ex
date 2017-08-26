@@ -255,7 +255,7 @@ defmodule Tds.Protocol do
   defp new_data(<<data::binary>>, %{state: state, pak_header: pak_header, pak_data: pak_data} = s) do
     <<type::int8, status::int8, size::int16, _head_rem::int32>> = pak_header
     size = size - 8 #size includes packet header
-
+    IO.puts inspect(data)
     case data do
       <<package::binary(size), tail::binary>> ->
         #satisfied size specified in packet header
@@ -265,8 +265,7 @@ defmodule Tds.Protocol do
             #TODO Messages.parse does not use pak_header
             
             msg = parse(state, type, pak_header, pak_data <> package)
-            # TODO apparently if login fails, after msg is parsed function message cannot be matched!!!
-            # this need to be handled somehow
+
             case message(state, msg, s) do
               {:ok, s} ->
                 #message processed, reset header and msg buffer, then process tail
@@ -279,7 +278,7 @@ defmodule Tds.Protocol do
             end
           _ ->
             #not the last packet of message, more packets coming with new packet header
-            new_data(tail, %{s | pak_header: "", pak_data: pak_data <> data})
+            new_data(tail, %{s | pak_header: "", pak_data: pak_data <> package})
         end
       data ->
         #size specified in packet header still unsatisfied, wait for more data
