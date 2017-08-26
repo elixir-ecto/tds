@@ -255,7 +255,6 @@ defmodule Tds.Protocol do
   defp new_data(<<data::binary>>, %{state: state, pak_header: pak_header, pak_data: pak_data} = s) do
     <<type::int8, status::int8, size::int16, _head_rem::int32>> = pak_header
     size = size - 8 #size includes packet header
-    IO.puts inspect(data)
     case data do
       <<package::binary(size), tail::binary>> ->
         #satisfied size specified in packet header
