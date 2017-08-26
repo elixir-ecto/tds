@@ -1,6 +1,7 @@
 defmodule Tds.Types do
   import Tds.BinaryUtils
   import Tds.Utils
+  use Bitwise
 
   alias Tds.Parameter
   alias Tds.DateTime
@@ -104,9 +105,9 @@ defmodule Tds.Types do
     @tds_data_type_variant
   ]
 
-  #@tds_plp_marker 0xffff
+  @tds_plp_marker 0xffff
   @tds_plp_null 0xffffffffffffffff
-  #@tds_plp_unknown 0xfffffffffffffffe
+  @tds_plp_unknown 0xfffffffffffffffe
 
   #
   #  Data Type Decoders
@@ -284,7 +285,6 @@ defmodule Tds.Types do
   #
   #  Data Decoders
   #
-
   def decode_data(%{data_type: :fixed, data_type_code: data_type_code, length: length}, <<tail::binary>>) do
     <<value_binary::binary-size(length)-unit(8), tail::binary>> = tail
     value = case data_type_code do
@@ -784,15 +784,12 @@ defmodule Tds.Types do
       :smalldatetime -> "smalldatetime"
       :binary -> encode_binary_descriptor(value)
       :string ->
-        length =
-          if value == nil do
-            0
-          else
-            String.length(value)
-          end
-        length = if length <= 0, do: 1, else: length
-        length = if length > 4000, do: "max", else: length
-        "nvarchar(#{length})"
+        cond do
+          is_nil(value)                 -> "nvarchar(1)"
+          String.length(value) <= 0     -> "nvarchar(1)"
+          String.length(value) > 4_000  -> "nvarchar(max)"
+          true                          -> "nvarchar(#{String.length(value)})"
+        end
       :integer ->
         case value do
           0 ->
@@ -809,15 +806,12 @@ defmodule Tds.Types do
       :float -> encode_float_descriptor(param)
       :boolean -> "bit"
       _ ->
-        length =
-          if value == nil do
-            0
-          else
-            String.length(value)
-          end
-        length = if length <= 0, do: 1, else: length
-        length = if length > 4000, do: "max", else: length
-        "nvarchar(#{length})"
+        cond do
+          is_nil(value)                 -> "nvarchar(1)"
+          String.length(value) <= 0     -> "nvarchar(1)"
+          String.length(value) > 4_000  -> "nvarchar(max)"
+          true                          -> "nvarchar(#{String.length(value)})"
+        end
     end
 
     "#{name} #{desc}"
@@ -974,16 +968,11 @@ defmodule Tds.Types do
   @doc """
   Binary Type Parameter Descriptor
   """
-  def encode_binary_descriptor(value) when is_integer(value), do: encode_binary_descriptor(<<value>>)
-  def encode_binary_descriptor(value) do
-    size =
-      if value == nil do
-        1
-      else
-        byte_size(value)
-      end
-    "varbinary(#{size})"
-  end
+  def encode_binary_descriptor(value) when is_integer(value),         do: encode_binary_descriptor(<<value>>)
+  def encode_binary_descriptor(value) when is_nil(value),             do: "varbinary(1)"
+  def encode_binary_descriptor(value) when byte_size(value) <= 0,     do: "varbinary(1)"
+  def encode_binary_descriptor(value) when byte_size(value) > 8_000,  do: "varbinary(max)"
+  def encode_binary_descriptor(value),                                do: "varbinary(#{byte_size(value)})"
 
   @doc """
   Data Encoding Binary Types
