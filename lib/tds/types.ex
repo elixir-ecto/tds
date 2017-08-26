@@ -980,33 +980,26 @@ defmodule Tds.Types do
   def encode_data(@tds_data_type_bigvarbinary = data_type, value, attr)
   when is_integer(value),
     do: encode_data(data_type, <<value>>, attr)
-
-  def encode_data(@tds_data_type_bigvarbinary, value, _) do
-    if value != nil do
-      <<byte_size(value)::little-unsigned-16>> <> value
-    else
-      <<@tds_plp_null::little-unsigned-64>>
-    end
-  end
+  def encode_data(@tds_data_type_bigvarbinary, nil, _), 
+    do: <<@tds_plp_null::little-unsigned-64>>
+  def encode_data(@tds_data_type_bigvarbinary, value, _), 
+    do: <<byte_size(value)::little-unsigned-16>> <> value
 
   @doc """
   Data Encoding String Types
   """
+  def encode_data(@tds_data_type_nvarchar, nil, _), 
+    do: <<@tds_plp_null::little-unsigned-64>>
   def encode_data(@tds_data_type_nvarchar, value, _) do
-    if value == nil do
-      <<@tds_plp_null::little-unsigned-64>>
-    else
-      value = value |> to_little_ucs2
-      value_size = byte_size(value)
-
-      cond do
-        value_size == 0 ->
-          <<0x00::unsigned-64, 0x00::unsigned-32>>
-        value_size > 8000 ->
-          encode_plp(value)
-        true ->
-          <<value_size::little-size(2)-unit(8)>> <> value
-      end
+    value = to_little_ucs2(value)
+    value_size = byte_size(value)
+    cond do
+      value_size <= 0 ->
+        <<0x00::unsigned-64, 0x00::unsigned-32>>
+      value_size > 8000 ->
+        encode_plp(value)
+      true ->
+        <<value_size::little-size(2)-unit(8)>> <> value
     end
   end
 
@@ -1057,8 +1050,8 @@ defmodule Tds.Types do
     value_size = byte_size(value_binary)
     len =
       cond do
-        precision <= 9 -> 4
-        precision <= 19 -> 8
+        precision <=  9 ->  4
+        precision <= 19 ->  8
         precision <= 28 -> 12
         precision <= 38 -> 16
       end
@@ -1067,9 +1060,8 @@ defmodule Tds.Types do
     value_binary = value_binary <> <<0::size(padding)-unit(8)>>
     <<byte_len>> <> <<sign>> <> value_binary
   end
-  def encode_data(@tds_data_type_decimaln, nil, _) do
-    <<0x00, 0x00, 0x00, 0x00>>
-  end
+  def encode_data(@tds_data_type_decimaln, nil, _), 
+    do: <<0x00::little-unsigned-32>> # <<0, 0, 0, 0>
   def encode_data(@tds_data_type_decimaln = data_type, value, attr) do
     encode_data(data_type, Decimal.new(value), attr)
   end
@@ -1146,7 +1138,7 @@ defmodule Tds.Types do
 
   def encode_plp(data) do
     size = byte_size(data)
-    <<size::little-unsigned-64>> <> encode_plp_chunk(size, data, <<>>) <> <<0x00::32>>
+    <<size::little-unsigned-64>> <> encode_plp_chunk(size, data, <<>>) <> <<0x00::little-unsigned-32>>
   end
 
   def encode_plp_chunk(0, _, buf), do: buf

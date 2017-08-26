@@ -51,12 +51,11 @@ defmodule Tds.Protocol do
     end
   end
 
-  def disconnect(_err, %{sock: {:gen_tcp, sock}} = s) do
-    :ok = :gen_tcp.close(sock)
+  def disconnect(_err, %{sock: {mod, sock}} = s) do
     # If socket is active we flush any socket messages so the next
     # socket does not get the messages.
     _ = flush(s)
-    :ok
+    mod.close(sock)
   end
 
   def ping(s) do
