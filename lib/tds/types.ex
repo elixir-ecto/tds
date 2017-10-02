@@ -139,11 +139,11 @@ defmodule Tds.Types do
   end
 
   def decode_info(<<data_type_code::unsigned-8, tail::binary>>) when data_type_code in @variable_data_types do
-    col_info = %{data_type: :variable, data_type_code: data_type_code}
+    def_col_info = %{data_type: :variable, data_type_code: data_type_code}
     cond do
       data_type_code == @tds_data_type_daten ->
         length = 3
-        col_info = col_info
+        col_info = def_col_info
           |> Map.put(:length, length)
           |> Map.put(:data_reader, :bytelen)
         {col_info, tail}    
@@ -152,7 +152,7 @@ defmodule Tds.Types do
         @tds_data_type_datetime2n,
         @tds_data_type_datetimeoffsetn
       ] ->
-        <<scale::unsigned-8, tail::binary>> = tail
+        <<scale::unsigned-8, rest::binary>> = tail
         length =
           cond do
             scale in [0, 1, 2] -> 3
@@ -160,8 +160,6 @@ defmodule Tds.Types do
             scale in [5, 6, 7] -> 5
             true -> nil
           end
-        col_info = col_info
-          |> Map.put(:scale, scale)
 
         length =
           case data_type_code do
@@ -169,17 +167,27 @@ defmodule Tds.Types do
             @tds_data_type_datetimeoffsetn -> length + 5
             _ -> length
           end
-        col_info = col_info
+        col_info = def_col_info
+          |> Map.put(:scale, scale)
           |> Map.put(:length, length)
           |> Map.put(:data_reader, :bytelen)
-        {col_info, tail}
+        {col_info, rest}
+      data_type_code in [
+        @tds_data_type_numericn,
+        @tds_data_type_decimaln
+      ] ->
+        <<length::little-unsigned-8, precision::unsigned-8, scale::unsigned-8, rest::binary>> = tail
+        col_info = def_col_info
+          |> Map.put(:precision, precision)
+          |> Map.put(:scale, scale)
+          |> Map.put(:length, length)
+          |> Map.put(:data_reader, :bytelen)
+        {col_info, rest}    
       data_type_code in [
         @tds_data_type_uniqueidentifier,
         @tds_data_type_intn,
         @tds_data_type_decimal,
-        @tds_data_type_decimaln,
         @tds_data_type_numeric,
-        @tds_data_type_numericn,
         @tds_data_type_bitn,
         @tds_data_type_floatn,
         @tds_data_type_moneyn,
@@ -189,100 +197,74 @@ defmodule Tds.Types do
         @tds_data_type_binary,
         @tds_data_type_varbinary
       ] ->
-        <<length::little-unsigned-8, tail::binary>> = tail
-        if data_type_code in [
-            @tds_data_type_numericn,
-            @tds_data_type_decimaln
-          ] do
-          <<precision::unsigned-8, scale::unsigned-8, tail::binary>> = tail
-          col_info = col_info
-            |> Map.put(:precision, precision)
-            |> Map.put(:scale, scale)
-        end
-        col_info = col_info
+        <<length::little-unsigned-8, rest::binary>> = tail
+        col_info = def_col_info
           |> Map.put(:length, length)
           |> Map.put(:data_reader, :bytelen)
-        {col_info, tail}    
+        {col_info, rest}    
       data_type_code == @tds_data_type_xml ->
-        <<schema::unsigned-8, tail::binary>> = tail
+        <<schema::unsigned-8, rest::binary>> = tail
         if schema == 1 do
           # TODO should stick a raise in here??
           # BVarChar dbname
           # BVarChar owning schema
           # USVarChar xml schema collection
         end
-        col_info = col_info
+        col_info = def_col_info
           |> Map.put(:data_reader, :plp)
-        {col_info, tail}
+        {col_info, rest}
       data_type_code in [
-        @tds_data_type_bigvarbinary,
         @tds_data_type_bigvarchar,
-        @tds_data_type_bigbinary,
         @tds_data_type_bigchar,
         @tds_data_type_nvarchar,
-        @tds_data_type_nchar,
+        @tds_data_type_nchar
+      ] ->
+        <<length::little-unsigned-16, collation::binary-5, rest::binary>> = tail
+        col_info = def_col_info
+          |> Map.put(:collation, collation)
+          |> Map.put(:data_reader, if(length == 0xFFFF, do: :plp, else: :shortlen))
+          |> Map.put(:length, length)
+        {col_info, rest}
+      data_type_code in [
+        @tds_data_type_bigvarbinary,
+        @tds_data_type_bigbinary,
         @tds_data_type_udt
       ] ->
-        <<length::little-unsigned-16, tail::binary>> = tail
-        if data_type_code in [
-          @tds_data_type_bigvarchar,
-          @tds_data_type_bigchar,
-          @tds_data_type_nvarchar,
-          @tds_data_type_nchar
-          ] do
-          <<collation::binary-5, tail::binary>> = tail
-          col_info = col_info
-            |> Map.put(:collation, collation)
-        end
-        if length == 0xFFFF do
-          col_info = col_info
-            |> Map.put(:data_reader, :plp)
-        else
-          col_info = col_info
-            |> Map.put(:data_reader, :shortlen)
-        end
-        col_info = col_info
+        <<length::little-unsigned-16, rest::binary>> = tail
+        col_info = def_col_info
+          |> Map.put(:data_reader, if(length == 0xFFFF, do: :plp, else: :shortlen))
           |> Map.put(:length, length)
-        {col_info, tail}
-      data_type_code in [
-        @tds_data_type_text,
-        @tds_data_type_image,
-        @tds_data_type_ntext,
-        @tds_data_type_variant
-      ] ->
-        <<length::signed-32, tail::binary>> = tail
-        col_info = col_info
+        {col_info, rest}
+      
+      data_type_code in [@tds_data_type_text, @tds_data_type_ntext] ->
+        <<length::signed-32, collation::binary-5, numparts::signed-8, rest::binary>> = tail
+        
+        col_info = def_col_info
+          |> Map.put(:collation, collation)
+          |> Map.put(:data_reader, :longlen)
           |> Map.put(:length, length)
-        cond do
-          data_type_code in [@tds_data_type_text, @tds_data_type_ntext] ->
 
-            <<collation::binary-5, tail::binary>> = tail
-            col_info = col_info
-              |> Map.put(:collation, collation)
-              |> Map.put(:data_reader, :longlen)
-            <<numparts::signed-8, tail::binary>> = tail
-            tail =
-            Enum.reduce([1..numparts], tail, fn(_, acc) ->
-              <<tsize::little-unsigned-16, _table_name::binary-size(tsize)-unit(16), tail::binary>> = acc
-              tail
-            end)
-            {col_info, tail}
-          data_type_code == @tds_data_type_image ->
-            # TODO NumBarts Reader
-            <<numparts::signed-8, tail::binary>> = tail
-            tail =
-            Enum.reduce([1..numparts], tail, fn(_, acc) ->
-              <<size::unsigned-16, _str::size(size)-unit(16), tail::binary>> = acc
-              tail
-            end)
-            col_info = col_info
-              |> Map.put(:data_reader, :bytelen)
-            {col_info, tail}
-          data_type_code == @tds_data_type_variant ->
-            col_info = col_info
-              |> Map.put(:data_reader, :variant)
-          true -> {nil, tail}
-        end
+        rest = Enum.reduce([1..numparts], rest, fn
+          (_, <<tsize::little-unsigned-16, _table_name::binary-size(tsize)-unit(16), next_rest::binary>>) -> next_rest
+        end)
+        {col_info, rest} 
+      data_type_code == @tds_data_type_image ->
+        # TODO NumBarts Reader
+        <<length::signed-32, numparts::signed-8, rest::binary>> = tail
+        rest = Enum.reduce([1..numparts], rest, fn
+          (_, <<size::unsigned-16, _str::size(size)-unit(16), next_rest::binary>>) -> next_rest
+        end)
+        col_info = def_col_info
+          |> Map.put(:length, length)
+          |> Map.put(:data_reader, :bytelen)
+        {col_info, rest}
+      data_type_code == @tds_data_type_variant ->
+        <<length::signed-32, rest::binary>> = tail
+        col_info = def_col_info
+          |> Map.put(:length, length)
+          |> Map.put(:data_reader, :variant)
+        {col_info, rest}
+    
     end
   end
 
