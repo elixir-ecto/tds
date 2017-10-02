@@ -84,7 +84,7 @@ defmodule Tds.Messages do
 
   ## Parsers
 
-  def parse(:login, @tds_pack_reply, header, tail) do
+  def parse(:login, @tds_pack_reply, _header, tail) do
     case tail do
       <<170::little-size(8), _::binary>> ->
         [error: error] = decode_tokens(tail, [])

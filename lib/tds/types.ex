@@ -105,9 +105,9 @@ defmodule Tds.Types do
     @tds_data_type_variant
   ]
 
-  @tds_plp_marker 0xffff
+  # @tds_plp_marker 0xffff
   @tds_plp_null 0xffffffffffffffff
-  @tds_plp_unknown 0xfffffffffffffffe
+  # @tds_plp_unknown 0xfffffffffffffffe
 
   #
   #  Data Type Decoders
@@ -146,6 +146,7 @@ defmodule Tds.Types do
         col_info = col_info
           |> Map.put(:length, length)
           |> Map.put(:data_reader, :bytelen)
+        {col_info, tail}    
       data_type_code in [
         @tds_data_type_timen,
         @tds_data_type_datetime2n,
@@ -171,6 +172,7 @@ defmodule Tds.Types do
         col_info = col_info
           |> Map.put(:length, length)
           |> Map.put(:data_reader, :bytelen)
+        {col_info, tail}
       data_type_code in [
         @tds_data_type_uniqueidentifier,
         @tds_data_type_intn,
@@ -200,6 +202,7 @@ defmodule Tds.Types do
         col_info = col_info
           |> Map.put(:length, length)
           |> Map.put(:data_reader, :bytelen)
+        {col_info, tail}    
       data_type_code == @tds_data_type_xml ->
         <<schema::unsigned-8, tail::binary>> = tail
         if schema == 1 do
@@ -210,6 +213,7 @@ defmodule Tds.Types do
         end
         col_info = col_info
           |> Map.put(:data_reader, :plp)
+        {col_info, tail}
       data_type_code in [
         @tds_data_type_bigvarbinary,
         @tds_data_type_bigvarchar,
@@ -239,6 +243,7 @@ defmodule Tds.Types do
         end
         col_info = col_info
           |> Map.put(:length, length)
+        {col_info, tail}
       data_type_code in [
         @tds_data_type_text,
         @tds_data_type_image,
@@ -261,6 +266,7 @@ defmodule Tds.Types do
               <<tsize::little-unsigned-16, _table_name::binary-size(tsize)-unit(16), tail::binary>> = acc
               tail
             end)
+            {col_info, tail}
           data_type_code == @tds_data_type_image ->
             # TODO NumBarts Reader
             <<numparts::signed-8, tail::binary>> = tail
@@ -271,15 +277,13 @@ defmodule Tds.Types do
             end)
             col_info = col_info
               |> Map.put(:data_reader, :bytelen)
+            {col_info, tail}
           data_type_code == @tds_data_type_variant ->
             col_info = col_info
               |> Map.put(:data_reader, :variant)
-          true -> nil
+          true -> {nil, tail}
         end
-
-
     end
-    {col_info,tail}
   end
 
   #
@@ -295,15 +299,15 @@ defmodule Tds.Types do
       @tds_data_type_smalldatetime -> decode_smalldatetime(value_binary)
       @tds_data_type_smallmoney -> decode_smallmoney(value_binary)
       @tds_data_type_real ->
-        <<value::little-float-32>> = value_binary
-        Float.round value, 4
+        <<val::little-float-32>> = value_binary
+        Float.round val, 4
       @tds_data_type_datetime -> decode_datetime(value_binary)
       @tds_data_type_float ->
-        <<value::little-float-64>> = value_binary
-        Float.round value, 8
+        <<val::little-float-64>> = value_binary
+        Float.round val, 8
       @tds_data_type_money -> decode_money(value_binary)
-      _ -> <<value::little-signed-size(length)-unit(8)>> = value_binary
-        value
+      _ -> <<val::little-signed-size(length)-unit(8)>> = value_binary
+        val
     end
     {value, tail}
   end
@@ -321,17 +325,17 @@ defmodule Tds.Types do
           data = data <> tail
           case length do
             1 ->
-              <<value::unsigned-8, tail::binary>> = data
-              value
+              <<val::unsigned-8, _tail::binary>> = data
+              val
             2 ->
-              <<value::little-signed-16, tail::binary>> = data
-              value
+              <<val::little-signed-16, _tail::binary>> = data
+              val
             4 ->
-              <<value::little-signed-32, tail::binary>> = data
-              value
+              <<val::little-signed-32, _tail::binary>> = data
+              val
             8 ->
-              <<value::little-signed-64, tail::binary>> = data
-              value
+              <<val::little-signed-64, _tail::binary>> = data
+              val
           end
         data_type_code in [
           @tds_data_type_decimal,
@@ -346,11 +350,11 @@ defmodule Tds.Types do
           data = data <> tail
           case length do
             4 ->
-              <<value::little-float-32, tail::binary>> = data
-              value
+              <<val::little-float-32, _tail::binary>> = data
+              val
             8 ->
-              <<value::little-float-64, tail::binary>> = data
-              value
+              <<val::little-float-64, _tail::binary>> = data
+              val
           end
         data_type_code == @tds_data_type_moneyn ->
           case length do
@@ -413,7 +417,7 @@ defmodule Tds.Types do
 
   # TODO Variant Types
 
-  def decode_data(%{data_reader: :plp}, <<@tds_plp_null, tail::binary>>), do: {nil, tail}
+  def decode_data(%{data_reader: :plp}, <<@tds_plp_null::little-unsigned-64, tail::binary>>), do: {nil, tail}
   def decode_data(%{data_type_code: data_type_code, data_reader: :plp} = data_info, <<_size::little-unsigned-64, tail::binary>>) do
     {data, tail} = decode_plp_chunk(tail, <<>>)
     value = cond do

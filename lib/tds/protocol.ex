@@ -156,7 +156,7 @@ defmodule Tds.Protocol do
 
         :ok = :inet.setopts(sock, buffer: buffer)
         case login(%{s | sock: {:gen_tcp, sock}}) do
-          {:error, error, state} ->
+          {:error, error, _state} ->
             :gen_tcp.close(sock)
             {:error, error}
           r -> 

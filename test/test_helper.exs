@@ -2,9 +2,9 @@ ExUnit.start()
 
 defmodule Tds.TestHelper do
   require Logger
-  defmacro query(stat, params, opts \\ []) do
+  defmacro query(statement, params, opts \\ []) do
     quote do
-      case Tds.query(var!(context)[:pid], unquote(stat),
+      case Tds.query(var!(context)[:pid], unquote(statement),
                                      unquote(params), unquote(opts)) do
         {:ok, %Tds.Result{rows: nil}} -> :ok
         {:ok, %Tds.Result{rows: []}} -> :ok

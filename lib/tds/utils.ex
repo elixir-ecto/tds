@@ -1,5 +1,5 @@
 defmodule Tds.Utils do
-
+  require Logger
   #alias Tds.Connection
 
   def to_hex_list(x) when is_list(x) do
@@ -50,6 +50,7 @@ defmodule Tds.Utils do
         false
     end
   end
+
 
   def reply(reply, {_, _} = from) do
     GenServer.reply(from, reply)
