@@ -11,7 +11,7 @@ Add Tds as a dependency in your `mix.exs` file.
 
 ```elixir
 def deps do
-  [{:tds, "~> 0.6.0-alpha"} ]
+  [{:tds, github: "livehelpnow/tds", tag: "1.0.0"} ]
 end
 ```
 
@@ -53,7 +53,7 @@ Tds Supports sql instances by passing ```instance: "instancename"``` to the conn
     datetime	      {{2013, 10, 12}, {0, 37, 14}}
     uuid            <<160,238,188,153,156,11,78,248,187,109,107,185,189,56,10,17>>
 
-All data types will be supported, unsupported types currently are udt, xml
+All data types will be supported, unsupported types currently are *User Defined Types*, xml
 
 ## Contributing
 
@@ -65,11 +65,10 @@ $ cd tds
 $ mix test
 ```
 
-The tests require an addition to your hosts file to connect to your sql server database.
+The tests require your sql server database to be present on localhost. In case you are unable to run local instance of SQL server either using local installation on [windows](https://docs.microsoft.com/en-us/sql/database-engine/install-windows/install-sql-server-from-the-installation-wizard-setup) or [linix](https://docs.microsoft.com/en-us/sql/linux/sql-server-linux-setup), docker image for [linux](https://hub.docker.com/r/microsoft/mssql-server-linux/) 
 
-<IP OF SQL SERVER>	sqlserver.local
 
-Additionally SQL authentication needs to be used for connecting and testing. Add the user test_user as owner to the database test_db. See one of the test files for the connection information and port number.
+Additionally SQL authentication needs to be used for connecting and testing. Check config/test.exs file for credentials used in unit testing.
 
 ##Special Thanks
 
