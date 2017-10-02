@@ -145,30 +145,34 @@ defmodule Tds.Tokens do
     {tokens, tail}
   end
   defp decode_token(<<@tds_token_envchange, _length::little-unsigned-16, env_type::unsigned-8, tail::binary>>, tokens) do
-    token = case env_type do
+    case env_type do
       @tds_envtype_database ->
         <<new_value_size::unsigned-8,
           new_value::binary-little-size(new_value_size)-unit(8),
           old_value_size::unsigned-8,
-          _old_value::binary-little-size(old_value_size)-unit(8),
-          tail::binary>> = tail
+          old_value::binary-little-size(old_value_size)-unit(8),
+          rest::binary>> = tail
+        Logger.debug("Switching from #{new_value} database to #{old_value}")
+        {tokens |> Keyword.put(:database, new_value), rest}
       @tds_envtype_packetsize ->
         <<new_value_size::unsigned-8,
           new_value::binary-little-size(new_value_size)-unit(8),
           old_value_size::unsigned-8,
-          _old_value::binary-little-size(old_value_size)-unit(8),
-          tail::binary>> = tail
+          old_value::binary-little-size(old_value_size)-unit(8),
+          rest::binary>> = tail
+        Logger.debug("Database server configured packetsize to #{new_value} where old value was #{old_value}")
+        {tokens |> Keyword.put(:packetsize, new_value), rest}
       @tds_envtype_begintrans ->
-        <<value_size::unsigned-8, new_value::binary-little-size(value_size)-unit(8), 0x00, tail::binary>> = tail
-        [trans: new_value]
+        <<value_size::unsigned-8, new_value::binary-little-size(value_size)-unit(8), 0x00, rest::binary>> = tail
+        {tokens |> Keyword.put(:trans, new_value), rest}
       @tds_envtype_committrans ->
-        <<0x00, value_size::unsigned-8, _old_value::binary-little-size(value_size)-unit(8), tail::binary>> = tail
-        [trans: <<0x00>>]
+        <<0x00, value_size::unsigned-8, _old_value::binary-little-size(value_size)-unit(8), rest::binary>> = tail
+        {tokens |> Keyword.put(:trans, <<0x00>>), rest}
       @tds_envtype_rollbacktrans ->
-        <<0x00, value_size::unsigned-8, _old_value::binary-little-size(value_size)-unit(8), tail::binary>> = tail
-        [trans: <<0x00>>]
+        <<0x00, value_size::unsigned-8, _old_value::binary-little-size(value_size)-unit(8), rest::binary>> = tail
+        {tokens |> Keyword.put(:trans, <<0x00>>), rest}
     end
-    {token ++ tokens, tail}
+    
   end
   ## DONE
   defp decode_token(<<@tds_token_done, status::int16, cur_cmd::binary(2), row_count::little-size(8)-unit(8), _tail::binary>>, tokens) do
