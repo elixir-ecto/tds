@@ -68,11 +68,12 @@ defmodule Tds.Parameter do
   end
   def fix_data_type(%Tds.Parameter{value: value} = param)
   when is_binary(value) do
-    if String.valid?(value) do
-      %{param | type: :string}
-    else
-      %{param | type: :binary}
-    end
+    # if String.valid?(value) do
+    #   %{param | type: :string}
+    # else
+    #   %{param | type: :binary}
+    # end
+    %{param | type: :binary}
   end
   def fix_data_type(%Tds.Parameter{value: value} = param)
   when is_integer(value) and value >= 0 do

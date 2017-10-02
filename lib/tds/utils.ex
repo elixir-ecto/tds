@@ -20,8 +20,16 @@ defmodule Tds.Utils do
     Enum.join x, " "
   end
 
-  def to_little_ucs2(s) do
-    to_char_list(s) |> Enum.map_join(&(<<&1::little-size(16)>>))
+  def to_little_ucs2(str) do
+    with utf16 when is_bitstring(utf16) <-
+      :unicode.characters_to_binary(str, :unicode, {:utf16, :little})
+    do
+      utf16
+    else
+      # todo: should below be removed? We probably don't want to allow messy bytes! 
+      _ -> to_char_list(str) |> Enum.map_join(&(<<&1::little-size(16)>>))
+    end
+    
   end
 
   def ucs2_to_utf(s) do
