@@ -7,75 +7,80 @@ defmodule RPCTest do
   @tag timeout: 50000
 
   setup do
-    opts = Application.fetch_env!(:mssql, :opts)
+    opts = Application.fetch_env!(:tds, :opts)
     {:ok, pid} = Tds.start_link(opts)
 
     {:ok, [pid: pid]}
   end
 
-  test "Parameterized Queries", context do
-    Integers
-    nums = [
-      0,
-      1,
-      256,
-      65536,
-      4294967296,
-      20080906120000
-    ]
-    Enum.each(nums, fn(num) ->
-      assert [[num]] == query("SELECT @n1", [%Parameter{name: "@n1", value: num}])
-    end)
+  describe "parametrized queries" do
+    test "with positiove integer numbers", context do
+      Integers
+      nums = [
+        0,
+        1,
+        256,
+        65536,
+        4294967296,
+        20080906120000
+      ]
+      Enum.each(nums, fn(num) ->
+        assert [[num]] == query("SELECT @n1", [%Parameter{name: "@n1", value: num}])
+      end)
+    end
+    test "with negative integer numbers", context do
+      # Negative Numbers
+      nums = [
+        -111111111,
+        -1111111111111111111,
+        -1111111111111111111111111111,
+        -11111111111111111111111111111111111111
+      ]
+      Enum.each(nums, fn(num) ->
+        assert [[Decimal.new("#{num}")]] == query("SELECT @n1", [%Parameter{name: "@n1", value: num}])
+      end)
+    end
+    test "with decimal numbers", context do
+      # Decimals
+      nums = [
+        1.11111111,
+        1.111111111111111111,
+        1.111111111111111111111111111,
+        1.1111111111111111111111111111111111111
+      ]
+      Enum.each(nums, fn(num) ->
+        assert [[Decimal.new("#{num}")]] == query("SELECT @n1", [%Parameter{name: "@n1", value: Decimal.new("#{num}")}])
+      end)
+    end
+    test "with varchar string", context do
+      # VarChar Strings
+      strs = [
+        "hello",
+        "'",
+        "!@#$%^&*()",
+        ""
+      ]
+      Enum.each(strs, fn(str) ->
+        assert [[str]] == query("SELECT @n1", [%Parameter{name: "@n1", value: str, type: :string}])
+      end)
+    end
+    test "with nvarchar strings", context do
+      strs = [
+        "hello",
+        "'",
+        "!@#$%^&*()",
+        "Знакомства",
+        ""
+      ]
+      Enum.each(strs, fn(str) ->
+        assert [[str]] == query("SELECT @n1", [%Parameter{name: "@n1", type: :string, value: str}])
+      end)
 
-    # Negative Numbers
-    nums = [
-      -111111111,
-      -1111111111111111111,
-      -1111111111111111111111111111,
-      -11111111111111111111111111111111111111
-    ]
-    Enum.each(nums, fn(num) ->
-      assert [[Decimal.new("#{num}")]] == query("SELECT @n1", [%Parameter{name: "@n1", value: num}])
-    end)
+      # Dates and Times
+      #assert [{{{2014, 06, 20}, {10, 21, 42}}}] = query("SELECT @n1", [%Parameter{name: "@n", value: {{2014, 06, 20}, {10, 21, 42}}])
 
-    # Decimals
-    nums = [
-      1.11111111,
-      1.111111111111111111,
-      1.111111111111111111111111111,
-      1.1111111111111111111111111111111111111
-    ]
-    Enum.each(nums, fn(num) ->
-      assert [[Decimal.new("#{num}")]] == query("SELECT @n1", [%Parameter{name: "@n1", value: Decimal.new("#{num}")}])
-    end)
-
-    # VarChar Strings
-    strs = [
-      "hello",
-      "'",
-      "!@#$%^&*()",
-      ""
-    ]
-    Enum.each(strs, fn(str) ->
-      assert [[str]] == query("SELECT @n1", [%Parameter{name: "@n1", value: str}])
-    end)
-
-    strs = [
-      "hello",
-      "'",
-      "!@#$%^&*()",
-      "Знакомства",
-      ""
-    ]
-    Enum.each(strs, fn(str) ->
-      assert [[str]] == query("SELECT @n1", [%Parameter{name: "@n1", type: :string, value: str}])
-    end)
-
-    # Dates and Times
-    #assert [{{{2014, 06, 20}, {10, 21, 42}}}] = query("SELECT @n1", [%Parameter{name: "@n", value: {{2014, 06, 20}, {10, 21, 42}}])
-
+    end
   end
-
   test "NULL Types", context do
     query("DROP TABLE TestTable", [])
     assert :ok = query("CREATE TABLE TestTable (bin varbinary(1) NULL, uuid uniqueidentifier NULL, char nvarchar(1) NULL, nchar nvarchar(255) NULL)", [])

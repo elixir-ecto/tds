@@ -37,6 +37,18 @@ defmodule Tds.Parameter do
     |> Enum.join(", ")
   end
 
+  @doc """
+  Prepares parameters by giving them names, define missing type, encoding value if necessary
+  """
+  def prepare_params(nil) do
+    []
+  end
+  def prepare_params(params) do
+    params
+    |> name(0)
+    |> Enum.map(&fix_data_type/1)
+  end
+
   def name(params, name) do
     do_name(params, name, [])
   end
@@ -55,7 +67,7 @@ defmodule Tds.Parameter do
     acc
   end
 
-  def fix_data_type(%Tds.Parameter{type: _type, value: _value} = param) do
+  def fix_data_type(%Tds.Parameter{type: type, value: _value} = param) when not is_nil(type) do
     param
   end
   def fix_data_type(%Tds.Parameter{value: value} = param)
@@ -68,12 +80,11 @@ defmodule Tds.Parameter do
   end
   def fix_data_type(%Tds.Parameter{value: value} = param)
   when is_binary(value) do
-    # if String.valid?(value) do
-    #   %{param | type: :string}
-    # else
-    #   %{param | type: :binary}
-    # end
-    %{param | type: :binary}
+    if String.valid?(value) do
+      %{param | type: :string}
+    else
+      %{param | type: :binary}
+    end
   end
   def fix_data_type(%Tds.Parameter{value: value} = param)
   when is_integer(value) and value >= 0 do
@@ -113,6 +124,14 @@ defmodule Tds.Parameter do
   end
   def fix_data_type(%Tds.Parameter{value: {{_,_,_},{_,_,_,},_}} = param) do
     %{param | type: :datetimeoffset}
+  end
+  def fix_data_type(%Tds.Parameter{}=raw_param, acc) do
+    param = if is_nil(raw_param.name) do
+        %{raw_param | name: "@#{acc}"}
+      else
+        raw_param
+      end
+    fix_data_type(param)
   end
   def fix_data_type(raw_param, acc) do
     param = %Tds.Parameter{name: "@#{acc}", value: raw_param}

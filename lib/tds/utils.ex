@@ -26,8 +26,7 @@ defmodule Tds.Utils do
     do
       utf16
     else
-      # todo: should below be removed? We probably don't want to allow messy bytes! 
-      _ -> to_char_list(str) |> Enum.map_join(&(<<&1::little-size(16)>>))
+      _ -> raise Tds.Error, ~s(failed to covert string "#{inspect(str)}" to ucs2 binary)
     end
     
   end

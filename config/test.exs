@@ -2,7 +2,7 @@ use Mix.Config
 
 config :logger, level: :info
 
-config :mssql,
+config :tds,
   opts: [
     hostname: "localhost",
     username: "sa",
