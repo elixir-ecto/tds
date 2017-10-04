@@ -41,13 +41,13 @@ defmodule Tds.Mixfile do
 
   defp description do
     """
-    MSSQL / TDS Driver for Ecto 2.0
+    Microsoft SQL Server client (elixit implementation of MS TDS protocol)
     """
   end
 
   defp package do
     [ name: "tds",
-      files: ["lib", "priv", "mix.exs", "README*"],
+      files: ["lib", "mix.exs", "README*"],
       maintainers: ["Eric Witchin", "Milan Jaric"],
       licenses: ["Apache 2.0"],
       links: %{"Github" => "https://github.com/livehelpnow/tds"}]
