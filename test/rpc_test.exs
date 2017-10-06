@@ -121,7 +121,7 @@ defmodule RPCTest do
     query("DROP TABLE dbo.TestTable2", [])
     assert :ok = query("CREATE TABLE TestTable2 (text varbinary(max) NULL)", [])
     query("INSERT INTO TestTable2 VALUES (@1)",[%Parameter{name: "@1", value: "hello", type: :binary}])
-    assert [["hello"]] = query("SELECT * FROM TestTable2 WHERE text IN ('x', 'y', @1)", [%Parameter{name: "@1", value: "hello"}])
+    assert [["hello"]] = query("SELECT * FROM TestTable2 WHERE text IN ('x', 'y', @1)", [%Parameter{name: "@1", value: "hello", type: :binary}])
   end
 
   test "Common Types Null", context do

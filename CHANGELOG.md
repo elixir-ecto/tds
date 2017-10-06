@@ -1,3 +1,7 @@
+# v1.0.3
+* BugFix
+  * When insert is performed with output incorect row count is calucated. Causing tds_ecto and ecto to think it is StaleEntity
+
 # v0.5.4
 * Enhancements
   * Cleaned up code style for Elixir 1.2.0 warnings
