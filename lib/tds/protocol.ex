@@ -58,9 +58,11 @@ defmodule Tds.Protocol do
     mod.close(sock)
   end
 
-  def ping(s) do
-
-    {:ok, s}
+  def ping(state) do
+    case send_query(~s{SELECT 'pong' as [msg]}, state) do
+      {:ok, s} -> {:ok, s}
+      {:error, err, s} -> {:disconnect, err, s}
+    end
   end
 
   def checkout(%{sock: {_mod, sock}} = s) do
@@ -482,8 +484,9 @@ defmodule Tds.Protocol do
       columns
     end
     num_rows = done.rows;
-    rows =
-    if rows != nil, do:  Enum.reverse(rows), else: rows
+    # rows are correctly orrdered when they were parsed, so below is not needed anymore
+    # rows =
+    # if rows != nil, do:  Enum.reverse(rows), else: rows
     rows = if num_rows == 0 && rows == nil, do: [], else: rows
 
     result = %Tds.Result{columns: columns, rows: rows, num_rows: num_rows}
