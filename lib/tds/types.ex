@@ -1011,7 +1011,26 @@ defmodule Tds.Types do
     <<0>>
   end
   def encode_data(@tds_data_type_floatn, value, _) do
-    <<0x04, value::little-float-size(32)>>
+    d_ctx = Decimal.get_context
+    d_ctx = %{d_ctx | precision: 38}
+    Decimal.set_context d_ctx
+    value_list = Decimal.new(value)
+      |> Decimal.abs
+      |> Decimal.to_string(:scientific)
+      |> String.split(".")
+    precision =
+      case value_list do
+        [p,s] ->
+          String.length(p) + String.length(s)
+        [p] ->
+          String.length(p)
+      end
+    if precision <= 7 + 1 do
+      <<0x04, value::little-float-size(32)>>
+    else
+      # up to 15 digits of precision https://docs.microsoft.com/en-us/sql/t-sql/data-types/float-and-real-transact-sql
+      <<0x08, value::little-float-size(64)>>
+    end
   end
 
   @doc """
