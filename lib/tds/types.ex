@@ -67,6 +67,7 @@ defmodule Tds.Types do
   @tds_data_type_nchar            0xEF
   @tds_data_type_xml              0xF1
   @tds_data_type_udt              0xF0
+  @tds_data_type_tvp              0xF3
   @tds_data_type_text             0x23
   @tds_data_type_image            0x22
   @tds_data_type_ntext            0x63
@@ -764,6 +765,7 @@ defmodule Tds.Types do
       :date -> "date"
       :time -> "time"
       :smalldatetime -> "smalldatetime"
+      :tvp -> "#{value.vame} readonly"
       :binary -> encode_binary_descriptor(value)
       :string ->
         cond do
