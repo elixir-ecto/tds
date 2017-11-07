@@ -60,7 +60,7 @@ defmodule Tds.Protocol do
 
   def ping(state) do
     case send_query(~s{SELECT 'pong' as [msg]}, state) do
-      {:ok, s} -> {:ok, s}
+      {:ok, _, s} -> {:ok, s}
       {:error, err, s} -> {:disconnect, err, s}
     end
   end
