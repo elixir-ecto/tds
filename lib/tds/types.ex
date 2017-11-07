@@ -502,6 +502,7 @@ defmodule Tds.Types do
       :date -> encode_date_type(param)
       :time -> encode_time_type(param)
       :uuid -> encode_uuid_type(param)
+      :tvp -> encode_tvp_type(param)
       _ -> encode_string_type(param)
     end
   end
@@ -575,6 +576,11 @@ defmodule Tds.Types do
     encode_data_type(%{param | type: :datetimeoffset})
   end
 
+  def encode_tvp_type(%Parameter{value: value} = param) do
+    type = @tds_data_type_tvp
+    data = <<type>> <> <<0, 0>> <> <<0, 0>> <> <<0, 0>>
+    {type, data, []}
+  end
 
   def encode_binary_type(%Parameter{value: value} = param)
   when value == "" do
