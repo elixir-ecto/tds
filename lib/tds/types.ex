@@ -576,7 +576,7 @@ defmodule Tds.Types do
     encode_data_type(%{param | type: :datetimeoffset})
   end
 
-  def encode_tvp_type(%Parameter{value: value} = param) do
+  def encode_tvp_type(%Parameter{}) do
     type = @tds_data_type_tvp
     data = <<type>> <> <<0, 0>> <> <<0, 0>> <> <<0, 0>>
     {type, data, []}
@@ -974,6 +974,33 @@ defmodule Tds.Types do
     do: <<@tds_plp_null::little-unsigned-64>>
   def encode_data(@tds_data_type_bigvarbinary, value, _),
     do: <<byte_size(value)::little-unsigned-16>> <> value
+
+  @doc """
+  Data Encoding TVP type
+  """
+  def encode_data(@tds_data_type_tvp, value, _attrs) when is_nil(value),
+    do: <<0xFF :: little-unsigned-16, 0x00, 0x00 >>
+
+  def encode_data(@tds_data_type_tvp, %{columns: columns, rows: rows}, _attrs) do
+    column_length = <<length(columns) :: little-unsigned-16>>
+    {column_attrs, column_meta} = Enum.reduce(columns, {[], <<>>}, fn (%Parameter{} = param, {attrs, acc_bin}) ->
+      {bin_type, data, attr} = encode_data_type(param)
+      bin = acc_bin <> <<0x00 :: little-unsigned-32, 0x00 :: little-unsigned-16 >> <> data <> <<0, 0>>
+
+      {[{bin_type, attr} | attrs], bin}
+    end)
+
+    row_data = Enum.reduce(rows, <<>>, fn params ->
+      column_attrs
+      |> Enum.zip(params)
+      |> Enum.reduce(<<>>, fn ({{type, attr}, param}, acc) ->
+        acc <> encode_data(type, param, attr)
+      end)
+      << 0x01 >> <> column_attrs
+    end)
+
+    column_length <> column_meta <> <<0x00>> <> row_data <> <<0x00>>
+  end
 
   @doc """
   Data Encoding String Types
