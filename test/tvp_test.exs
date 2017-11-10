@@ -31,6 +31,6 @@ defmodule TvpTest do
       %Parameter{name: "@tvp", value: %{name: "TvpTestType", columns: [%Parameter{name: "d", type: :integer, value: nil}], rows: [[1]]}, type: :tvp}
     ]
 
-    assert {:ok, res} = query("__tvpTest @tvp", params)
+    assert [[1]] = proc("__tvpTest", params)
   end
 end

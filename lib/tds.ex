@@ -17,6 +17,11 @@ defmodule Tds do
     end
   end
 
+  def proc(pid, statement, params, opts \\ []) do
+    opts = Keyword.put_new(opts, :proc, statement)
+    query(pid, statement, params, opts)
+  end
+
   def query!(pid, statement, params, opts \\ []) do
     query = %Query{statement: statement}
     opts = Keyword.put_new(opts, :parameters, params)

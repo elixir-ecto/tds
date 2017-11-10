@@ -14,7 +14,7 @@ defmodule Tds.TestHelper do
 
   defmacro proc(proc, params, opts \\ []) do
     quote do
-      case Tds.Connection.proc(var!(context)[:pid], unquote(proc),
+      case Tds.proc(var!(context)[:pid], unquote(proc),
                                      unquote(params), unquote(opts)) do
         {:ok, %Tds.Result{rows: nil}} -> :ok
         {:ok, %Tds.Result{rows: []}} -> :ok
