@@ -771,7 +771,7 @@ defmodule Tds.Types do
       :date -> "date"
       :time -> "time"
       :smalldatetime -> "smalldatetime"
-      :tvp -> "#{value.vame} readonly"
+      :tvp -> "#{value.name} readonly"
       :binary -> encode_binary_descriptor(value)
       :string ->
         cond do
