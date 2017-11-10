@@ -985,21 +985,23 @@ defmodule Tds.Types do
     column_length = <<length(columns) :: little-unsigned-16>>
     {column_attrs, column_meta} = Enum.reduce(columns, {[], <<>>}, fn (%Parameter{} = param, {attrs, acc_bin}) ->
       {bin_type, data, attr} = encode_data_type(param)
-      bin = acc_bin <> <<0x00 :: little-unsigned-32, 0x00 :: little-unsigned-16 >> <> data <> <<0, 0>>
+      bin = acc_bin <> <<0x00 :: little-unsigned-32, 0x00 :: little-unsigned-16 >> <> data <> <<0x00>>
 
       {[{bin_type, attr} | attrs], bin}
     end)
 
     row_data = Enum.reduce(rows, <<>>, fn (params, row_acc) ->
       row_bin = column_attrs
+      |> Enum.reverse
       |> Enum.zip(params)
       |> Enum.reduce(<<>>, fn ({{type, attr}, param}, acc) ->
         acc <> encode_data(type, param, attr)
       end)
+
       row_acc <> << 0x01 >> <> row_bin
     end)
 
-    column_length <> column_meta <> row_data <> <<0x00>>
+    column_length <> column_meta <> <<0x00>> <> row_data <> <<0x00>>
   end
 
   @doc """
