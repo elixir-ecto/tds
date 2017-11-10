@@ -578,7 +578,7 @@ defmodule Tds.Types do
 
   def encode_tvp_type(%Parameter{}) do
     type = @tds_data_type_tvp
-    data = <<type>> <> <<0, 0>> <> <<0, 0>> <> <<0, 0>>
+    data = <<type>> <> <<0, 0, 0>>
     {type, data, []}
   end
 
@@ -978,7 +978,7 @@ defmodule Tds.Types do
   @doc """
   Data Encoding TVP type
   """
-  def encode_data(@tds_data_type_tvp, value, _attrs) when is_nil(value),
+  def encode_data(@tds_data_type_tvp, %{columns: nil}, _attrs),
     do: <<0xFF :: little-unsigned-16, 0x00, 0x00 >>
 
   def encode_data(@tds_data_type_tvp, %{columns: columns, rows: rows}, _attrs) do
@@ -990,16 +990,16 @@ defmodule Tds.Types do
       {[{bin_type, attr} | attrs], bin}
     end)
 
-    row_data = Enum.reduce(rows, <<>>, fn params ->
-      column_attrs
+    row_data = Enum.reduce(rows, <<>>, fn (params, row_acc) ->
+      row_bin = column_attrs
       |> Enum.zip(params)
       |> Enum.reduce(<<>>, fn ({{type, attr}, param}, acc) ->
-        acc <> encode_data(type, param, attr)
+        foo = acc <> encode_data(type, param, attr)
       end)
-      << 0x01 >> <> column_attrs
+      row_acc <> << 0x01 >> <> row_bin
     end)
 
-    column_length <> column_meta <> <<0x00>> <> row_data <> <<0x00>>
+    column_length <> column_meta <> row_data <> <<0x00>>
   end
 
   @doc """
