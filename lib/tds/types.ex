@@ -994,7 +994,7 @@ defmodule Tds.Types do
       row_bin = column_attrs
       |> Enum.zip(params)
       |> Enum.reduce(<<>>, fn ({{type, attr}, param}, acc) ->
-        foo = acc <> encode_data(type, param, attr)
+        acc <> encode_data(type, param, attr)
       end)
       row_acc <> << 0x01 >> <> row_bin
     end)
