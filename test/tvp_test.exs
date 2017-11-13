@@ -3,6 +3,7 @@ defmodule TvpTest do
   require Logger
   use ExUnit.Case, async: true
   alias Tds.Parameter
+  alias Tds.Column
 
   @tag timeout: 50000
 
@@ -17,9 +18,13 @@ defmodule TvpTest do
     assert :ok = query("BEGIN TRY DROP PROCEDURE __tvpTest DROP TYPE TvpTestType END TRY BEGIN CATCH END CATCH", [])
     assert :ok = query("""
       CREATE TYPE TvpTestType AS TABLE (
-        d int
+        a int,
+        b uniqueidentifier,
+        c varchar(100),
+        d varbinary(max)
       );
     """, [])
+
     assert :ok = query("""
     CREATE PROCEDURE __tvpTest (@tvp TvpTestType readonly)
       AS BEGIN
@@ -27,10 +32,24 @@ defmodule TvpTest do
       END
     """, [])
 
+    rows = [1, <<158, 3, 157, 56, 133, 56, 73, 67, 128, 121, 126, 204, 115, 227, 162, 157>>, "foo", "{\"foo\":\"bar\",\"baz\":\"biz\"}"]
     params = [
-      %Parameter{name: "@tvp", value: %{name: "TvpTestType", columns: [%Parameter{name: "d", type: :integer, value: nil}], rows: [[1]]}, type: :tvp}
+      %Parameter{
+        name: "@tvp",
+        value: %{
+          name: "TvpTestType",
+          columns: [
+            %Column{name: "a", type: :int},
+            %Column{name: "b", type: :uuid},
+            %Column{name: "c", type: :varchar},
+            %Column{name: "d", type: :varbinary},
+          ],
+          rows: [rows]
+        },
+        type: :tvp
+      }
     ]
 
-    assert [[1]] = proc("__tvpTest", params)
+    assert [^rows] = proc("__tvpTest", params)
   end
 end
