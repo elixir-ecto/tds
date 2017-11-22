@@ -121,7 +121,7 @@ defmodule Tds.Protocol do
 
   defp instance(opts, s) do
     host      = Keyword.fetch!(opts, :hostname)
-    host      = if is_binary(host), do: String.to_char_list(host), else: host
+    host      = if is_binary(host), do: String.to_charlist(host), else: host
 
     case :gen_udp.open(0, [:binary, {:active, false}, {:reuseaddr, true}]) do
       {:ok, sock} ->
@@ -135,7 +135,7 @@ defmodule Tds.Protocol do
 
   defp connect(opts, s) do
     host      = Keyword.fetch!(opts, :hostname)
-    host      = if is_binary(host), do: String.to_char_list(host), else: host
+    host      = if is_binary(host), do: String.to_charlist(host), else: host
     port      = s.itcp || opts[:port] || System.get_env("MSSQLPORT") || 1433
     {port, _}      = if is_binary(port), do: Integer.parse(port), else: {port, nil}
     timeout   = opts[:timeout] || @timeout
