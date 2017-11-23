@@ -77,24 +77,24 @@ defmodule Tds.Utils do
  #   Connection.next(%{s | statement: "", queue: queue, state: :ready})
  # end
 
-  def pow10(num,0), do: num
-  def pow10(num,pow) when pow > 0 do
-    pow10(10*num, pow - 1)
-  end
+  # def pow10(num,0), do: num
+  # def pow10(num,pow) when pow > 0 do
+  #   pow10(10*num, pow - 1)
+  # end
 
-  def pow10(num,pow) when pow < 0 do
-    pow10(num/10, pow + 1)
-  end
+  # def pow10(num,pow) when pow < 0 do
+  #   pow10(num/10, pow + 1)
+  # end
 
-  def pow(_, 0), do: 1
-  def pow(a, 1), do: a
+  # def pow(_, 0), do: 1
+  # def pow(a, 1), do: a
 
-  def pow(a, n) when rem(n, 2) === 0 do
-    tmp = pow(a, div(n, 2))
-    tmp * tmp
-  end
+  # def pow(a, n) when rem(n, 2) === 0 do
+  #   tmp = pow(a, div(n, 2))
+  #   tmp * tmp
+  # end
 
-  def pow(a, n) do
-    a * pow(a, n-1)
-  end
+  # def pow(a, n) do
+  #   a * pow(a, n-1)
+  # end
 end

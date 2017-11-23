@@ -458,14 +458,10 @@ defmodule Tds.Types do
     d_ctx = Decimal.get_context
     d_ctx = %{d_ctx | precision: precision}
     Decimal.set_context d_ctx
-    d = Decimal.new pow10(value,(scale * -1))
-    value = pow10(d.coef, d.exp)
-    value =
     case sign do
-      0 -> value * -1
-      _ -> value
+      0 -> Decimal.new(-1, value, (scale * -1))
+      _ -> Decimal.new( 1, value, (scale * -1))
     end
-    Decimal.new value
   end
 
   def decode_char(_collation, <<data::binary>>) do
