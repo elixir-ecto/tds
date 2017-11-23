@@ -25,4 +25,20 @@ defmodule Tds.TestHelper do
       end
     end
   end
+
+  def sqlcmd(params, sql, args \\ []) do
+    args = [
+      "-U", params[:username], 
+      "-P", params[:password],
+      "-S", params[:hostname],
+      "-Q", ~s(#{sql}) | args]
+    |> IO.inspect()
+    System.cmd "sqlcmd", args
+  end
 end
+
+
+Application.get_env(:tds, :opts)
+
+|> IO.inspect()
+|> Tds.TestHelper.sqlcmd "IF NOT EXISTS(SELECT * FROM sys.databases where name = 'test') BEGIN CREATE DATABASE [test]; END;"

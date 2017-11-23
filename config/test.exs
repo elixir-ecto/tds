@@ -4,7 +4,7 @@ config :logger, level: :info
 
 config :tds,
   opts: [
-    hostname: "localhost",
+    hostname: "127.0.0.1",
     username: "sa",
     password: "some!Password",
     database: "test"
