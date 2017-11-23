@@ -1022,11 +1022,11 @@ defmodule Tds.Types do
           String.length(p)
       end
     if precision <= 7 + 1 do
-      <<0x04, value::little-float-size(32)>>
+      <<0x04, value::little-float-32>>
     else
       # up to 15 digits of precision https://docs.microsoft.com/en-us/sql/t-sql/data-types/float-and-real-transact-sql
-      <<0x08, value::little-float-size(64)>>
-    end
+      <<0x08, value::little-float-64>>      
+    end  
   end
 
   @doc """

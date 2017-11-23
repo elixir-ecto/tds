@@ -1,5 +1,3 @@
-ExUnit.start()
-
 defmodule Tds.TestHelper do
   require Logger
   defmacro query(statement, params, opts \\ []) do
@@ -39,3 +37,5 @@ end
 
 Application.get_env(:tds, :opts)
 |> Tds.TestHelper.sqlcmd("IF NOT EXISTS(SELECT * FROM sys.databases where name = 'test') BEGIN CREATE DATABASE [test]; END;")
+
+ExUnit.start()

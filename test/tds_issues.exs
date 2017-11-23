@@ -1,7 +1,7 @@
-defmodule TdsTest do
-  use ExUnit.Case, async: true
-  require Logger
+defmodule TdsIssuesTest do
   import Tds.TestHelper
+  require Logger
+  use ExUnit.Case, async: true
 
   @tag timeout: 50000
 
@@ -30,7 +30,7 @@ defmodule TdsTest do
                   %Tds.Parameter{name: "@3", value: {{2016, 12, 20}, {23, 59, 23, 0}}}]) 
 
       assert :ok == res
-      assert [[val]] = query("SELECT [total] FROM hades_sealed_cfdis WHERE id in (select max(id) from hades_sealed_cfdis)", [])
+      assert [[val]] == IO.inspect(query("SELECT [total] FROM hades_sealed_cfdis WHERE id in (select max(id) from hades_sealed_cfdis)", []))
     end
     Enum.flat_map(1..17, &([1/&1, -1/&1]))
     |> Enum.each(f)
