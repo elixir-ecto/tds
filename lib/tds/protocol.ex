@@ -58,9 +58,10 @@ defmodule Tds.Protocol do
     mod.close(sock)
   end
 
+  @spec ping(any) :: {:ok, any} | {:disconnect, Exception.t, any}
   def ping(state) do
     case send_query(~s{SELECT 'pong' as [msg]}, state) do
-      {:ok, _, s} -> {:ok, s}
+      {:ok, _, s}      -> {:ok, s}
       {:error, err, s} -> {:disconnect, err, s}
     end
   end
@@ -311,7 +312,7 @@ defmodule Tds.Protocol do
     case msg_send(msg, s) do
       :ok ->
         {:noreply,  %{s | state: :prelogin}}
-      {:error, reason} ->
+      {:error, reason, s} ->
         error(%Tds.Error{message: "tcp send: #{reason}"}, s)
     end
   end
@@ -538,8 +539,8 @@ defmodule Tds.Protocol do
       mod.send(sock, pak)
     end)
     case msg_recv(<<>>, s) do
-      {:disconnect, _ , ex} ->
-        {:error, ex}
+      {:disconnect, _ex , _s}=res ->
+        res
       buffer ->
         new_data(buffer, %{s | state: :executing, pak_header: ""})
     end
@@ -597,8 +598,8 @@ defmodule Tds.Protocol do
     end)
 
     case msg_recv(<<>>, s) do
-      {:disconnect, _ , ex} ->
-        {:error, ex}
+      {:disconnect, ex , s} ->
+        {:error, ex, s}
       buffer ->
         new_data(buffer, %{s | state: :login})
     end

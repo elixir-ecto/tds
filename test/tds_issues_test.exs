@@ -12,6 +12,7 @@ defmodule TdsIssuesTest do
     {:ok, [pid: pid]}
   end
 
+  @tag :manual
   test "issue 33: Sending Float with more than 9 characters should not fail", context do
     query("DROP TABLE hades_sealed_cfdis", [])
     query(
