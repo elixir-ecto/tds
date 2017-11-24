@@ -61,8 +61,18 @@ defmodule Tds.Protocol do
   @spec ping(any) :: {:ok, any} | {:disconnect, Exception.t, any}
   def ping(state) do
     case send_query(~s{SELECT 'pong' as [msg]}, state) do
-      {:ok, _, s}      -> {:ok, s}
-      {:error, err, s} -> {:disconnect, err, s}
+      {:ok, _, s} -> 
+        {:ok, s}
+      {:disconnect, :closed, s} -> 
+        {:disconnect, %Tds.Error{message: "Connection closed."}, s}
+      {:error, err, s} -> 
+        err = cond do
+          Exception.exception?(err) -> err
+          true                      -> %Tds.Error{message: inspect(err)}
+        end
+        {:disconnect, err, s}
+      any -> 
+        any
     end
   end
 
