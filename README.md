@@ -35,7 +35,7 @@ iex> Tds.query!(pid, "INSERT INTO MyTable (MyColumn) VALUES (@my_value)",
 ## Features
 
 * Automatic decoding and encoding of Elixir values to and from MSSQL's binary format
-* Supports TDS Version 7.3, 7.4
+* Support of TDS Versions 7.3, 7.4
 
 ## Connecting to SQL Instances
 
@@ -78,7 +78,7 @@ use it for the first time.
 
 The tests require an sql server database to be available on localhost.
 
-If you have Docker installed, you can use the official [SQL Server Docker image]([linux](https://hub.docker.com/r/microsoft/mssql-server-linux).
+If you have Docker installed, you can use the official [SQL Server Docker image](https://hub.docker.com/r/microsoft/mssql-server-linux).
 To start the container, run:
 
 ```bash
@@ -93,7 +93,7 @@ installation instructions here:
 
 Make sure your SQL server accepts the credentials defined in `config/test.exs`.
 
-You also will need to have the *sqlcmd command line tools* installed. Setup
+You also will need to have the *sqlcmd* command line tools installed. Setup
 instructions can be found [here](https://docs.microsoft.com/en-us/sql/linux/sql-server-linux-setup-tools).
 
 ## Special Thanks
