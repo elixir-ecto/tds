@@ -28,13 +28,11 @@ iex> Tds.query!(pid, "INSERT INTO MyTable (MyColumn) VALUES (@my_value)", [%Tds.
 
 ## Features
 
-  * Automatic decoding and encoding of Elixir values to and from MSSQL's binary format
-  * Supports TDS Version 7.3, 7.4
+* Automatic decoding and encoding of Elixir values to and from MSSQL's binary format
+* Supports TDS Version 7.3, 7.4
 
 ## Connecting to SQL Instances
 Tds Supports sql instances by passing ```instance: "instancename"``` to the connection options.
-
-
 
 ## Data representation
 
@@ -71,27 +69,24 @@ You will need sqlcmd command line tools for some operations in test. Setup instr
 
 Additionally SQL authentication needs to be used for connecting and testing. Check config/test.exs file for credentials used in unit testing.
 
-##Special Thanks
+## Special Thanks
 
-Thanks to ericmj, this driver takes a lot of inspiration from postgrex.
-https://github.com/ericmj/
+Thanks to [ericmj](https://github.com/ericmj), this driver takes a lot of inspiration from postgrex.
 
-
-Also thanks to everyone in the Elixir Google group and on the Elixir IRC Channel
-
+Also thanks to everyone in the Elixir Google group and on the Elixir IRC Channel.
 
 ## License
 
-   Copyright 2014, 2015, 2017 LiveHelpNow
+Copyright 2014, 2015, 2017 LiveHelpNow
 
-   Licensed under the Apache License, Version 2.0 (the "License");
-   you may not use this file except in compliance with the License.
-   You may obtain a copy of the License at
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
 
-       http://www.apache.org/licenses/LICENSE-2.0
+    http://www.apache.org/licenses/LICENSE-2.0
 
-   Unless required by applicable law or agreed to in writing, software
-   distributed under the License is distributed on an "AS IS" BASIS,
-   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-   See the License for the specific language governing permissions and
-   limitations under the License.
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
