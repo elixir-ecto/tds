@@ -62,10 +62,11 @@ To contribute you need to compile Tds from source and test it:
 ```
 $ git clone https://github.com/livehelpnow/tds.git
 $ cd tds
+$ mix deps.get
 $ mix test
 ```
 
-The tests require your sql server database to be present on localhost. In case you are unable to run local instance of SQL server either using local installation on [windows](https://docs.microsoft.com/en-us/sql/database-engine/install-windows/install-sql-server-from-the-installation-wizard-setup) or [linix](https://docs.microsoft.com/en-us/sql/linux/sql-server-linux-setup), docker image for [linux](https://hub.docker.com/r/microsoft/mssql-server-linux/) 
+The tests require your sql server database to be present on localhost. In case you are unable to run local instance of SQL server either using local installation on [windows](https://docs.microsoft.com/en-us/sql/database-engine/install-windows/install-sql-server-from-the-installation-wizard-setup) or [linix](https://docs.microsoft.com/en-us/sql/linux/sql-server-linux-setup), docker image for [linux](https://hub.docker.com/r/microsoft/mssql-server-linux/)
 You will need sqlcmd command line tools for some operations in test. Setup instructions can be found [here](https://docs.microsoft.com/en-us/sql/linux/sql-server-linux-setup-tools)
 
 Additionally SQL authentication needs to be used for connecting and testing. Check config/test.exs file for credentials used in unit testing.
