@@ -14,7 +14,6 @@ defmodule Tds.Mixfile do
         "coveralls.post": :test,
         "coveralls.html": :test
       ],
-      source_url: "https://github.com/livehelpnow/tds",
       description: description(),
       package: package(),
 
