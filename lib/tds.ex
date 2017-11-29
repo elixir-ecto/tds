@@ -1,5 +1,4 @@
 defmodule Tds do
-
   alias Tds.Query
 
   @timeout 5000
@@ -17,6 +16,7 @@ defmodule Tds do
       {:error, err} -> {:error, err}
     end
   end
+
   def query!(pid, statement, params, opts \\ []) do
     query = %Query{statement: statement}
     opts = Keyword.put_new(opts, :parameters, params)
@@ -35,6 +35,7 @@ defmodule Tds do
       {:error, err} -> {:error, err}
     end
   end
+
   def prepare!(pid, statement, opts \\ []) do
     query = %Query{statement: statement}
 
@@ -50,6 +51,7 @@ defmodule Tds do
       {:error, err} -> {:error, err}
     end
   end
+
   def execute!(pid, query, params, opts \\ []) do
     case DBConnection.execute(pid, query, params, opts) do
       {:ok, result} -> result
@@ -63,6 +65,7 @@ defmodule Tds do
       {:error, err} -> {:error, err}
     end
   end
+
   def close!(pid, query, opts \\ []) do
     case DBConnection.close(pid, query, opts) do
       {:ok, result} -> result
@@ -71,10 +74,10 @@ defmodule Tds do
   end
 
   def transaction(pid, fun, opts \\ []) do
-     case DBConnection.transaction(pid, fun, opts) do
-       {:ok, result} -> result
-       err -> err
-     end
+    case DBConnection.transaction(pid, fun, opts) do
+      {:ok, result} -> result
+      err -> err
+    end
   end
 
   defdelegate rollback(conn, any), to: DBConnection
@@ -84,7 +87,6 @@ defmodule Tds do
   end
 
   defp default(opts) do
-    opts
-    |> Keyword.put_new(:idle_timeout, @timeout)
+    Keyword.put_new(opts, :idle_timeout, @timeout)
   end
 end
