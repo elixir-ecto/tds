@@ -1,5 +1,7 @@
 # Tds
 
+[![Hex.pm](https://img.shields.io/hexpm/v/tds.svg)](https://hex.pm/packages/tds)
+
 MSSQL / TDS Database driver for Elixir.
 
 This is an alpha version that currently supports Ecto 2.0. It has implemented the [db_connection](https://github.com/elixir-ecto/db_connection) behaviour, and added support for transactions and prepared queries.
