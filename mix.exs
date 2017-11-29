@@ -41,7 +41,7 @@ defmodule Tds.Mixfile do
 
   defp description do
     """
-    Microsoft SQL Server client (elixit implementation of MS TDS protocol)
+    Microsoft SQL Server client (Elixir implementation of the MS TDS protocol)
     """
   end
 
