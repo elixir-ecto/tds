@@ -61,17 +61,17 @@ defmodule Tds.Protocol do
   @spec ping(any) :: {:ok, any} | {:disconnect, Exception.t, any}
   def ping(state) do
     case send_query(~s{SELECT 'pong' as [msg]}, state) do
-      {:ok, _, s} -> 
+      {:ok, _, s} ->
         {:ok, s}
-      {:disconnect, :closed, s} -> 
+      {:disconnect, :closed, s} ->
         {:disconnect, %Tds.Error{message: "Connection closed."}, s}
-      {:error, err, s} -> 
+      {:error, err, s} ->
         err = cond do
           Exception.exception?(err) -> err
           true                      -> %Tds.Error{message: inspect(err)}
         end
         {:disconnect, err, s}
-      any -> 
+      any ->
         any
     end
   end
@@ -162,7 +162,7 @@ defmodule Tds.Protocol do
         # :socket_options.
         {:ok, [sndbuf: sndbuf, recbuf: recbuf, buffer: buffer]} =
           :inet.getopts(sock, [:sndbuf, :recbuf, :buffer])
-        
+
         buffer = buffer
         |> max(sndbuf)
         |> max(recbuf)
@@ -172,7 +172,7 @@ defmodule Tds.Protocol do
           {:error, error, _state} ->
             :gen_tcp.close(sock)
             {:error, error}
-          r -> 
+          r ->
             r
         end
       {:error, error} ->
@@ -274,7 +274,7 @@ defmodule Tds.Protocol do
           1 ->
             #status 1 means last packet of message
             #TODO Messages.parse does not use pak_header
-            
+
             msg = parse(state, type, pak_header, pak_data <> package)
 
             case message(state, msg, s) do
@@ -548,16 +548,18 @@ defmodule Tds.Protocol do
     Enum.each(paks, fn(pak) ->
       mod.send(sock, pak)
     end)
+
     case msg_recv(<<>>, s) do
       {:disconnect, _ex , _s}=res ->
         res
       buffer ->
         new_data(buffer, %{s | state: :executing, pak_header: ""})
     end
-        
+
   end
-  
+
   defp msg_recv(buffer, %{sock: {mod, sock}} = s) do
+    #IO.puts("buffer: #{inspect buffer}")
     case mod.recv(sock, 8) do
       # there is more tds packages after this one
       {:ok, <<_type::int8, 0x00, length::int16, _spid::int16, _package::int8, _window::int8>> = header}  ->
@@ -566,10 +568,11 @@ defmodule Tds.Protocol do
         |> msg_recv(s)
       # this heder belongs to last package
       {:ok, <<_type::int8, 0x01, length::int16, _spid::int16, _package::int8, _window::int8>> = header} ->
+        #IO.puts("header: #{inspect header}")
         buffer <> header
         |> package_recv(s, length - 8)
       {:ok, _} ->
-        raise("Other statuses todo!")    
+        raise("Other statuses todo!")
       {:error, exception} ->
         {:disconnect, exception, s}
     end
@@ -581,13 +584,13 @@ defmodule Tds.Protocol do
         length = length - byte_size(data)
         buffer <> data
         |> package_recv(s, length)
-      {:ok, data} -> 
+      {:ok, data} ->
         buffer <> data
       {:error, exception} ->
         {:disconnect, exception, s}
     end
   end
-  
+
   # defp msg_cast(msg, %{sock: {mod, sock}, env: env} = s) do
   #   :inet.setopts(sock, active: false)
 
@@ -597,7 +600,7 @@ defmodule Tds.Protocol do
   #   end)
   #   # NOTE: this method can not be used since it is not receiving packages from SQL server!
   #   # TODO: add :gen_tcp.recv/flush since it should flush next package if there is such case where we don't care about
-  #   # what package contains. 
+  #   # what package contains.
   #   {:ok, s}
   # end
 

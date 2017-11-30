@@ -89,7 +89,7 @@ defmodule Tds.Messages do
       <<170::little-size(8), _::binary>> ->
         [error: error] = decode_tokens(tail, [])
         msg_error(e: error)
-      _ -> 
+      _ ->
         msg_login_ack(type: 4, data: tail)
     end
   end
@@ -97,7 +97,7 @@ defmodule Tds.Messages do
   def parse(:executing, @tds_pack_reply, _header, tail) do
     tokens = []
     tokens = decode_tokens(tail, tokens)
-    
+
     case tokens do
       [error: error] ->
         msg_error(e: error)
@@ -374,7 +374,9 @@ defmodule Tds.Messages do
     p_name = to_little_ucs2(name)
     p_flags = param |> Tds.Parameter.option_flags
     {type_code, type_data, type_attr} = Types.encode_data_type(param)
+
     p_meta_data = <<byte_size(name)>> <> p_name <> p_flags <> type_data
+
     p_meta_data <> Types.encode_data(type_code, param.value, type_attr)
   end
 
