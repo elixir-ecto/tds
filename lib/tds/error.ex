@@ -2,7 +2,7 @@ defmodule Tds.Error do
   @moduledoc """
   Defines the `Tds.Error` struct.
 
-  The struct has to fields:
+  The struct has two fields:
 
   * `:message`: expected to be a string
   * `:mssql`: expected to be a keyword list with the fields `line_number`,
