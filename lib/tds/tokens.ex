@@ -48,24 +48,31 @@ defmodule Tds.Tokens do
     raise Tds.Error, "Unknown datatype parsed when decoding return value: #{dec}"
   end
 
-  defp decode_token(<<@tds_token_returnvalue, tail::binary>>, tokens) do
-    <<_ord::little-unsigned-16, length::size(8), rest::binary>> = tail
-
-    length = length * 2
-
-    <<name::binary-size(length)-unit(8), rest::binary>> = rest
-    name = ucs2_to_utf(name)
-
-    <<_status::size(8), _usertype::size(32), _flags::size(16), datatype::size(8), rest::binary>> = rest
-
-    datatype_size = retval_typ_size(datatype)
-
-    <<_garbage::binary-size(2), ret_val::size(datatype_size), _empty::binary-size(3), tail::binary>> = rest
-
-    {[parameters: {name, ret_val}]++tokens, tail}
+  defp decode_value(
+    <<0x26,size::size(8),size::size(8),data::binary>>
+  ) do
+    <<value::little-size(size)-unit(8), data::binary>> = data
+    {value, data}
   end
-  defp decode_token(<<@tds_token_returnstatus, _value::little-size(32), tail::binary>>, tokens) do
-    {tokens, tail}
+
+  defp decode_token(<<@tds_token_returnvalue, data::binary>>, tokens) do
+    <<
+      _ord::little-unsigned-16,
+      length::size(8),
+      name::binary-size(length)-unit(16),
+      _status::size(8),
+      _usertype::size(32),
+      _flags::size(16),
+      data::binary
+    >> = data
+
+    name = ucs2_to_utf(name)
+    {value, data} = decode_value(data)
+
+    {[parameters: {name, value}] ++ tokens, data}
+  end
+  defp decode_token(<<@tds_token_returnstatus, _value::little-size(32), data::binary>>, tokens) do
+    {tokens, data}
   end
   # COLMETADATA
   defp decode_token(<<@tds_token_colmetadata, column_count::little-2*8, tail::binary>>, tokens) do
@@ -172,41 +179,41 @@ defmodule Tds.Tokens do
         <<0x00, value_size::unsigned-8, _old_value::binary-little-size(value_size)-unit(8), rest::binary>> = tail
         {tokens |> Keyword.put(:trans, <<0x00>>), rest}
     end
-    
+
   end
   ## DONE
   defp decode_token(<<@tds_token_done, status::int16, cur_cmd::binary(2), row_count::little-size(8)-unit(8), _tail::binary>>, tokens) do
     case Keyword.get(tokens, :done) do
-      nil -> 
+      nil ->
         {Keyword.put(tokens, :done, %{status: status, cmd: cur_cmd, rows: row_count}), nil}
       %{rows: rows} when row_count > rows ->
         {Keyword.put(tokens, :done, %{status: status, cmd: cur_cmd, rows: row_count}), nil}
-      _ -> 
+      _ ->
         {tokens, nil}
     end
   end
   ## DONEPROC
   defp decode_token(<<@tds_token_doneproc, status::int16, cur_cmd::binary(2), row_count::little-size(8)-unit(8), _tail::binary>>, tokens) do
     case Keyword.get(tokens, :done) do
-      nil -> 
+      nil ->
         {Keyword.put(tokens, :done, %{status: status, cmd: cur_cmd, rows: row_count}), nil}
       %{rows: rows} when row_count > rows ->
         {Keyword.put(tokens, :done, %{status: status, cmd: cur_cmd, rows: row_count}), nil}
-      _ -> 
+      _ ->
         {tokens, nil}
     end
   end
   ## DONEINPROC
   defp decode_token(<<@tds_token_doneinproc, status::int16, cur_cmd::binary(2), row_count::little-size(8)-unit(8), _something::binary-size(5), tail::binary>>, tokens) do
     case Keyword.get(tokens, :done) do
-      nil -> 
+      nil ->
         {Keyword.put(tokens, :done, %{status: status, cmd: cur_cmd, rows: row_count}), tail}
       %{rows: rows} when row_count > rows ->
         {Keyword.put(tokens, :done, %{status: status, cmd: cur_cmd, rows: row_count}), nil}
-      _ -> 
+      _ ->
         {tokens, nil}
     end
-    
+
     # case tokens do
     #   [done: done] ->
     #     cond do

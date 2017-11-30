@@ -29,13 +29,13 @@ defmodule Handle0Test do
     )
 
     n = 300
-    for i <- 1..n do
+    for _ <- 1..n do
       result =
         Tds.query(pid, "SELECT * FROM #{@table} WHERE id = @id", [
           %Tds.Parameter{name: "@id", value: "7", type: :int}
         ])
 
-      assert {i, {:ok,_}} = {i, result}
+      assert {:ok,_} = result
     end
 
     query("DROP TABLE #{@table}", [])
