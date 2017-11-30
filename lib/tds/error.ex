@@ -16,9 +16,6 @@ defmodule Tds.Error do
       iex> raise Tds.Error, "some error"
       ** (Tds.Error) some error
 
-      iex> raise Tds.Error, "some error"
-      ** (Tds.Error) some error
-
       iex> raise Tds.Error, line_number: 10, number: 8, msg_text: "some error"
       ** (Tds.Error) Line 10 (8): some error
   """
