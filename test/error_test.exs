@@ -8,7 +8,7 @@ defmodule ErrorTest do
   end
 
   test "raises a Tds.Error with Mssql infos" do
-    assert_raise Tds.Error, "Line 4 (8): something bad", fn ->
+    assert_raise Tds.Error, "Line 4 (Error 8): something bad", fn ->
       raise Tds.Error, line_number: 4, number: 8, msg_text: "something bad"
     end
   end

@@ -46,7 +46,7 @@ defmodule Tds.Error do
 
   @spec message(%__MODULE__{}) :: String.t()
   def message(%__MODULE__{mssql: mssql}) when is_map(mssql) do
-    "Line #{mssql[:line_number]} (#{mssql[:number]}): #{mssql[:msg_text]}"
+    "Line #{mssql[:line_number]} (Error #{mssql[:number]}): #{mssql[:msg_text]}"
   end
 
   def message(%__MODULE__{message: message}) when is_binary(message) do
