@@ -1,7 +1,9 @@
 defmodule Tds.Date do
   @moduledoc """
   Struct for MSSQL date. https://msdn.microsoft.com/en-us/library/bb630352.aspx
+
   ## Fields
+
     * `year`
     * `month`
     * `day`
@@ -18,7 +20,9 @@ end
 defmodule Tds.Time do
   @moduledoc """
   Struct for MSSQL time. https://msdn.microsoft.com/en-us/library/bb677243.aspx
+
   ## Fields
+
     * `hour`
     * `min`
     * `sec`
@@ -36,7 +40,9 @@ end
 defmodule Tds.DateTime do
   @moduledoc """
   Struct for MSSQL DateTime. https://msdn.microsoft.com/en-us/library/ms187819.aspx
+
   ## Fields
+
     * `year`
     * `month`
     * `day`
@@ -61,7 +67,9 @@ end
 defmodule Tds.DateTime2 do
   @moduledoc """
   Struct for MSSQL DateTime2. https://msdn.microsoft.com/en-us/library/bb677335.aspx
+
   ## Fields
+
     * `year`
     * `month`
     * `day`
@@ -88,7 +96,9 @@ defmodule Tds.DateTimeOffset do
   @moduledoc """
   Struct for MSSQL DateTimeOffset.
   https://msdn.microsoft.com/en-us/library/bb630289.aspx
+
   ## Fields
+
     * `year`
     * `month`
     * `day`
@@ -118,7 +128,9 @@ defmodule Tds.SmallDateTime do
   @moduledoc """
   Struct for MSSQL SmallDateTime.
   https://msdn.microsoft.com/en-us/library/ms182418.aspx
+
   ## Fields
+
     * `year`
     * `month`
     * `day`

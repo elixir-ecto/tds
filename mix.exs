@@ -2,16 +2,29 @@ defmodule Tds.Mixfile do
   use Mix.Project
 
   def project do
-    [ app: :tds,
+    [
+      app: :tds,
       version: "1.0.8",
       elixir: "~> 1.0",
       deps: deps(),
       test_coverage: [tool: ExCoveralls],
-      preferred_cli_env: ["coveralls": :test, "coveralls.detail": :test, "coveralls.post": :test, "coveralls.html": :test],
-      source_url: "https://github.com/livehelpnow/tds",
+      preferred_cli_env: [
+        "coveralls": :test,
+        "coveralls.detail": :test,
+        "coveralls.post": :test,
+        "coveralls.html": :test
+      ],
       description: description(),
-      package: package()
-     ]
+      package: package(),
+
+      # Docs
+      name: "Tds",
+      source_url: "https://github.com/livehelpnow/tds",
+      docs: [
+        main: "Readme",
+        extras: ["README.md"]
+      ]
+    ]
   end
 
   # Configuration for the OTP application
@@ -32,24 +45,28 @@ defmodule Tds.Mixfile do
   # Type `mix help deps` for more examples and options
   defp deps do
     [
+      {:credo, "~> 0.8", only: [:dev, :test], runtime: false},
       {:decimal, "~> 1.4"},
       {:db_connection, "~> 1.1"},
+      {:dialyxir, "~> 0.5", only: [:dev], runtime: false},
       {:excoveralls, "~> 0.7", only: :test},
-      {:ex_doc, ">= 0.0.0", only: :dev}
+      {:ex_doc, "~> 0.18", only: :dev}
     ]
   end
 
   defp description do
     """
-    Microsoft SQL Server client (elixit implementation of MS TDS protocol)
+    Microsoft SQL Server client (Elixir implementation of the MS TDS protocol)
     """
   end
 
   defp package do
-    [ name: "tds",
+    [
+      name: "tds",
       files: ["lib", "mix.exs", "README*"],
       maintainers: ["Eric Witchin", "Milan Jaric"],
       licenses: ["Apache 2.0"],
-      links: %{"Github" => "https://github.com/livehelpnow/tds"}]
+      links: %{"Github" => "https://github.com/livehelpnow/tds"}
+    ]
   end
 end
