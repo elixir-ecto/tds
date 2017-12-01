@@ -4,6 +4,7 @@ defmodule Tds.Types do
   use Bitwise
 
   alias Tds.Parameter
+  alias Tds.Column
   alias Tds.DateTime
   alias Tds.DateTime2
 
@@ -67,6 +68,7 @@ defmodule Tds.Types do
   @tds_data_type_nchar            0xEF
   @tds_data_type_xml              0xF1
   @tds_data_type_udt              0xF0
+  @tds_data_type_tvp              0xF3
   @tds_data_type_text             0x23
   @tds_data_type_image            0x22
   @tds_data_type_ntext            0x63
@@ -501,6 +503,7 @@ defmodule Tds.Types do
       :date -> encode_date_type(param)
       :time -> encode_time_type(param)
       :uuid -> encode_uuid_type(param)
+      :tvp -> encode_tvp_type(param)
       _ -> encode_string_type(param)
     end
   end
@@ -574,6 +577,11 @@ defmodule Tds.Types do
     encode_data_type(%{param | type: :datetimeoffset})
   end
 
+  def encode_tvp_type(%Parameter{}) do
+    type = @tds_data_type_tvp
+    data = <<type>> <> <<0, 0, 0>>
+    {type, data, []}
+  end
 
   def encode_binary_type(%Parameter{value: value} = param)
   when value == "" do
@@ -764,6 +772,7 @@ defmodule Tds.Types do
       :date -> "date"
       :time -> "time"
       :smalldatetime -> "smalldatetime"
+      :tvp -> "#{value.name} readonly"
       :binary -> encode_binary_descriptor(value)
       :string ->
         cond do
@@ -968,8 +977,94 @@ defmodule Tds.Types do
     do: <<byte_size(value)::little-unsigned-16>> <> value
 
   @doc """
+  Data Encoding TVP type
+  """
+  def encode_data(@tds_data_type_tvp, %{columns: nil}, _attrs),
+    do: <<0xFF :: little-unsigned-16, 0x00, 0x00 >>
+
+  def encode_data(@tds_data_type_tvp, %{columns: columns, rows: rows}, _attrs) do
+    column_length = <<length(columns) :: little-unsigned-16>>
+    {column_attrs, column_meta} = Enum.reduce(columns, {[], <<>>}, fn (%Column{} = param, {attrs, acc_bin}) ->
+      {bin_type, data, attr} = encode_column_type(param)
+      bin = acc_bin <> <<0x00 :: little-unsigned-32, 0x00 :: little-unsigned-16 >> <> data <> <<0x00>>
+
+      {[{bin_type, attr} | attrs], bin}
+    end)
+
+    row_data = Enum.reduce(rows, <<>>, fn (params, row_acc) ->
+      row_bin = column_attrs
+      |> Enum.reverse
+      |> Enum.zip(params)
+      |> Enum.reduce(<<>>, fn ({{type, attr}, param}, acc) ->
+        acc <> encode_data(type, param, attr)
+      end)
+
+      row_acc <> << 0x01 >> <> row_bin
+    end)
+
+    column_length <> column_meta <> <<0x00>> <> row_data <> <<0x00>>
+  end
+
+  def encode_column_type(%Column{type: type} = col) when type != nil do
+    case type do
+      :varchar -> encode_bigvarchar_col_type(col)
+      :boolean -> encode_binary_type(%Parameter{type: :boolean, value: nil})
+      :varbinary -> encode_varbinary_col_type(col)
+      :int -> encode_integer_type(%Parameter{type: :integer, value: nil})
+      :decimal -> encode_decimal_type(%Parameter{type: :decimal, value: nil})
+      :float -> encode_float_type(%Parameter{type: :float, value: nil})
+      :datetime -> encode_datetime_type(%Parameter{type: :datetime, value: nil})
+      :smalldatetime -> encode_smalldatetime_type(%Parameter{type: :smalldatetime, value: nil})
+      :datetime2 -> encode_datetime2_type(%Parameter{type: :datetime2, value: nil})
+      :datetimeoffset -> encode_datetimeoffset_type(%Parameter{type: :datetimeoffset, value: nil})
+      :date -> encode_date_type(%Parameter{type: :datetimeoffset, value: nil})
+      :time -> encode_time_type(%Parameter{type: :time, value: nil})
+      :uuid -> encode_uuid_type(%Parameter{type: :uuid, value: nil})
+    end
+  end
+
+  def encode_bigvarchar_col_type(%Column{opts: opts} = col) do
+    type = @tds_data_type_bigvarchar
+    length = Keyword.get(opts, :length, 0)
+    collation = <<0x00, 0x00, 0x00, 0x00, 0x00>>
+    bin_length = if length <= 8000, do: <<8000::little-unsigned-16>>, else: <<0xFF, 0xFF>>
+    data = <<type>> <> bin_length <> collation
+
+    {type, data, length: length}
+  end
+
+  def encode_varbinary_col_type(%Column{opts: opts} = col) do
+    type = @tds_data_type_bigvarbinary
+    length = Keyword.get(opts, :length, 0)
+    bin_length = if length <= 8000, do: <<8000::little-unsigned-16>>, else: <<0xFF, 0xFF>>
+    data = <<type>> <> bin_length
+
+    {type, data, length: length}
+  end
+
+  @doc """
   Data Encoding String Types
   """
+
+  def encode_data(@tds_data_type_bigvarchar, nil, opts) do
+    length = Keyword.get(opts, :length, 0)
+    if length <= 8000,
+      do: <<65535::little-unsigned-16>>,
+      else: <<@tds_plp_null::little-unsigned-64>>
+  end
+
+  def encode_data(@tds_data_type_bigvarchar, value, opts) do
+    value_size = byte_size(value)
+    cond do
+      value_size <= 0 ->
+        <<0x00::unsigned-64, 0x00::unsigned-32>>
+      value_size > 8000 ->
+        encode_plp(value)
+      true ->
+        <<value_size::little-size(2)-unit(8)>> <> value
+    end
+  end
+
   def encode_data(@tds_data_type_nvarchar, nil, _),
     do: <<@tds_plp_null::little-unsigned-64>>
   def encode_data(@tds_data_type_nvarchar, value, _) do

@@ -362,6 +362,11 @@ defmodule Tds.Messages do
   defp encode_rpc(:sp_unprepare, params) do
     <<0xFF, 0xFF, @tds_sp_unprepare::little-size(2)-unit(8), 0x00, 0x00>> <> encode_rpc_params(params, "")
   end
+  defp encode_rpc(proc, params) when is_binary(proc) do
+    rpc_size = byte_size(proc)
+    rpc_name = to_little_ucs2(proc)
+    <<rpc_size::little-size(16)>> <> rpc_name <> <<0x00, 0x00>> <> encode_rpc_params(params, "")
+  end
 
   # Finished processing params
   defp encode_rpc_params([], ret), do: ret
