@@ -465,13 +465,13 @@ defmodule Tds.Protocol do
         %{transaction: :started} = s
       ) do
     params = [
-      %Tds.Parameter{
+      %Parameter{
         name: "@handle",
         type: :integer,
         direction: :input,
         value: handle
       }
-      | Tds.Parameter.prepare_params(params)
+      | Parameter.prepare_params(params)
     ]
 
     # msg = msg_rpc(proc: :sp_executesql, params: params)
@@ -491,13 +491,13 @@ defmodule Tds.Protocol do
 
   def send_param_query(%Query{handle: handle} = _query, params, s) do
     params = [
-      %Tds.Parameter{
+      %Parameter{
         name: "@handle",
         type: :integer,
         direction: :input,
         value: handle
       }
-      | Tds.Parameter.prepare_params(params)
+      | Parameter.prepare_params(params)
     ]
 
     # msg = msg_rpc(proc: :sp_executesql, params: params)

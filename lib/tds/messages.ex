@@ -3,10 +3,12 @@ defmodule Tds.Messages do
   import Tds.Utils
   import Tds.Tokens, only: [decode_tokens: 2]
 
+  alias Tds.Parameter
   alias Tds.Types
 
   require Bitwise
   require Logger
+
   defrecord :msg_prelogin, [:params]
   defrecord :msg_login, [:params]
   defrecord :msg_login_ack, [:type, :data]
@@ -429,7 +431,7 @@ defmodule Tds.Messages do
 
   defp encode_rpc_param(%Tds.Parameter{name: name} = param) do
     p_name = to_little_ucs2(name)
-    p_flags = param |> Tds.Parameter.option_flags()
+    p_flags = param |> Parameter.option_flags()
     {type_code, type_data, type_attr} = Types.encode_data_type(param)
 
     p_meta_data = <<byte_size(name)>> <> p_name <> p_flags <> type_data

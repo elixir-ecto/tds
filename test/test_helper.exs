@@ -1,4 +1,6 @@
 defmodule Tds.TestHelper do
+  alias Tds.Connection
+
   require Logger
 
   defmacro query(statement, params, opts \\ []) do
@@ -19,7 +21,7 @@ defmodule Tds.TestHelper do
 
   defmacro proc(proc, params, opts \\ []) do
     quote do
-      case Tds.Connection.proc(
+      case Connection.proc(
              var!(context)[:pid],
              unquote(proc),
              unquote(params),

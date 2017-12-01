@@ -1,5 +1,6 @@
 defmodule Tds.Query do
   alias Tds.Parameter
+  alias Tds.Types
 
   defstruct [:statement, :handle]
 
@@ -21,7 +22,7 @@ defmodule Tds.Query do
           param_desc =
             params
             |> Enum.map(fn %Parameter{} = param ->
-                 Tds.Types.encode_param_descriptor(param)
+                 Types.encode_param_descriptor(param)
                end)
 
           param_desc =
