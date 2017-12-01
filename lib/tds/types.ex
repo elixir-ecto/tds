@@ -146,7 +146,7 @@ defmodule Tds.Types do
         col_info = def_col_info
           |> Map.put(:length, length)
           |> Map.put(:data_reader, :bytelen)
-        {col_info, tail}    
+        {col_info, tail}
       data_type_code in [
         @tds_data_type_timen,
         @tds_data_type_datetime2n,
@@ -182,7 +182,7 @@ defmodule Tds.Types do
           |> Map.put(:scale, scale)
           |> Map.put(:length, length)
           |> Map.put(:data_reader, :bytelen)
-        {col_info, rest}    
+        {col_info, rest}
       data_type_code in [
         @tds_data_type_uniqueidentifier,
         @tds_data_type_intn,
@@ -201,7 +201,7 @@ defmodule Tds.Types do
         col_info = def_col_info
           |> Map.put(:length, length)
           |> Map.put(:data_reader, :bytelen)
-        {col_info, rest}    
+        {col_info, rest}
       data_type_code == @tds_data_type_xml ->
         <<schema::unsigned-8, rest::binary>> = tail
         if schema == 1 do
@@ -235,10 +235,10 @@ defmodule Tds.Types do
           |> Map.put(:data_reader, if(length == 0xFFFF, do: :plp, else: :shortlen))
           |> Map.put(:length, length)
         {col_info, rest}
-      
+
       data_type_code in [@tds_data_type_text, @tds_data_type_ntext] ->
         <<length::signed-32, collation::binary-5, numparts::signed-8, rest::binary>> = tail
-        
+
         col_info = def_col_info
           |> Map.put(:collation, collation)
           |> Map.put(:data_reader, :longlen)
@@ -247,7 +247,7 @@ defmodule Tds.Types do
         rest = Enum.reduce([1..numparts], rest, fn
           (_, <<tsize::little-unsigned-16, _table_name::binary-size(tsize)-unit(16), next_rest::binary>>) -> next_rest
         end)
-        {col_info, rest} 
+        {col_info, rest}
       data_type_code == @tds_data_type_image ->
         # TODO NumBarts Reader
         <<length::signed-32, numparts::signed-8, rest::binary>> = tail
@@ -264,7 +264,7 @@ defmodule Tds.Types do
           |> Map.put(:length, length)
           |> Map.put(:data_reader, :variant)
         {col_info, rest}
-    
+
     end
   end
 
@@ -962,15 +962,15 @@ defmodule Tds.Types do
   def encode_data(@tds_data_type_bigvarbinary = data_type, value, attr)
   when is_integer(value),
     do: encode_data(data_type, <<value>>, attr)
-  def encode_data(@tds_data_type_bigvarbinary, nil, _), 
+  def encode_data(@tds_data_type_bigvarbinary, nil, _),
     do: <<@tds_plp_null::little-unsigned-64>>
-  def encode_data(@tds_data_type_bigvarbinary, value, _), 
+  def encode_data(@tds_data_type_bigvarbinary, value, _),
     do: <<byte_size(value)::little-unsigned-16>> <> value
 
   @doc """
   Data Encoding String Types
   """
-  def encode_data(@tds_data_type_nvarchar, nil, _), 
+  def encode_data(@tds_data_type_nvarchar, nil, _),
     do: <<@tds_plp_null::little-unsigned-64>>
   def encode_data(@tds_data_type_nvarchar, value, _) do
     value = to_little_ucs2(value)
@@ -1025,8 +1025,8 @@ defmodule Tds.Types do
       <<0x04, value::little-float-32>>
     else
       # up to 15 digits of precision https://docs.microsoft.com/en-us/sql/t-sql/data-types/float-and-real-transact-sql
-      <<0x08, value::little-float-64>>      
-    end  
+      <<0x08, value::little-float-64>>
+    end
   end
 
   @doc """
@@ -1061,7 +1061,7 @@ defmodule Tds.Types do
     value_binary = value_binary <> <<0::size(padding)-unit(8)>>
     <<byte_len>> <> <<sign>> <> value_binary
   end
-  def encode_data(@tds_data_type_decimaln, nil, _), 
+  def encode_data(@tds_data_type_decimaln, nil, _),
     do: <<0x00::little-unsigned-32>> # <<0, 0, 0, 0>
   def encode_data(@tds_data_type_decimaln = data_type, value, attr) do
     encode_data(data_type, Decimal.new(value), attr)
@@ -1152,7 +1152,7 @@ defmodule Tds.Types do
 
   defp int_type_size(int) when int == nil, do: 4
   defp int_type_size(int) when int in 0..255, do: 4
-  defp int_type_size(int) when int in -32768..32767, do: 2
+  defp int_type_size(int) when int in -32768..32767, do: 4
   defp int_type_size(int) when int in -2147483648..2147483647, do: 4
   defp int_type_size(int) when int in -9223372036854775808..9223372036854775807, do: 8
 
@@ -1365,7 +1365,4 @@ defmodule Tds.Types do
     data = <<type, 0x07>>
     {type, data, scale: 7}
   end
-
-
-
 end
