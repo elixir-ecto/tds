@@ -7,18 +7,32 @@ defmodule Tds.Query do
     def encode(_statement, [], _opts) do
       []
     end
-    def encode(%Tds.Query{statement: statement, handle: handle}, params, _opts) do
+
+    def encode(
+          %Tds.Query{
+            statement: statement,
+            handle: handle
+          },
+          params,
+          _opts
+        ) do
       case handle do
         nil ->
-          param_desc = params |> Enum.map(fn(%Parameter{} = param) ->
-            Tds.Types.encode_param_descriptor(param)
-          end)
+          param_desc =
+            params
+            |> Enum.map(fn %Parameter{} = param ->
+                 Tds.Types.encode_param_descriptor(param)
+               end)
 
-          param_desc = param_desc
-          |> Enum.join(", ")
+          param_desc =
+            param_desc
+            |> Enum.join(", ")
 
-          [%Parameter{value: statement, type: :string},
-           %Parameter{value: param_desc, type: :string}] ++ params
+          [
+            %Parameter{value: statement, type: :string},
+            %Parameter{value: param_desc, type: :string}
+          ] ++ params
+
         _ ->
           params
       end

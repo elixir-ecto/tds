@@ -1,5 +1,4 @@
 defmodule Handle0Test do
-
   use ExUnit.Case, async: true
 
   import Tds.TestHelper
@@ -16,7 +15,8 @@ defmodule Handle0Test do
     {:ok, [pid: pid]}
   end
 
-  test "Could not find prepared statement with handle 0.", %{pid: pid} = context do
+  test "Could not find prepared statement with handle 0.",
+       %{pid: pid} = context do
     query("DROP TABLE #{@table}", [])
 
     query(
@@ -29,13 +29,14 @@ defmodule Handle0Test do
     )
 
     n = 300
+
     for _ <- 1..n do
       result =
         Tds.query(pid, "SELECT * FROM #{@table} WHERE id = @id", [
           %Tds.Parameter{name: "@id", value: "7", type: :int}
         ])
 
-      assert {:ok,_} = result
+      assert {:ok, _} = result
     end
 
     query("DROP TABLE #{@table}", [])

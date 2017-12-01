@@ -1,14 +1,14 @@
 defmodule Tds.Parameter do
   alias Tds.Types
-  #alias Tds.Parameter
+  # alias Tds.Parameter
   alias Tds.DateTime
   alias Tds.DateTime2
 
   @type t :: %__MODULE__{
-    name:       String.t | nil,
-    direction:  Atom | :input
-  }
-  defstruct [name: "", direction: :input, value: "", type: nil]
+          name: String.t() | nil,
+          direction: Atom | :input
+        }
+  defstruct name: "", direction: :input, value: "", type: nil
 
   def option_flags(%__MODULE__{direction: direction, value: value}) do
     fByRefValue =
@@ -29,6 +29,7 @@ defmodule Tds.Parameter do
   def prepared_params(nil) do
     []
   end
+
   def prepared_params(params) do
     params
     |> name(0)
@@ -38,11 +39,13 @@ defmodule Tds.Parameter do
   end
 
   @doc """
-  Prepares parameters by giving them names, define missing type, encoding value if necessary
+  Prepares parameters by giving them names, define missing type, encoding value
+  if necessary.
   """
   def prepare_params(nil) do
     []
   end
+
   def prepare_params(params) do
     params
     |> name(0)
@@ -55,10 +58,10 @@ defmodule Tds.Parameter do
 
   def do_name([param | tail], name, acc) do
     param =
-    case param do
-      %Tds.Parameter{} -> param
-      raw_param -> fix_data_type(raw_param, name+1)
-    end
+      case param do
+        %Tds.Parameter{} -> param
+        raw_param -> fix_data_type(raw_param, name + 1)
+      end
 
     do_name(tail, name, [param | acc])
   end
@@ -67,72 +70,96 @@ defmodule Tds.Parameter do
     acc
   end
 
-  def fix_data_type(%Tds.Parameter{type: type, value: _value} = param) when not is_nil(type) do
+  def fix_data_type(%Tds.Parameter{type: type, value: _value} = param)
+      when not is_nil(type) do
     param
   end
+
   def fix_data_type(%Tds.Parameter{value: value} = param)
-  when value == true or value == false do
+      when value == true or value == false do
     %{param | type: :boolean}
   end
+
   def fix_data_type(%Tds.Parameter{value: value} = param)
-  when is_binary(value) and value == "" do
+      when is_binary(value) and value == "" do
     %{param | type: :string}
   end
+
   def fix_data_type(%Tds.Parameter{value: value} = param)
-  when is_binary(value) do
+      when is_binary(value) do
     if String.valid?(value) do
       %{param | type: :string}
     else
       %{param | type: :binary}
     end
   end
+
   def fix_data_type(%Tds.Parameter{value: value} = param)
-  when is_integer(value) and value >= 0 do
+      when is_integer(value) and value >= 0 do
     %{param | type: :integer}
   end
+
   def fix_data_type(%Tds.Parameter{value: value} = param)
-  when is_float(value) do
+      when is_float(value) do
     %{param | type: :float}
   end
+
   def fix_data_type(%Tds.Parameter{value: value} = param)
-  when (is_integer(value) and value < 0) do
+      when is_integer(value) and value < 0 do
     %{param | value: Decimal.new(value), type: :decimal}
   end
-  def fix_data_type(%Tds.Parameter{value: {{_,_,_}}} = param) do
+
+  def fix_data_type(%Tds.Parameter{value: {{_, _, _}}} = param) do
     %{param | type: :date}
   end
-  def fix_data_type(%Tds.Parameter{value: {{_,_,_,_}}} = param) do
+
+  def fix_data_type(%Tds.Parameter{value: {{_, _, _, _}}} = param) do
     %{param | type: :time}
   end
+
   def fix_data_type(%Tds.Parameter{value: %Decimal{}} = param) do
     %{param | type: :decimal}
   end
+
   def fix_data_type(%Tds.Parameter{value: %DateTime{}} = param) do
     %{param | type: :datetime}
   end
+
   def fix_data_type(%Tds.Parameter{value: %DateTime2{}} = param) do
     %{param | type: :datetime2}
   end
-  def fix_data_type(%Tds.Parameter{value: {{_,_,_},{_,_,_}}} = param) do
+
+  def fix_data_type(%Tds.Parameter{value: {{_, _, _}, {_, _, _}}} = param) do
     %{param | type: :datetime}
   end
-  def fix_data_type(%Tds.Parameter{value: {{_,_,_},{_,_,_,_}}} = param) do
+
+  def fix_data_type(%Tds.Parameter{value: {{_, _, _}, {_, _, _, _}}} = param) do
     %{param | type: :datetime2}
   end
-  def fix_data_type(%Tds.Parameter{value: {{_,_,_},{_,_,_,_},_}} = param) do
+
+  def fix_data_type(
+        %Tds.Parameter{
+          value: {{_, _, _}, {_, _, _, _}, _}
+        } = param
+      ) do
     %{param | type: :datetimeoffset}
   end
-  def fix_data_type(%Tds.Parameter{value: {{_,_,_},{_,_,_,},_}} = param) do
+
+  def fix_data_type(%Tds.Parameter{value: {{_, _, _}, {_, _, _}, _}} = param) do
     %{param | type: :datetimeoffset}
   end
-  def fix_data_type(%Tds.Parameter{}=raw_param, acc) do
-    param = if is_nil(raw_param.name) do
+
+  def fix_data_type(%Tds.Parameter{} = raw_param, acc) do
+    param =
+      if is_nil(raw_param.name) do
         %{raw_param | name: "@#{acc}"}
       else
         raw_param
       end
+
     fix_data_type(param)
   end
+
   def fix_data_type(raw_param, acc) do
     param = %Tds.Parameter{name: "@#{acc}", value: raw_param}
     fix_data_type(param)

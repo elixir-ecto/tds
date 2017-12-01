@@ -14,7 +14,9 @@ defmodule QueryTest do
 
   test "Decode Fixed Length Data types", context do
     query("DROP TABLE FixedLength", [])
-    query("""
+
+    query(
+      """
       CREATE TABLE FixedLength (
         TinyInt tinyint,
         Bit bit,
@@ -27,9 +29,45 @@ defmodule QueryTest do
         Float float,
         SmallMoney smallmoney,
         BitInt bigint)
-      """, [])
-    query("INSERT INTO FixedLength VALUES(1, 0, 12, 100, '2014-01-10T12:30:00', 0.5, '-822,337,203,685,477.5808', '2014-01-11T11:34:25', 5.6, '$-214,748.3648', 1000)", []);
-    assert [[1, false, 12, 100, {{2014, 01, 10},{12, 30, 0, 0}}, 0.5, -822_337_203_685_477.5808, {{2014, 01, 11},{11, 34, 25, 0}}, 5.6, -214_748.3648 , 1000]] == query("SELECT TOP(1) * FROM FixedLength", [])
+      """,
+      []
+    )
+
+    query(
+      """
+      INSERT INTO FixedLength
+      VALUES(
+        1,
+        0,
+        12,
+        100,
+        '2014-01-10T12:30:00',
+        0.5,
+        '-822,337,203,685,477.5808',
+        '2014-01-11T11:34:25',
+        5.6,
+        '$-214,748.3648',
+        1000
+      )
+      """,
+      []
+    )
+
+    assert [
+             [
+               1,
+               false,
+               12,
+               100,
+               {{2014, 01, 10}, {12, 30, 0, 0}},
+               0.5,
+               -822_337_203_685_477.5808,
+               {{2014, 01, 11}, {11, 34, 25, 0}},
+               5.6,
+               -214_748.3648,
+               1000
+             ]
+           ] == query("SELECT TOP(1) * FROM FixedLength", [])
 
     query("DROP TABLE FixedLength", [])
   end
@@ -39,12 +77,43 @@ defmodule QueryTest do
     assert [[1]] = query("SELECT 1 as 'number'", [])
     assert [[1, 1]] = query("SELECT 1, 1", [])
     assert [[-1]] = query("SELECT -1", [])
-    assert [[10000000000000]] = query("select CAST(10000000000000 AS bigint)", [])
+
+    assert [[10_000_000_000_000]] =
+             query("select CAST(10000000000000 AS bigint)", [])
 
     assert [["string"]] = query("SELECT 'string'", [])
     assert [["ẽstring"]] = query("SELECT N'ẽstring'", [])
     assert [[true, false]] = query("SELECT CAST(1 AS BIT), CAST(0 AS BIT)", [])
-    assert [[<<0x82, 0x25, 0xF2, 0xA9, 0xAF, 0xBA, 0x45, 0xC5, 0xA4, 0x31, 0x86, 0xB9, 0xA8, 0x67, 0xE0, 0xF7>>]] = query("SELECT CAST('8225F2A9-AFBA-45C5-A431-86B9A867E0F7' AS uniqueidentifier)", [])
+
+    assert [
+             [
+               <<
+                 0x82,
+                 0x25,
+                 0xF2,
+                 0xA9,
+                 0xAF,
+                 0xBA,
+                 0x45,
+                 0xC5,
+                 0xA4,
+                 0x31,
+                 0x86,
+                 0xB9,
+                 0xA8,
+                 0x67,
+                 0xE0,
+                 0xF7
+               >>
+             ]
+           ] =
+             query(
+               """
+               SELECT
+               CAST('8225F2A9-AFBA-45C5-A431-86B9A867E0F7' AS uniqueidentifier)
+               """,
+               []
+             )
   end
 
   test "Decode NULL", context do
@@ -64,6 +133,7 @@ defmodule QueryTest do
   test "Large Result Set", context do
     query("DROP TABLE MyTable", [])
     assert :ok = query("CREATE TABLE MyTable (TableId int)", [])
+
     for n <- 1..100 do
       assert :ok = query("INSERT INTO MyTable VALUES (#{n})", [])
     end
@@ -88,7 +158,6 @@ defmodule QueryTest do
   end
 
   test "char nulls", context do
-    assert [[nil]] = query("SELECT CAST(NULL as nvarchar(255))",[])
+    assert [[nil]] = query("SELECT CAST(NULL as nvarchar(255))", [])
   end
-
 end
