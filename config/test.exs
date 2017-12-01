@@ -4,9 +4,9 @@ config :logger, level: :info
 
 config :tds,
   opts: [
-    hostname: "127.0.0.1",
-    username: "sa",
-    password: "some!Password",
+    hostname: System.get_env("SQL_HOSTNAME") || "127.0.0.1",
+    username: System.get_env("SQL_USERNAME") || "sa",
+    password: System.get_env("SQL_PASSWORD") || "some!Password",
     database: "test"
   ]
 

@@ -2,6 +2,8 @@
 
 MSSQL / TDS Database driver for Elixir.
 
+[![Build status](https://ci.appveyor.com/api/projects/status/aibnqbukppa3kcpt?svg=true)](https://ci.appveyor.com/project/mjaric/tds)
+
 This is an alpha version that currently supports Ecto 2.0. It has implemented the [db_connection](https://github.com/elixir-ecto/db_connection) behaviour, and added support for transactions and prepared queries.
 Please check out the issues for a more complete overview. This branch should not yet be considered stable or used in production.
 
@@ -11,7 +13,7 @@ Add Tds as a dependency in your `mix.exs` file.
 
 ```elixir
 def deps do
-  [{:tds, "~> 1.0.4"} ]
+  [{:tds, "~> 1.0"} ]
 end
 ```
 
