@@ -82,7 +82,7 @@ If you have Docker installed, you can use the official [SQL Server Docker image]
 To start the container, run:
 
 ```bash
-docker run -e 'ACCEPT_EULA=Y' -e 'SA_PASSWORD=some!Password' -p 1433:1433 -d microsoft/mssql-server-linux:latest
+./docker-mssql.sh
 ```
 
 If you prefer to install SQL Server directly on your computer, you can find
