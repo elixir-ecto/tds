@@ -49,7 +49,7 @@ defmodule TdsIssuesTest do
       assert :ok == res
 
       assert [[val]] ==
-               IO.inspect(
+               inspect(
                  query(
                    """
                    SELECT [total] FROM hades_sealed_cfdis
