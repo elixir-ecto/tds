@@ -49,13 +49,14 @@ defmodule Tds.TestHelper do
   end
 end
 
-Application.get_env(:tds, :opts)
-|> Tds.TestHelper.sqlcmd("""
-   IF NOT EXISTS(SELECT * FROM sys.databases where name = 'test')
-   BEGIN
-     CREATE DATABASE [test];
-   END;
-   """)
+opts = Application.get_env(:tds, :opts)
+
+Tds.TestHelper.sqlcmd(opts, """
+IF NOT EXISTS(SELECT * FROM sys.databases where name = 'test')
+BEGIN
+  CREATE DATABASE [test];
+END;
+""")
 
 ExUnit.start()
 ExUnit.configure(exclude: [:manual])

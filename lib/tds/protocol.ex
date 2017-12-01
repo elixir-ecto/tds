@@ -75,9 +75,10 @@ defmodule Tds.Protocol do
 
       {:error, err, s} ->
         err =
-          cond do
-            Exception.exception?(err) -> err
-            true -> %Tds.Error{message: inspect(err)}
+          if Exception.exception?(err) do
+            err
+          else
+            %Tds.Error{message: inspect(err)}
           end
 
         {:disconnect, err, s}
@@ -210,11 +211,13 @@ defmodule Tds.Protocol do
     :gen_udp.close(sock)
 
     server =
-      String.split(data, ";;")
+      data
+      |> String.split(";;")
       |> Enum.slice(0..-2)
       |> Enum.reduce([], fn str, acc ->
            server =
-             String.split(str, ";")
+             str
+             |> String.split(";")
              |> Enum.chunk(2)
              |> Enum.reduce([], fn [k, v], acc ->
                   k =
@@ -591,7 +594,8 @@ defmodule Tds.Protocol do
       ) do
     columns =
       if columns != nil do
-        Enum.reduce(columns, [], fn col, acc -> [col[:name] | acc] end)
+        columns
+        |> Enum.reduce([], fn col, acc -> [col[:name] | acc] end)
         |> Enum.reverse()
       else
         columns

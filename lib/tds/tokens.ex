@@ -195,7 +195,8 @@ defmodule Tds.Tokens do
     column_count = Enum.count(tokens[:columns])
 
     {bitmap_bytes, _} =
-      (column_count / 8)
+      column_count
+      |> Kernel./(8)
       |> Float.ceil()
       |> :erlang.float_to_list(decimals: 0)
       |> to_string

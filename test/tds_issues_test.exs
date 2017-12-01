@@ -60,7 +60,8 @@ defmodule TdsIssuesTest do
                )
     end
 
-    Enum.flat_map(1..17, &[1 / &1, -1 / &1])
+    1..17
+    |> Enum.flat_map(&[1 / &1, -1 / &1])
     |> Enum.each(f)
 
     query("DROP TABLE hades_sealed_cfdis", [])

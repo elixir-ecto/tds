@@ -830,12 +830,10 @@ defmodule Tds.Types do
         value = value |> to_little_ucs2
         value_size = byte_size(value)
 
-        cond do
-          value_size == 0 or value_size > 8000 ->
-            <<0xFF, 0xFF>>
-
-          true ->
-            <<value_size::little-(2 * 8)>>
+        if value_size == 0 or value_size > 8000 do
+          <<0xFF, 0xFF>>
+        else
+          <<value_size::little-(2 * 8)>>
         end
       else
         <<0xFF, 0xFF>>
@@ -1337,7 +1335,8 @@ defmodule Tds.Types do
     Decimal.set_context(d_ctx)
 
     value_list =
-      Decimal.new(value)
+      value
+      |> Decimal.new()
       |> Decimal.abs()
       |> Decimal.to_string(:scientific)
       |> String.split(".")
@@ -1543,8 +1542,8 @@ defmodule Tds.Types do
         mins::little-unsigned-16
       >>) do
     date = :calendar.gregorian_days_to_date(@year_1900_days + days)
-    hour = (mins / 60) |> trunc
-    min = (mins - hour * 60) |> trunc
+    hour = trunc(mins / 60)
+    min = trunc(mins - hour * 60)
     {date, {hour, min, 0, 0}}
   end
 
@@ -1577,7 +1576,7 @@ defmodule Tds.Types do
     # remaining fractional
     sub_sec = secs300 / 300 - secs
     # Logger.debug "#{inspect {sub_sec}}"
-    usec = (sub_sec * @usecs_in_sec + 0.5) |> trunc
+    usec = trunc(sub_sec * @usecs_in_sec + 0.5)
     {date, {h, m, s, usec}}
   end
 
@@ -1617,15 +1616,15 @@ defmodule Tds.Types do
 
     fs_per_sec = :math.pow(10, scale)
 
-    hour = (parsed_fsec / fs_per_sec / @secs_in_hour) |> trunc
+    hour = trunc(parsed_fsec / fs_per_sec / @secs_in_hour)
     parsed_fsec = parsed_fsec - hour * @secs_in_hour * fs_per_sec
 
-    min = (parsed_fsec / fs_per_sec / @secs_in_min) |> trunc
+    min = trunc(parsed_fsec / fs_per_sec / @secs_in_min)
     parsed_fsec = parsed_fsec - min * @secs_in_min * fs_per_sec
 
-    sec = (parsed_fsec / fs_per_sec) |> trunc
+    sec = trunc(parsed_fsec / fs_per_sec)
 
-    parsed_fsec = (parsed_fsec - sec * fs_per_sec) |> trunc
+    parsed_fsec = trunc(parsed_fsec - sec * fs_per_sec)
 
     {hour, min, sec, parsed_fsec}
   end
@@ -1643,7 +1642,7 @@ defmodule Tds.Types do
 
   def encode_time({hour, min, sec, fsec}, scale) do
     # 10^scale fs in 1 sec
-    fs_per_sec = :math.pow(10, scale) |> trunc
+    fs_per_sec = trunc(:math.pow(10, scale))
 
     fsec =
       hour * 3600 * fs_per_sec + min * 60 * fs_per_sec + sec * fs_per_sec + fsec
