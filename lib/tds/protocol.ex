@@ -267,7 +267,7 @@ defmodule Tds.Protocol do
   end
 
   def handle_info(msg, s) do
-    Logger.debug("Unhandled info: #{inspect(msg)}")
+    Logger.debug(fn -> "Unhandled info: #{inspect(msg)}" end)
 
     {:ok, s}
   end

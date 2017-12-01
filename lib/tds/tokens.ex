@@ -231,7 +231,10 @@ defmodule Tds.Tokens do
           rest::binary
         >> = tail
 
-        Logger.debug("Switching from #{new_value} database to #{old_value}")
+        Logger.debug(fn ->
+          "Switching from #{new_value} database to #{old_value}"
+        end)
+
         {tokens |> Keyword.put(:database, new_value), rest}
 
       @tds_envtype_packetsize ->
@@ -243,10 +246,12 @@ defmodule Tds.Tokens do
           rest::binary
         >> = tail
 
-        Logger.debug("""
-        Database server configured packetsize to #{new_value} where old value
-        was #{old_value}
-        """)
+        Logger.debug(fn ->
+          """
+          Database server configured packetsize to #{new_value} where old value
+          was #{old_value}
+          """
+        end)
 
         {tokens |> Keyword.put(:packetsize, new_value), rest}
 
