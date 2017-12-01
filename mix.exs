@@ -21,7 +21,7 @@ defmodule Tds.Mixfile do
       name: "Tds",
       source_url: "https://github.com/livehelpnow/tds",
       docs: [
-        main: "Readme",
+        main: "readme",
         extras: ["README.md"]
       ]
     ]
