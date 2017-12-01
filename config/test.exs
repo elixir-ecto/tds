@@ -9,4 +9,3 @@ config :tds,
     password: System.get_env("SQL_PASSWORD") || "some!Password",
     database: "test"
   ]
-
