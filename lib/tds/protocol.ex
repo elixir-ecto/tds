@@ -1,4 +1,7 @@
 defmodule Tds.Protocol do
+  @moduledoc """
+  Implements DBConnection behaviour for TDS protocol
+  """
   import Tds.BinaryUtils
   import Tds.Messages
   import Tds.Utils
@@ -176,10 +179,6 @@ defmodule Tds.Protocol do
 
     case :gen_tcp.connect(host, port, sock_opts, timeout) do
       {:ok, sock} ->
-        # s = put_in s.sock, {:gen_tcp, sock}
-
-        # A suitable :buffer is only set if :recbuf is included in
-        # :socket_options.
         {:ok, [sndbuf: sndbuf, recbuf: recbuf, buffer: buffer]} =
           :inet.getopts(sock, [:sndbuf, :recbuf, :buffer])
 

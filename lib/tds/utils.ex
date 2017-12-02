@@ -1,4 +1,5 @@
 defmodule Tds.Utils do
+  @moduledoc false
   require Logger
 
   def to_hex_list(x) when is_list(x) do
@@ -37,8 +38,7 @@ defmodule Tds.Utils do
   end
 
   def ucs2_to_utf(s) do
-    s
-    |> :binary.bin_to_list()
+    :binary.bin_to_list(s)
     |> Enum.reject(&(&1 == 0))
     |> to_string()
   end
@@ -52,23 +52,6 @@ defmodule Tds.Utils do
   end
 
   def error(error, s) do
-    reply(error, s)
     {:error, error}
-  end
-
-  def reply(reply, %{queue: queue}) do
-    case :queue.out(queue) do
-      {{:value, {_command, from, _ref}}, _queue} ->
-        GenServer.reply(from, reply)
-        true
-
-      {:empty, _queue} ->
-        false
-    end
-  end
-
-  def reply(reply, {_, _} = from) do
-    GenServer.reply(from, reply)
-    true
   end
 end
