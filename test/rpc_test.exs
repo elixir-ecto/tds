@@ -1,10 +1,11 @@
 defmodule RPCTest do
+  @moduledoc false
   import Tds.TestHelper
   require Logger
   use ExUnit.Case
   alias Tds.Parameter
 
-  @tag timeout: 50000
+  @tag timeout: 50_000
 
   setup do
     opts = Application.fetch_env!(:tds, :opts)
@@ -14,46 +15,68 @@ defmodule RPCTest do
   end
 
   describe "parametrized queries" do
-    test "with positiove integer numbers", context do
-      Integers
+    test "with positiove and negative integer numbers", context do
+      # Integers
 
       nums = [
+        -9_223_372_036_854_775_807,
+        -20_080_906_120_000,
+        -4_294_967_296,
+        -65_536,
+        -256,
+        -1,
         0,
         1,
         256,
-        65536,
+        65_536,
         4_294_967_296,
-        20_080_906_120_000
+        20_080_906_120_000,
+        9_223_372_036_854_775_807
       ]
 
       Enum.each(nums, fn num ->
         assert [[num]] ==
-                 query("SELECT @n1", [%Parameter{name: "@n1", value: num}])
+                 query("SELECT cast(@n1 as bigint)", [%Parameter{name: "@n1", value: num, type: :integer}])
       end)
+
+      query("""
+      IF OBJECT_ID('int_test') IS NOT NULL DROP TABLE int_test;
+      CREATE TABLE int_test (
+        val bigint
+      )
+      """, [])
+      Enum.each(nums, fn (num) -> query("insert into int_test values (@n1)", [%Parameter{name: "@n1", value: num}]) end)
+      
+      result = Enum.map(nums, fn (num) -> [num] end)
+      assert result == query("SELECT val FROM int_test ORDER BY val asc", [])
+      query("IF OBJECT_ID('int_test') IS NOT NULL DROP TABLE int_test;", [])
     end
 
-    test "with negative integer numbers", context do
-      # Negative Numbers
+    test "should raise ArgumentError if erlang integer value is not in range -9,223,372,036,854,775,807..9,223,372,036,854,775,807", _context do
       nums = [
-        -111_111_111,
-        -1_111_111_111_111_111_111,
-        -1_111_111_111_111_111_111_111_111_111,
-        -11_111_111_111_111_111_111_111_111_111_111_111_111
+        -11_111_111_111_111_111_111_111_111_111_111_111_111,
+        11_111_111_111_111_111_111_111_111_111_111_111_111
       ]
-
-      Enum.each(nums, fn num ->
-        assert [[Decimal.new("#{num}")]] ==
-                 query("SELECT @n1", [%Parameter{name: "@n1", value: num}])
+      Enum.each(nums, fn (num) ->
+        assert_raise(ArgumentError, fn ->
+          Tds.Types.encode_data("@1", num, :integer)
+        end)
       end)
     end
 
     test "with decimal numbers", context do
       # Decimals
       nums = [
+        -11_111_111_111_111_111_111_111_111_111_111_111_111,
+        -1.1111111111111111111111111111111111111,
+        -1.111111111111111111111111111,
+        -1.111111111111111111,
+        -1.11111111,
         1.11111111,
         1.111111111111111111,
         1.111111111111111111111111111,
-        1.1111111111111111111111111111111111111
+        1.1111111111111111111111111111111111111,
+        11_111_111_111_111_111_111_111_111_111_111_111_111
       ]
 
       Enum.each(nums, fn num ->

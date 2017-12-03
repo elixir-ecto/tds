@@ -844,13 +844,12 @@ defmodule Tds.Types do
     {type, data, [collation: collation]}
   end
 
-  def encode_integer_type(%Parameter{value: value} = param)
-      when value < 0 do
-    encode_decimal_type(param)
-  end
+  # def encode_integer_type(%Parameter{value: value} = param)
+  #     when value < 0 do
+  #   encode_decimal_type(Decima.new(param))
+  # end
 
-  def encode_integer_type(%Parameter{value: value})
-      when value >= 0 do
+  def encode_integer_type(%Parameter{value: value}) do
     attributes = []
     type = @tds_data_type_intn
 
@@ -1309,7 +1308,7 @@ defmodule Tds.Types do
   @doc """
   Data Encoding Positive Integers Types
   """
-  def encode_data(_, value, _) when is_integer(value) and value >= 0 do
+  def encode_data(_, value, _) when is_integer(value) do
     size = int_type_size(value)
     <<size>> <> <<value::little-signed-size(size)-unit(8)>>
   end
@@ -1506,12 +1505,10 @@ defmodule Tds.Types do
 
   defp int_type_size(int) when int == nil, do: 4
   defp int_type_size(int) when int in 0..255, do: 4
-  defp int_type_size(int) when int in -32768..32767, do: 4
+  defp int_type_size(int) when int in -32_768..32_767, do: 4
   defp int_type_size(int) when int in -2_147_483_648..2_147_483_647, do: 4
-
-  defp int_type_size(int)
-       when int in -9_223_372_036_854_775_808..9_223_372_036_854_775_807,
-       do: 8
+  defp int_type_size(int) when int in -9_223_372_036_854_775_808..9_223_372_036_854_775_807, do: 8
+  defp int_type_size(int), do: raise ArgumentError, "Erlang integer value #{int} is too big (more than 64bits) to fit tds integer/bigint. Please consider using Decimal.new/1 to maintain precision."
 
   @doc """
   Data Encoding DateTime Types

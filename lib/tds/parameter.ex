@@ -94,19 +94,13 @@ defmodule Tds.Parameter do
     end
   end
 
-  def fix_data_type(%Tds.Parameter{value: value} = param)
-      when is_integer(value) and value >= 0 do
+  def fix_data_type(%Tds.Parameter{value: value} = param) when is_integer(value) do
     %{param | type: :integer}
   end
 
   def fix_data_type(%Tds.Parameter{value: value} = param)
       when is_float(value) do
     %{param | type: :float}
-  end
-
-  def fix_data_type(%Tds.Parameter{value: value} = param)
-      when is_integer(value) and value < 0 do
-    %{param | value: Decimal.new(value), type: :decimal}
   end
 
   def fix_data_type(%Tds.Parameter{value: {{_, _, _}}} = param) do
