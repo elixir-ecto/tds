@@ -18,9 +18,9 @@ defmodule Tds.Tokens do
   @tds_token_info 0xAB
   @tds_token_returnvalue 0xAC
   # @tds_token_loginack       0xAD # 0xAD
-  # 0xD1
+  # 0xD1 - ROW
   @tds_token_row 0xD1
-  # 0xD1
+  # 0xD2 - NBCROW
   @tds_token_nbcrow 0xD2
   # 0xE3
   @tds_token_envchange 0xE3
@@ -87,6 +87,7 @@ defmodule Tds.Tokens do
          <<@tds_token_returnstatus, _value::little-size(32), data::binary>>,
          tokens
        ) do
+    # todo: add retrun status into tokens
     {tokens, data}
   end
 
@@ -367,9 +368,9 @@ defmodule Tds.Tokens do
          <<
            @tds_token_doneinproc,
            status::int16,
-           cur_cmd::binary(2),
+           cur_cmd::little-size(8)-unit(2),
            row_count::little-size(8)-unit(8),
-           _something::binary-size(5),
+          #  _something::binary-size(5),
            tail::binary
          >>,
          tokens
