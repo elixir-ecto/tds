@@ -1,3 +1,7 @@
+# v1.0.12
+* BugFix
+  * issue #59 fixing login error when database name contains special characters like "-"
+
 # v1.0.3
 * BugFix
   * When insert is performed with output incorect row count is calucated. Causing tds_ecto and ecto to think it is StaleEntity
