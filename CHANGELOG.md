@@ -29,6 +29,7 @@
 # v1.0.5
 * BugFix
   * StaleEntity error fix when row is inserted into table and done token is incorectlly parsed
+  * fixing resultset order
 
 
 # v1.0.3
