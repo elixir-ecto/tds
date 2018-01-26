@@ -52,11 +52,11 @@ defmodule Tds.TestHelper do
 end
 
 opts = Application.get_env(:tds, :opts)
-
-Tds.TestHelper.sqlcmd(opts, """
-IF NOT EXISTS(SELECT * FROM sys.databases where name = 'test')
+database = opts[:database]
+{"", 0} = Tds.TestHelper.sqlcmd(opts, """
+IF NOT EXISTS(SELECT * FROM sys.databases where name = '#{database}')
 BEGIN
-  CREATE DATABASE [test];
+  CREATE DATABASE [#{database}];
 END;
 """)
 

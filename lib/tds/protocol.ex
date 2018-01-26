@@ -578,7 +578,7 @@ defmodule Tds.Protocol do
         SET ANSI_WARNINGS ON;
         SET CONCAT_NULL_YIELDS_NULL ON;
         SET TEXTSIZE 2147483647;
-        ALTER DATABASE #{opts[:database]} SET ALLOW_SNAPSHOT_ISOLATION ON;
+        ALTER DATABASE [#{opts[:database]}] SET ALLOW_SNAPSHOT_ISOLATION ON;
       """,
       s
     )

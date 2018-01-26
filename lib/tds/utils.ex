@@ -51,7 +51,7 @@ defmodule Tds.Utils do
     false
   end
 
-  def error(error, s) do
+  def error(error, _s) do
     {:error, error}
   end
 end
