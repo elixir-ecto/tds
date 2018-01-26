@@ -31,7 +31,6 @@
   * StaleEntity error fix when row is inserted into table and done token is incorectlly parsed
   * fixing resultset order
 
-
 # v1.0.3
 * BugFix
   * When insert is performed with output incorect row count is calucated. Causing tds_ecto and ecto to think it is StaleEntity
