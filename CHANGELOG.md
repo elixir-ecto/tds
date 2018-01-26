@@ -2,6 +2,35 @@
 * BugFix
   * issue #59 fixing login error when database name contains special characters like "-"
 
+# v1.0.11
+* BugFix
+  * fixing issue with done in proc token when stored pcedure is executed
+
+# v1.0.10
+* BugFix
+  * fixing negative integer/bigint encoding
+
+# v1.0.9
+* BugFix
+  * Removing obsolete reply function which causing error when connection can not be established to server
+
+# v1.0.8
+* BugFix
+  * Fixing handle 0 error
+
+# v1.0.7
+* BugFix
+  * Ping timout caused process to crash
+
+# v1.0.6
+* BugFix
+  * Double precision floats fix
+
+# v1.0.5
+* BugFix
+  * StaleEntity error fix when row is inserted into table and done token is incorectlly parsed
+
+
 # v1.0.3
 * BugFix
   * When insert is performed with output incorect row count is calucated. Causing tds_ecto and ecto to think it is StaleEntity
