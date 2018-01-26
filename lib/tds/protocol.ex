@@ -37,9 +37,9 @@ defmodule Tds.Protocol do
     opts =
       opts
       |> Keyword.put_new(
-           :username,
-           System.get_env("MSSQLUSER") || System.get_env("USER")
-         )
+        :username,
+        System.get_env("MSSQLUSER") || System.get_env("USER")
+      )
       |> Keyword.put_new(:password, System.get_env("MSSQLPASSWORD"))
       |> Keyword.put_new(:instance, System.get_env("MSSQLINSTANCE"))
       |> Keyword.put_new(:hostname, System.get_env("MSSQLHOST") || "localhost")
@@ -214,24 +214,24 @@ defmodule Tds.Protocol do
       |> String.split(";;")
       |> Enum.slice(0..-2)
       |> Enum.reduce([], fn str, acc ->
-           server =
-             str
-             |> String.split(";")
-             |> Enum.chunk(2)
-             |> Enum.reduce([], fn [k, v], acc ->
-                  k =
-                    k
-                    |> String.downcase()
-                    |> String.to_atom()
+        server =
+          str
+          |> String.split(";")
+          |> Enum.chunk(2)
+          |> Enum.reduce([], fn [k, v], acc ->
+            k =
+              k
+              |> String.downcase()
+              |> String.to_atom()
 
-                  Keyword.put_new(acc, k, v)
-                end)
+            Keyword.put_new(acc, k, v)
+          end)
 
-           [server | acc]
-         end)
+        [server | acc]
+      end)
       |> Enum.find(fn s ->
-           String.downcase(s[:instancename]) == String.downcase(opts[:instance])
-         end)
+        String.downcase(s[:instancename]) == String.downcase(opts[:instance])
+      end)
 
     case server do
       nil ->
@@ -560,28 +560,24 @@ defmodule Tds.Protocol do
   def message(:prelogin, _state) do
   end
 
-  def message(
-        :login,
-        msg_login_ack(),
-        %{opts: opts, sock: {_mod, _sock}} = s
-      ) do
-    s = %{s | opts: clean_opts(opts)}
+  def message(:login, msg_login_ack(), %{opts: opts} = s) do
+    state = %{s | opts: clean_opts(opts)}
+    database = Keyword.get(opts, :database)
 
-    send_query(
-      """
-        SET ANSI_NULLS ON;
-        SET QUOTED_IDENTIFIER ON;
-        SET CURSOR_CLOSE_ON_COMMIT OFF;
-        SET ANSI_NULL_DFLT_ON ON;
-        SET IMPLICIT_TRANSACTIONS OFF;
-        SET ANSI_PADDING ON;
-        SET ANSI_WARNINGS ON;
-        SET CONCAT_NULL_YIELDS_NULL ON;
-        SET TEXTSIZE 2147483647;
-        ALTER DATABASE [#{opts[:database]}] SET ALLOW_SNAPSHOT_ISOLATION ON;
-      """,
-      s
-    )
+    [
+      "SET ANSI_NULLS ON; ",
+      "SET QUOTED_IDENTIFIER ON; ",
+      "SET CURSOR_CLOSE_ON_COMMIT OFF; ",
+      "SET ANSI_NULL_DFLT_ON ON; ",
+      "SET IMPLICIT_TRANSACTIONS OFF; ",
+      "SET ANSI_PADDING ON; ",
+      "SET ANSI_WARNINGS ON; ",
+      "SET CONCAT_NULL_YIELDS_NULL ON; ",
+      "SET TEXTSIZE 2147483647; ",
+      "ALTER DATABASE [#{database}] SET ALLOW_SNAPSHOT_ISOLATION ON; "
+    ]
+    |> IO.iodata_to_binary()
+    |> send_query(state)
   end
 
   ## executing
