@@ -11,7 +11,7 @@ defmodule Tds.Messages do
 
   defrecord :msg_prelogin, [:params]
   defrecord :msg_login, [:params]
-  defrecord :msg_login_ack, [:type, :data]
+  defrecord :msg_login_ack, [:type, :redirect, :tokens]
   defrecord :msg_ready, [:status]
   defrecord :msg_sql, [:query]
   defrecord :msg_trans, [:trans]
@@ -90,7 +90,8 @@ defmodule Tds.Messages do
         msg_error(e: error)
 
       _ ->
-        msg_login_ack(type: 4, data: tail)
+        tokens = decode_tokens(tail, [])
+        msg_login_ack(type: 4, redirect: Keyword.has_key?(tokens, :env_redirect), tokens: tokens)
     end
   end
 
@@ -162,9 +163,11 @@ defmodule Tds.Messages do
     offset_start = byte_size(login_a) + 4
     username = params[:username]
     password = params[:password]
+    servername = params[:servername] || ""
 
     username_ucs = to_little_ucs2(username)
     password_ucs = to_little_ucs2(password)
+    servername_ucs = to_little_ucs2(servername)
 
     password_ucs_xor = encode_tdspassword(password_ucs)
     # Before submitting a password from the client to the server,
@@ -178,7 +181,7 @@ defmodule Tds.Messages do
     database_ucs = to_little_ucs2(database)
 
     login_data =
-      username_ucs <> password_ucs_xor <> clt_int_name_ucs <> database_ucs
+      username_ucs <> password_ucs_xor <> servername_ucs <> clt_int_name_ucs <> database_ucs
 
     curr_offset = offset_start + 58
     ibHostName = <<curr_offset::little-size(16)>>
@@ -195,8 +198,9 @@ defmodule Tds.Messages do
     ibAppName = <<0::size(16)>>
     cchAppName = <<0::size(16)>>
 
-    ibServerName = <<0::size(16)>>
-    cchServerName = <<0::size(16)>>
+    ibServerName = <<curr_offset::little-size(16)>>
+    cchServerName = <<String.length(servername)::little-size(16)>>
+    curr_offset = curr_offset + byte_size(servername_ucs)
 
     ibUnused = <<0::size(16)>>
     cbUnused = <<0::size(16)>>
