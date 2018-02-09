@@ -163,7 +163,7 @@ defmodule Tds.Messages do
     offset_start = byte_size(login_a) + 4
     username = params[:username]
     password = params[:password]
-    servername = params[:servername] || ""
+    servername = params[:hostname]
 
     username_ucs = to_little_ucs2(username)
     password_ucs = to_little_ucs2(password)

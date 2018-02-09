@@ -564,18 +564,10 @@ defmodule Tds.Protocol do
     # we got an ENVCHANGE:redirection token, we need to disconnect and start over with new server
     disconnect("redirected", s)
     %{hostname: host, port: port} = tokens[:env_redirect]
-    server = case String.split(host, ".database.windows.net") do
-      [servername, ""] -> 
-        # we are connecting to azure, need to extract servername from host
-        # https://blogs.msdn.microsoft.com/sqlnativeclient/2010/11/30/troubleshooting-sql-azure-applications-with-sql-server-native-client/
-        servername
-      _ -> ""
-    end
     new_opts =
       opts
       |> Keyword.put(:hostname, host)
       |> Keyword.put(:port, port)
-      |> Keyword.put(:servername, server)
     connect(new_opts)
   end
 
