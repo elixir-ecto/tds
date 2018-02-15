@@ -25,11 +25,17 @@ iex> {:ok, pid} = Tds.start_link([hostname: "localhost", username: "test_user", 
 {:ok, #PID<0.69.0>}
 
 iex> Tds.query!(pid, "SELECT 'Some Awesome Text' AS MyColumn", [])
-%Tds.Result{columns: ["MyColumn"], rows: [{"Some Awesome Text"}], num_rows: 1}}
+%Tds.Result{columns: ["MyColumn"], rows: [["Some Awesome Text"]], num_rows: 1}
 
 iex> Tds.query!(pid, "INSERT INTO MyTable (MyColumn) VALUES (@my_value)",
 ...> [%Tds.Parameter{name: "@my_value", value: "My Actual Value"}])
 %Tds.Result{columns: nil, rows: nil, num_rows: 1}}
+
+iex> Tds.query!(pid, "SELECT 1; SELECT 2;", [], [multiple_datasets: true])
+[
+  %Tds.Result{columns: [""], num_rows: 1, rows: [[1]]},
+  %Tds.Result{columns: [""], num_rows: 1, rows: [[2]]}
+]
 ```
 
 ## Features

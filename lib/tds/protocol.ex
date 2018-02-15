@@ -639,36 +639,18 @@ defmodule Tds.Protocol do
 
   def message(
         :executing,
-        msg_sql_result(columns: columns, rows: rows, done: done),
+        msg_sql_resultset(results: results),
         %{} = s
       ) do
-    columns =
-      if columns != nil do
-        columns
-        |> Enum.reduce([], fn col, acc -> [col[:name] | acc] end)
-        |> Enum.reverse()
-      else
-        columns
-      end
+    parsed_results = parse_results(results)
 
-    num_rows = done.rows
-
-    # rows are correctly orrdered when they were parsed, so below is not needed
-    # anymore
-    # rows =
-    # if rows != nil, do:  Enum.reverse(rows), else: rows
-
-    rows = if num_rows == 0 && rows == nil, do: [], else: rows
-
-    result = %Tds.Result{columns: columns, rows: rows, num_rows: num_rows}
-
-    {:ok, %{s | state: :executing, result: result}}
+    {:ok, %{s | state: :executing, result: parsed_results}}
   end
 
-  def message(:executing, msg_trans(trans: trans), %{} = s) do
-    result = %Tds.Result{columns: [], rows: [], num_rows: 0}
+  def message(:executing, msg_trans(trans: trans, results: results), %{} = s) do
+    parsed_results = parse_results(results)
 
-    {:ok, %{s | state: :ready, result: result, env: %{trans: trans}}}
+    {:ok, %{s | state: :ready, result: parsed_results, env: %{trans: trans}}}
   end
 
   def message(:executing, msg_prepared(params: params), %{} = s) do
@@ -975,5 +957,30 @@ defmodule Tds.Protocol do
         "should be either :on, :off, nil"
       )
     end
+  end
+
+  defp parse_results(results) do
+    results
+    |> Enum.reverse()
+    |> Enum.filter(fn %{done: %{rows: row_count}} -> row_count > 0 end)
+    |> Enum.map(fn %{columns: columns, rows: rows, done: done} ->
+      columns =
+        (columns || [])
+        |> Enum.reduce([], fn col, acc -> [col[:name] | acc] end)
+        |> Enum.reverse()
+
+      num_rows = done.rows
+
+      # rows are correctly orrdered when they were parsed, so below is not needed
+      # anymore
+      # rows =
+      # if rows != nil, do:  Enum.reverse(rows), else: rows
+
+      rows = if num_rows == 0 && rows == nil, do: [], else: rows
+
+      %Tds.Result{columns: columns, rows: rows, num_rows: num_rows}
+
+    end)
+
   end
 end

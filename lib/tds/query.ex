@@ -39,16 +39,31 @@ defmodule Tds.Query do
       end
     end
 
-    def decode(_query, result, opts) do
+    def decode(_query, results, opts) do
       mapper = opts[:decode_mapper] || fn x -> x end
-      %Tds.Result{rows: rows} = result
-      rows = do_decode(rows, mapper, [])
-      %Tds.Result{result | rows: rows}
+      results =
+        results
+        |> Enum.map(fn %Tds.Result{rows: rows} = result ->
+          rows = do_decode(rows, mapper, [])
+          %Tds.Result{result | rows: rows}
+        end)
+      if Keyword.get(opts, :multiple_datasets) do
+        results
+      else
+        List.first(results) || %Tds.Result{num_rows: 0, rows: [], columns: []}
+      end
     end
 
     def do_decode([row | rows], mapper, decoded) do
       decoded = [mapper.(row) | decoded]
       do_decode(rows, mapper, decoded)
+    end
+
+    def do_decode(nil, _, _) do
+      # this case is required because struct/8 in ecto/adapters/sql.ex:541
+      # specifically checks for %{rows: nil, num_rows: 1}
+      # thus treating rows: [] as an error
+      nil
     end
 
     def do_decode(_, _, decoded) do

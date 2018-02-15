@@ -19,6 +19,22 @@ defmodule Tds.TestHelper do
     end
   end
 
+  defmacro query_multiset(statement, params, opts \\ []) do
+    quote do
+      case Tds.query(
+             var!(context)[:pid],
+             unquote(statement),
+             unquote(params),
+             unquote(opts)
+             |> Keyword.put(:multiple_datasets, true)
+           ) do
+        {:ok, results} when is_list(results) ->
+          Enum.map(results, fn %{rows: rows} -> rows end)
+        {:error, %Tds.Error{} = err} -> err
+      end
+    end
+  end
+
   defmacro proc(proc, params, opts \\ []) do
     quote do
       case Connection.proc(

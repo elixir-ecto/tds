@@ -14,9 +14,9 @@ defmodule Tds.Messages do
   defrecord :msg_login_ack, [:type, :redirect, :tokens]
   defrecord :msg_ready, [:status]
   defrecord :msg_sql, [:query]
-  defrecord :msg_trans, [:trans]
+  defrecord :msg_trans, [:trans, :results]
   defrecord :msg_transmgr, [:command]
-  defrecord :msg_sql_result, [:columns, :rows, :done]
+  defrecord :msg_sql_resultset, [:results]
   defrecord :msg_sql_empty, []
   defrecord :msg_rpc, [:proc, :query, :params]
   defrecord :msg_prepared, [:params]
@@ -102,19 +102,14 @@ defmodule Tds.Messages do
     case tokens do
       [error: error] ->
         msg_error(e: error)
-
-      [done: %{}, trans: <<trans::binary>>] ->
-        msg_trans(trans: trans)
-
       tokens ->
-        if Keyword.has_key?(tokens, :parameters) do
-          msg_prepared(params: tokens[:parameters])
-        else
-          msg_sql_result(
-            columns: tokens[:columns],
-            rows: tokens[:rows],
-            done: tokens[:done]
-          )
+        cond do
+          Keyword.has_key?(tokens, :trans) ->
+            msg_trans(trans: tokens[:trans], results: tokens[:results] || [])
+          Keyword.has_key?(tokens, :parameters) ->
+            msg_prepared(params: tokens[:parameters])
+          true ->
+            msg_sql_resultset(results: tokens[:results])
         end
     end
   end

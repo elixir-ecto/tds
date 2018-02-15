@@ -160,4 +160,26 @@ defmodule QueryTest do
   test "char nulls", context do
     assert [[nil]] = query("SELECT CAST(NULL as nvarchar(255))", [])
   end
+
+  test "multiple statements", context do
+    assert [[1]] = query("SET NOCOUNT ON; SET TRANSACTION ISOLATION LEVEL READ UNCOMMITTED; SELECT 1;", [])
+  end
+
+  test "multiple datasets", context do
+    assert [[["Hello"]], [["World"]]] = query_multiset("SELECT 'Hello'; SELECT 'World';", [])
+  end
+
+  test "multiple datasets inside stored procedure", context do
+    procname = "multiproc1"
+    create_sp = """
+      CREATE PROCEDURE #{procname} AS
+      BEGIN
+        SELECT 1;
+        SELECT 2;
+      END
+    """
+    query(create_sp, [])
+    assert [[[1]], [[2]]] = query_multiset(procname, [])
+    query("DROP PROCEDURE #{procname}", [])
+  end
 end
