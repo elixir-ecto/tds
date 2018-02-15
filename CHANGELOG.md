@@ -1,3 +1,7 @@
+# v1.0.13
+* BugFix
+  * issue #62 fixing info message token parsing
+
 # v1.0.12
 * BugFix
   * issue #59 fixing login error when database name contains special characters like "-"
