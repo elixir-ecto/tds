@@ -175,8 +175,9 @@ defmodule Tds.Tokens do
       line_number: line_number
     }
 
-    info_token = Keyword.get(tokens, :info, [])
-    {[[i | info_token] | tokens], tail}
+    tokens =
+      Keyword.update(tokens, :info, [i], fn infos -> [i | infos] end)
+    {tokens, tail}
   end
 
   ## ROW
