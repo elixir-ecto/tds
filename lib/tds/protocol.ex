@@ -104,11 +104,11 @@ defmodule Tds.Protocol do
   end
 
   def handle_execute(
-        %Query{statement: statement} = query,
-        params,
-        opts,
-        %{sock: _sock} = s
-      ) do
+    %Query{statement: statement} = query,
+    params,
+    opts,
+    %{sock: _sock} = s
+  ) do
     params = opts[:parameters] || params
 
     if params != [] do
@@ -119,9 +119,8 @@ defmodule Tds.Protocol do
   end
 
   def handle_prepare(%{statement: statement}, opts, %{sock: _sock} = s) do
-    params =
-      opts[:parameters]
-      |> Parameter.prepared_params()
+    params = opts[:parameters]
+             |> Parameter.prepared_params()
 
     send_prepare(statement, params, s)
   end
@@ -459,22 +458,40 @@ defmodule Tds.Protocol do
   # end
 
   def send_param_query(
-        %Query{handle: handle} = _query,
-        params,
-        %{transaction: :started} = s
-      ) do
-    params = [
-      %Parameter{
-        name: "@handle",
-        type: :integer,
-        direction: :input,
-        value: handle
-      }
-      | Parameter.prepare_params(params)
-    ]
-
-    # msg = msg_rpc(proc: :sp_executesql, params: params)
-    msg = msg_rpc(proc: :sp_execute, params: params)
+    %Query{handle: handle, statement: statement} = _,
+    params,
+    %{transaction: :started} = s
+  ) do
+    msg = case handle do
+      nil ->
+        p = [
+          %Parameter{
+            name: "@statement",
+            type: :string,
+            direction: :input,
+            value: statement
+          },
+          %Parameter{
+            name: "@params",
+            type: :string,
+            direction: :input,
+            value: Parameter.prepared_params(params)
+          }
+          | Parameter.prepare_params(params)
+        ]
+        msg_rpc(proc: :sp_executesql, params: p)
+      handle ->
+        p = [
+          %Parameter{
+            name: "@handle",
+            type: :integer,
+            direction: :input,
+            value: handle
+          }
+          | Parameter.prepare_params(params)
+        ]
+        msg_rpc(proc: :sp_execute, params: p)
+    end
 
     case msg_send(msg, s) do
       {:ok, %{result: result} = s} ->
@@ -488,19 +505,41 @@ defmodule Tds.Protocol do
     end
   end
 
-  def send_param_query(%Query{handle: handle} = _query, params, s) do
-    params = [
-      %Parameter{
-        name: "@handle",
-        type: :integer,
-        direction: :input,
-        value: handle
-      }
-      | Parameter.prepare_params(params)
-    ]
-
-    # msg = msg_rpc(proc: :sp_executesql, params: params)
-    msg = msg_rpc(proc: :sp_execute, params: params)
+  def send_param_query(
+    %Query{handle: handle, statement: statement} = _,
+    params,
+    s
+  ) do
+    msg = case handle do
+      nil -> 
+        p = [
+          %Parameter{
+            name: "@statement",
+            type: :string,
+            direction: :input,
+            value: statement
+          },
+          %Parameter{
+            name: "@params",
+            type: :string,
+            direction: :input,
+            value: Parameter.prepared_params(params)
+          }
+          | Parameter.prepare_params(params)
+        ]
+        msg_rpc(proc: :sp_executesql, params: p)
+      handle ->
+        p = [
+          %Parameter{
+            name: "@handle",
+            type: :integer,
+            direction: :input,
+            value: handle
+          }
+          | Parameter.prepare_params(params)
+        ]
+        msg_rpc(proc: :sp_execute, params: p)
+    end
 
     case msg_send(msg, s) do
       {:ok, %{result: result} = s} ->
@@ -557,8 +596,8 @@ defmodule Tds.Protocol do
 
   ## SERVER Packet Responses
 
-  def message(:prelogin, _state) do
-  end
+  # def message(:prelogin, _state) do
+  # end
 
   def message(:login, msg_login_ack(), %{opts: opts} = s) do
     state = %{s | opts: clean_opts(opts)}
@@ -632,11 +671,11 @@ defmodule Tds.Protocol do
   end
 
   ## ATTN Ack
-  # def message(:attn, _, %{} = s) do
-  #  result = %Tds.Result{columns: [], rows: [], num_rows: 0}
+  def message(:attn, _, %{} = s) do
+   result = %Tds.Result{columns: [], rows: [], num_rows: 0}
 
-  #  { :ok, %{s | statement: "", state: :ready, result: result} }
-  # end
+   { :ok, %{s | statement: "", state: :ready, result: result} }
+  end
 
   # defp simple_send(msg, %{sock: {mod, sock}, env: env}) do
   #  paks = encode_msg(msg, env)

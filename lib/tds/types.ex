@@ -1026,11 +1026,15 @@ defmodule Tds.Types do
           encode_binary_descriptor(value)
 
         :string ->
+          # this is same .net driver uses in order to avoid too many 
+          # cached execution plans, it must be always same length otherwise it will 
+          # use too much memory in sql server to cache each plan per param size
           cond do
             is_nil(value) -> "nvarchar(1)"
             String.length(value) <= 0 -> "nvarchar(1)"
-            String.length(value) > 4_000 -> "nvarchar(max)"
-            true -> "nvarchar(#{String.length(value)})"
+            String.length(value) > 0 -> "nvarchar(max)"
+            # String.length(value) > 4_000 -> "nvarchar(max)"
+            # true -> "nvarchar(#{String.length(value)})"
           end
 
         :integer ->
@@ -1060,11 +1064,15 @@ defmodule Tds.Types do
           "bit"
 
         _ ->
+          # this is same .net driver uses in order to avoid too many 
+          # cached execution plans, it must be always same length otherwise it will 
+          # use too much memory in sql server to cache each plan per param size
           cond do
-            is_nil(value) -> "nvarchar(1)"
-            String.length(value) <= 0 -> "nvarchar(1)"
-            String.length(value) > 4_000 -> "nvarchar(max)"
-            true -> "nvarchar(#{String.length(value)})"
+            is_nil(value) -> "varchar(1)"
+            String.length(value) <= 0 -> "varchar(1)"
+            String.length(value) > 0 -> "varchar(max)"
+            # String.length(value) > 4_000 -> "varchar(max)"
+            # true -> "varchar(#{String.length(value)})"
           end
       end
 
@@ -1265,10 +1273,13 @@ defmodule Tds.Types do
   def encode_binary_descriptor(value) when byte_size(value) <= 0,
     do: "varbinary(1)"
 
-  def encode_binary_descriptor(value) when byte_size(value) > 8_000,
+  def encode_binary_descriptor(value) when byte_size(value) > 0,
     do: "varbinary(max)"
 
-  def encode_binary_descriptor(value), do: "varbinary(#{byte_size(value)})"
+  # def encode_binary_descriptor(value) when byte_size(value) > 8_000,
+  #   do: "varbinary(max)"
+
+  # def encode_binary_descriptor(value), do: "varbinary(#{byte_size(value)})"
 
   @doc """
   Data Encoding Binary Types

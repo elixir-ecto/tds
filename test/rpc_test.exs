@@ -9,6 +9,7 @@ defmodule RPCTest do
 
   setup do
     opts = Application.fetch_env!(:tds, :opts)
+    # |> Keyword.put(:after_connect, {Tds, :query!, ["SET TRANSACTION ISOLATION LEVEL READ UNCOMMITTED", []]})
     {:ok, pid} = Tds.start_link(opts)
 
     {:ok, [pid: pid]}
@@ -289,22 +290,14 @@ defmodule RPCTest do
     assert :ok = query("DROP TABLE dbo.TestTable", [])
   end
 
-  # test "Stored procedure", context do
-  #   q = """
-  #     CREATE PROCEDURE testproc (
-  #       @param int,
-  #       @add int = 2,
-  #       @outparam int output
-  #     )
-  #       AS
-  #       BEGIN
-  #           SET nocount ON
-  #           SET @outparam = @param + @add
-  #           RETURN @outparam
-  #       END
-  #   """
-  #   value = 45
-  #   assert :ok =  query(q, [])
-  #   assert [{47}] = proc("testproc", [{val}, {:default}, {:output, 1}])
-  # end
+  test "read large table", context do
+    pid = context[:pid]
+    
+    {:ok, res} = Tds.query(pid, "SELECT @1 as c1, @2 as c2", [
+      %Tds.Parameter{name: "@1", value: "some string"},
+      %Tds.Parameter{name: "@2", value: "some string", type: :binary}
+    ])
+
+    assert res.num_rows > 0
+  end
 end

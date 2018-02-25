@@ -29,7 +29,7 @@ defmodule Tds do
 
   def prepare(pid, statement, opts \\ []) do
     query = %Query{statement: statement}
-
+    
     case DBConnection.prepare(pid, query, opts) do
       {:ok, query} -> {:ok, query}
       {:error, err} -> {:error, err}

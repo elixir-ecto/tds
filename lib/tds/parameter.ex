@@ -1,37 +1,34 @@
 defmodule Tds.Parameter do
   alias Tds.Types
-  # alias Tds.Parameter
   alias Tds.DateTime
   alias Tds.DateTime2
 
   @type t :: %__MODULE__{
-          name: String.t() | nil,
-          direction: Atom | :input
-        }
+    name: String.t() | nil,
+    direction: :input | :output,
+    value: String.t() | nil,
+    type: atom() | nil
+  }
+
   defstruct name: "", direction: :input, value: "", type: nil
 
   def option_flags(%__MODULE__{direction: direction, value: value}) do
-    fByRefValue =
-      case direction do
-        :output -> 1
-        _ -> 0
-      end
+    fByRefValue = case direction do
+      :output -> 1
+      _ -> 0
+    end
 
-    fDefaultValue =
-      case value do
-        :default -> 1
-        _ -> 0
-      end
+    fDefaultValue = case value do
+      :default -> 1
+      _ -> 0
+    end
 
     <<0::size(6), fDefaultValue::size(1), fByRefValue::size(1)>>
   end
 
-  def prepared_params(nil) do
-    []
-  end
-
   def prepared_params(params) do
     params
+    |> List.wrap()
     |> name(0)
     |> Enum.map(&fix_data_type/1)
     |> Enum.map(&Types.encode_param_descriptor/1)
@@ -71,22 +68,22 @@ defmodule Tds.Parameter do
   end
 
   def fix_data_type(%Tds.Parameter{type: type, value: _value} = param)
-      when not is_nil(type) do
+  when not is_nil(type) do
     param
   end
 
   def fix_data_type(%Tds.Parameter{value: value} = param)
-      when value == true or value == false do
+  when value == true or value == false do
     %{param | type: :boolean}
   end
 
   def fix_data_type(%Tds.Parameter{value: value} = param)
-      when is_binary(value) and value == "" do
+  when is_binary(value) and value == "" do
     %{param | type: :string}
   end
 
   def fix_data_type(%Tds.Parameter{value: value} = param)
-      when is_binary(value) do
+  when is_binary(value) do
     if String.valid?(value) do
       %{param | type: :string}
     else
@@ -150,7 +147,6 @@ defmodule Tds.Parameter do
       else
         raw_param
       end
-
     fix_data_type(param)
   end
 

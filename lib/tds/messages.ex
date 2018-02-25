@@ -133,7 +133,7 @@ defmodule Tds.Messages do
     prelogin_data = version_data
     data = version <> terminator <> prelogin_data
     encode_packets(0x12, data, [])
-    # encode_header(0x12, data)<>data
+    # encode_header(0x12, data) <> data
   end
 
   defp encode(msg_login(params: params), _env) do
@@ -461,10 +461,10 @@ defmodule Tds.Messages do
   end
 
   defp encode_packets(
-         type,
-         <<data::binary-size(@tds_pack_data_size)-unit(8), tail::binary>>,
-         paks
-       ) do
+    type,
+    <<data::binary-size(@tds_pack_data_size)-unit(8), tail::binary>>,
+    paks
+  ) do
     status = if byte_size(tail) > 0, do: 0, else: 1
     header = encode_header(type, data, id: length(paks) + 1, status: status)
     encode_packets(type, tail, [header <> data | paks])
@@ -476,13 +476,10 @@ defmodule Tds.Messages do
   end
 
   defp encode_tdspassword(list) do
-    # TODO UGLY!!!
-    for <<b::size(8) <- list>> do
-      # swap 4 bits
-      <<x::size(4), y::size(4)>> = <<b>>
-      <<c>> = <<y::size(4), x::size(4)>>
+    for <<b::4, a::4 <- list>> do
+      <<c>> = <<a::size(4), b::size(4)>>
       Bitwise.bxor(c, 0xA5)
     end
-    |> Enum.map_join(&<<&1>>)
+    |> Enum.map_join(& <<&1>>)
   end
 end

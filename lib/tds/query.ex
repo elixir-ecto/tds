@@ -13,7 +13,7 @@ defmodule Tds.Query do
           %Tds.Query{
             statement: statement,
             handle: handle
-          },
+          } = _,
           params,
           _opts
         ) do
