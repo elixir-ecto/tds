@@ -1,7 +1,7 @@
 # v1.0.14
 
 * Improvements
-  -  Parameters `:string` and `:binary` are encoded as `nvarchar(max)` and `varbinary(max)` to avoid agresive execution plan caching on SQL Server since when parameters vary in length SQL server will makes exec plan for each parameter lenght case.
+  - Parameters `:string`, `:varchar` and `:binary` are encoded as `nvarchar(max)`, `varchar(max)` and `varbinary(max)` when string or binary length is greater than 2000, otherwise `nvarchar(2000)`, `varchar(2000)` and `varbinary(2000)`. This change is added to avoid agresive execution plan caching on SQL Server since parameters may often vary in length, so SQL server will makes execution plan for each parameter lenght case.
     
 # v1.0.13
 * BugFix
