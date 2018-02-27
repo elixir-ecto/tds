@@ -104,11 +104,11 @@ defmodule Tds.Protocol do
   end
 
   def handle_execute(
-    %Query{statement: statement} = query,
-    params,
-    opts,
-    %{sock: _sock} = s
-  ) do
+      %Query{statement: statement} = query,
+      params,
+      opts,
+      %{sock: _sock} = s
+    ) do
     params = opts[:parameters] || params
 
     if params != [] do
@@ -147,6 +147,22 @@ defmodule Tds.Protocol do
 
   def handle_rollback(_opts, %{sock: _sock} = s) do
     send_transaction("TM_ROLLBACK_XACT", %{s | transaction: :failed})
+  end
+
+  def handle_first(_query, _cursor, _opts, state) do
+    {:error, UndefinedFunctionError.exception("Not supported yet."), state}
+  end
+
+  def handle_deallocate(_query, _cursor, _opts, state) do
+    {:error, UndefinedFunctionError.exception("Not supported yet."), state}
+  end
+
+  def handle_declare(_query, _params, _opts, state) do
+    {:error, UndefinedFunctionError.exception("Not supported yet."), state}
+  end
+
+  def handle_next(_query, _cursor, _opts, state) do
+    {:error, UndefinedFunctionError.exception("Not supported yet."), state}
   end
 
   # CONNECTION
