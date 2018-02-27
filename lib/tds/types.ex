@@ -1026,22 +1026,11 @@ defmodule Tds.Types do
           encode_binary_descriptor(value)
 
         :string ->
-          # this should fix issues when column is varchar but parameter
-          # is threated as nvarchar(..) since nothing defines parameter
-          # as varchar. 
-          latin1  = :unicode.characters_to_list(value || "", :latin1)
-          utf8    = :unicode.characters_to_list(value || "", :utf8)
-          db_type = if latin1 == utf8,
-                    do: "varchar",
-                    else: "nvarchar"
-          # this is same .net driver uses in order to avoid too many 
-          # cached execution plans, it must be always same length otherwise it will 
-          # use too much memory in sql server to cache each plan per param size 
           cond do
-            is_nil(value)                 -> "#{db_type}(1)"
-            String.length(value) <= 0     -> "#{db_type}(1)"
-            String.length(value) <= 2_000 -> "#{db_type}(2000)"
-            String.length(value) > 4_000  -> "#{db_type}(max)"
+            is_nil(value)                 -> "nvarchar(1)"
+            String.length(value) <= 0     -> "nvarchar(1)"
+            String.length(value) <= 2_000 -> "nvarchar(2000)"
+            String.length(value) > 4_000  -> "nvarchar(max)"
           end
         
         :varchar ->
