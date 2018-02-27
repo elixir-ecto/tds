@@ -1026,15 +1026,30 @@ defmodule Tds.Types do
           encode_binary_descriptor(value)
 
         :string ->
+          # this should fix issues when column is varchar but parameter
+          # is threated as nvarchar(..) since nothing defines parameter
+          # as varchar. 
+          latin1  = :unicode.characters_to_list(value || "", :latin1)
+          utf8    = :unicode.characters_to_list(value || "", :utf8)
+          db_type = if latin1 == utf8,
+                    do: "varchar",
+                    else: "nvarchar"
           # this is same .net driver uses in order to avoid too many 
           # cached execution plans, it must be always same length otherwise it will 
-          # use too much memory in sql server to cache each plan per param size
+          # use too much memory in sql server to cache each plan per param size 
           cond do
-            is_nil(value) -> "nvarchar(1)"
-            String.length(value) <= 0 -> "nvarchar(1)"
-            String.length(value) > 0 -> "nvarchar(max)"
-            # String.length(value) > 4_000 -> "nvarchar(max)"
-            # true -> "nvarchar(#{String.length(value)})"
+            is_nil(value)                 -> "#{db_type}(1)"
+            String.length(value) <= 0     -> "#{db_type}(1)"
+            String.length(value) <= 2_000 -> "#{db_type}(2000)"
+            String.length(value) > 4_000  -> "#{db_type}(max)"
+          end
+        
+        :varchar ->
+          cond do
+            is_nil(value)                 -> "varchar(1)"
+            String.length(value) <= 0     -> "varchar(1)"
+            String.length(value) <= 2_000 -> "varchar(2000)"
+            String.length(value) >  4_000 -> "varchar(max)"
           end
 
         :integer ->
@@ -1064,15 +1079,22 @@ defmodule Tds.Types do
           "bit"
 
         _ ->
+          # this should fix issues when column is varchar but parameter
+          # is threated as nvarchar(..) since nothing defines parameter
+          # as varchar. 
+          latin1  = :unicode.characters_to_list(value || "", :latin1)
+          utf8    = :unicode.characters_to_list(value || "", :utf8)
+          db_type = if latin1 == utf8,
+                    do: "varchar",
+                    else: "nvarchar"
           # this is same .net driver uses in order to avoid too many 
           # cached execution plans, it must be always same length otherwise it will 
-          # use too much memory in sql server to cache each plan per param size
+          # use too much memory in sql server to cache each plan per param size 
           cond do
-            is_nil(value) -> "varchar(1)"
-            String.length(value) <= 0 -> "varchar(1)"
-            String.length(value) > 0 -> "varchar(max)"
-            # String.length(value) > 4_000 -> "varchar(max)"
-            # true -> "varchar(#{String.length(value)})"
+            is_nil(value)                 -> "#{db_type}(1)"
+            String.length(value) <= 0     -> "#{db_type}(1)"
+            String.length(value) <= 2_000 -> "#{db_type}(2000)"
+            String.length(value) > 4_000  -> "#{db_type}(max)"
           end
       end
 
@@ -1725,9 +1747,9 @@ defmodule Tds.Types do
   def encode_datetimeoffset(nil), do: nil
 
   def encode_datetimeoffset(
-        {date, time, offset_min},
-        scale \\ @max_time_scale
-      ) do
+      {date, time, offset_min},
+      scale \\ @max_time_scale
+    ) do
     datetime = encode_datetime2({date, time}, scale)
     datetime <> <<offset_min::little-signed-16>>
   end

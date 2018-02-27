@@ -1,3 +1,8 @@
+# v1.0.14
+
+* Improvements
+  -  Parameters `:string` and `:binary` are encoded as `nvarchar(max)` and `varbinary(max)` to avoid agresive execution plan caching on SQL Server since when parameters vary in length SQL server will makes exec plan for each parameter lenght case.
+    
 # v1.0.13
 * BugFix
   * issue #62 fixing info message token parsing

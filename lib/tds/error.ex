@@ -22,7 +22,6 @@ defmodule Tds.Error do
 
   defexception [:message, :mssql]
 
-  @spec exception(String.t() | keyword) :: %__MODULE__{}
   def exception(message) when is_binary(message) do
     %__MODULE__{message: message}
   end
