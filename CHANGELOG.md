@@ -1,4 +1,7 @@
 # v1.0.14
+* Improvents
+  - Handle Azure redirecting to new host after env_change token on login #61
+# v1.0.14
 
 * Improvements
   - Parameters `:string`, `:varchar` and `:binary` are encoded as `nvarchar(max)`, `varchar(max)` and `varbinary(max)` when string or binary length is greater than 2000, otherwise `nvarchar(2000)`, `varchar(2000)` and `varbinary(2000)`. This change is added to avoid agresive execution plan caching on SQL Server since parameters may often vary in length, so SQL server will makes execution plan for each parameter lenght case.
