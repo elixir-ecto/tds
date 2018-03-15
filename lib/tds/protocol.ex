@@ -615,10 +615,20 @@ defmodule Tds.Protocol do
   # def message(:prelogin, _state) do
   # end
 
+  def message(:login, msg_login_ack(redirect: true, tokens: tokens), %{opts: opts} = s) do
+    # we got an ENVCHANGE:redirection token, we need to disconnect and start over with new server
+    disconnect("redirected", s)
+    %{hostname: host, port: port} = tokens[:env_redirect]
+    new_opts =
+      opts
+      |> Keyword.put(:hostname, host)
+      |> Keyword.put(:port, port)
+    connect(new_opts)
+  end
+
   def message(:login, msg_login_ack(), %{opts: opts} = s) do
     state = %{s | opts: clean_opts(opts)}
     database = Keyword.get(opts, :database)
-
     [
       "SET ANSI_NULLS ON; ",
       "SET QUOTED_IDENTIFIER ON; ",
