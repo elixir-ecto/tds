@@ -638,8 +638,7 @@ defmodule Tds.Protocol do
       "SET ANSI_PADDING ON; ",
       "SET ANSI_WARNINGS ON; ",
       "SET CONCAT_NULL_YIELDS_NULL ON; ",
-      "SET TEXTSIZE 2147483647; ",
-      "ALTER DATABASE [#{database}] SET ALLOW_SNAPSHOT_ISOLATION ON; "
+      "SET TEXTSIZE 2147483647; "
     ]
     |> IO.iodata_to_binary()
     |> send_query(state)
