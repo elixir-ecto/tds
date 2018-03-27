@@ -16,6 +16,7 @@ defmodule Tds.Protocol do
   @timeout 5000
   @max_packet 4 * 1024
   @sock_opts [packet: :raw, mode: :binary, active: false, recbuf: 4096]
+  @trans_levels [:read_uncommited, :read_commited, :repeatable_read, :snapshot, :serializable]
 
   defstruct sock: nil,
             usock: nil,
@@ -527,7 +528,7 @@ defmodule Tds.Protocol do
     s
   ) do
     msg = case handle do
-      nil -> 
+      nil ->
         p = [
           %Parameter{
             name: "@statement",
@@ -628,22 +629,8 @@ defmodule Tds.Protocol do
 
   def message(:login, msg_login_ack(), %{opts: opts} = s) do
     state = %{s | opts: clean_opts(opts)}
-    database = Keyword.get(opts, :database)
-    [
-      "SET ANSI_NULLS ON; ",
-      "SET QUOTED_IDENTIFIER ON; ",
-      "SET CURSOR_CLOSE_ON_COMMIT OFF; ",
-      "SET ANSI_NULL_DFLT_ON ON; ",
-      "SET IMPLICIT_TRANSACTIONS OFF; ",
-      "SET ANSI_PADDING ON; ",
-      "SET ANSI_WARNINGS ON; ",
-      "SET CONCAT_NULL_YIELDS_NULL ON; ",
-      "SET TEXTSIZE 2147483647; "
-    ]
-    |> append_statement_if_true(
-      Keyword.get(opts, :snapshot_isolation),
-      "ALTER DATABASE [#{database}] SET ALLOW_SNAPSHOT_ISOLATION ON; "
-    )
+    opts
+    |> conn_opts()
     |> IO.iodata_to_binary()
     |> send_query(state)
   end
@@ -843,7 +830,150 @@ defmodule Tds.Protocol do
     Keyword.put(opts, :password, :REDACTED)
   end
 
-  defp append_statement_if_true(statements, condition, statement) do
-    if condition, do: statements ++ [statement], else: statements
+  @spec conn_opts(Keyword.t()) :: list() | no_return
+  defp conn_opts(opts) do
+    [
+      "SET ANSI_NULLS ON; ",
+      "SET QUOTED_IDENTIFIER ON; ",
+      "SET CURSOR_CLOSE_ON_COMMIT OFF; ",
+      "SET ANSI_NULL_DFLT_ON ON; ",
+      "SET IMPLICIT_TRANSACTIONS OFF; ",
+      "SET ANSI_PADDING ON; ",
+      "SET ANSI_WARNINGS ON; ",
+      "SET CONCAT_NULL_YIELDS_NULL ON; ",
+      "SET TEXTSIZE 2147483647; "
+    ]
+    |> append_opts(opts, :set_language)
+    |> append_opts(opts, :set_datefirst)
+    |> append_opts(opts, :set_dateformat)
+    |> append_opts(opts, :set_deadlock_priority)
+    |> append_opts(opts, :set_lock_timeout)
+    |> append_opts(opts, :set_remote_proc_transactions)
+    |> append_opts(opts, :set_implicit_transactions)
+    |> append_opts(opts, :set_transaction_isolation_level)
+    |> append_opts(opts, :set_allow_snapshot_isolation)
+  end
+
+  defp append_opts(conn, opts, :set_language) do
+    case Keyword.get(opts, :set_language) do
+      nil  -> conn
+      val -> conn ++ ["SET LANGUAGE #{val}; "]
+    end
+  end
+
+  defp append_opts(conn, opts, :set_datefirst) do
+    case Keyword.get(opts, :set_datefirst) do
+      nil  -> conn
+      val when val in 1..7 -> conn ++ ["SET DATEFIRST #{val}; "]
+      val -> raise(
+        ArgumentError,
+        "set_datefirst: #{val} is out of bounds, valid range is 1..7"
+      )
+    end
+  end
+
+  defp append_opts(conn, opts, :set_dateformat) do
+    case Keyword.get(opts, :set_dateformat) do
+      nil  -> conn
+      val when val in [:mdy, :dmy, :ymd, :ydm, :myd, :dym] ->
+        conn ++ ["SET DATEFORMAT #{val}; "]
+      val -> raise(
+        ArgumentError,
+        "set_dateformat: #{inspect(val)} has ivalid value, " <>
+        "valid values are [:mdy, :dmy, :ymd, :ydm, :myd, :dym]"
+      )
+    end
+  end
+
+
+  defp append_opts(conn, opts, :set_deadlock_priority) do
+    case Keyword.get(opts, :set_deadlock_priority) do
+      nil  -> conn
+      val when val in [:low, :high, :normal] ->
+        conn ++ ["SET DEADLOCK_PRIORITY #{val}; "]
+      nil  -> conn
+      val when val in -10..10 ->
+        conn ++ ["SET DEADLOCK_PRIORITY #{val}; "]
+      val -> raise(
+        ArgumentError,
+        "set_deadlock_priority: #{inspect(val)} has ivalid value, " <>
+        "valid values are #{inspect([:low, :high, :normal|-10..10])}"
+      )
+    end
+  end
+
+  defp append_opts(conn, opts, :set_lock_timeout) do
+    case Keyword.get(opts, :set_lock_timeout) do
+      nil  -> conn
+      val when val > 0 ->
+        conn ++ ["SET LOCK_TIMEOUT #{val}; "]
+      val -> raise(
+        ArgumentError,
+        "set_lock_timeout: #{inspect(val)} has ivalid value, " <>
+        "must be an positive integer."
+      )
+    end
+  end
+
+  defp append_opts(conn, opts, :set_remote_proc_transactions) do
+    case Keyword.get(opts, :set_remote_proc_transactions) do
+      nil  -> conn
+      val when val in [:on, :off] ->
+        val = val |> Atom.to_string() |> String.upcase()
+        conn ++ ["SET REMOTE_PROC_TRANSACTIONS #{val}; "]
+      val -> raise(
+        ArgumentError,
+        "set_remote_proc_transactions: #{inspect(val)} has ivalid value, " <>
+        "should be either :on, :off, nil"
+      )
+    end
+  end
+
+  defp append_opts(conn, opts, :set_implicit_transactions) do
+    case Keyword.get(opts, :set_implicit_transactions) do
+      nil  -> conn
+      val when val in [:on, :off] ->
+        val = val |> Atom.to_string() |> String.upcase()
+        conn ++ ["SET IMPLICIT_TRANSACTIONS #{val}; "]
+      val -> raise(
+        ArgumentError,
+        "set_implicit_transactions: #{inspect(val)} has ivalid value, " <>
+        "should be either :on, :off, nil"
+      )
+    end
+  end
+
+
+  defp append_opts(conn, opts, :set_transaction_isolation_level) do
+    case Keyword.get(opts, :set_transaction_isolation_level) do
+      nil  -> conn
+      val when val in @trans_levels ->
+        t = val
+              |> Atom.to_string()
+              |> String.replace("_", " ")
+              |> String.upcase()
+        conn ++ ["SET TRANSACTION_ISOLATION_LEVEL #{t}; "]
+      val -> raise(
+        ArgumentError,
+        "set_transaction_isolation_level: #{inspect(val)} has ivalid value, " <>
+        "should be one of [:read_uncommited, :read_commited, :repeatable_read, " <>
+        ":snapshot, :serializable] or nil"
+      )
+    end
+  end
+
+  defp append_opts(conn, opts, :set_allow_snapshot_isolation) do
+    database = Keyword.get(opts, :database)
+    case Keyword.get(opts, :set_allow_snapshot_isolation) do
+      nil  -> conn
+      val when val in [:on, :off] ->
+        val = val |> Atom.to_string() |> String.upcase()
+        conn ++ ["ALTER DATABASE [#{database}] SET ALLOW_SNAPSHOT_ISOLATION #{val}; "]
+      val -> raise(
+        ArgumentError,
+        "set_allow_snapshot_isolation: #{inspect(val)} has ivalid value, " <>
+        "should be either :on, :off, nil"
+      )
+    end
   end
 end

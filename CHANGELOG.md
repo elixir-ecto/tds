@@ -1,3 +1,16 @@
+# v1.0.16
+* Improvements
+  - expsing connection options such as:
+    - set_language - check stored procedure `sp_helplanguage` name column value should be used here
+    - set_datefirst - number in range `1..7`
+    - set_dateformat - atom `:mdy | :dmy | :ymd | :ydm | :myd | :dym`
+    - set_deadlock_priority - one of `:low | :high | :normal | -10..10`
+    - set_lock_timeout - number in milliseconds > 0
+    - set_remote_proc_transactions - atom :on | :off
+    - set_implicit_transactions - atom :on | :off
+    - set_transaction_isolation_level - atom :read_uncommited | :read_commited | :repeatable_read | :snapshot | :serializable
+    - set_allow_snapshot_isolation - atom :on | :off
+
 # v1.0.14
 * Improvents
   - Handle Azure redirecting to new host after env_change token on login #61
