@@ -638,9 +638,12 @@ defmodule Tds.Protocol do
       "SET ANSI_PADDING ON; ",
       "SET ANSI_WARNINGS ON; ",
       "SET CONCAT_NULL_YIELDS_NULL ON; ",
-      "SET TEXTSIZE 2147483647; ",
-      "ALTER DATABASE [#{database}] SET ALLOW_SNAPSHOT_ISOLATION ON; "
+      "SET TEXTSIZE 2147483647; "
     ]
+    |> append_statement_if_true(
+      Keyword.get(opts, :snapshot_isolation),
+      "ALTER DATABASE [#{database}] SET ALLOW_SNAPSHOT_ISOLATION ON; "
+    )
     |> IO.iodata_to_binary()
     |> send_query(state)
   end
@@ -838,5 +841,9 @@ defmodule Tds.Protocol do
 
   defp clean_opts(opts) do
     Keyword.put(opts, :password, :REDACTED)
+  end
+
+  defp append_statement_if_true(statements, condition, statement) do
+    if condition, do: statements ++ [statement], else: statements
   end
 end
