@@ -41,6 +41,10 @@ iex> Tds.query!(pid, "INSERT INTO MyTable (MyColumn) VALUES (@my_value)",
 
 Tds supports SQL instances by passing `instance: "instancename"` to the connection options.
 
+### Other options
+#### `snapshot_isolation: true`
+Set this option to enable snapshot isolation on the database level. Requires connecting with a user with appropriate rights. More info [here](https://docs.microsoft.com/en-us/dotnet/framework/data/adonet/sql/snapshot-isolation-in-sql-server).
+
 ## Data representation
 
 | TDS      | Elixir                                                         |
