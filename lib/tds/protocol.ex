@@ -867,7 +867,7 @@ defmodule Tds.Protocol do
       val when val in 1..7 -> conn ++ ["SET DATEFIRST #{val}; "]
       val -> raise(
         ArgumentError,
-        "set_datefirst: #{val} is out of bounds, valid range is 1..7"
+        "set_datefirst: #{inspect(val)} is out of bounds, valid range is 1..7"
       )
     end
   end
@@ -879,7 +879,7 @@ defmodule Tds.Protocol do
         conn ++ ["SET DATEFORMAT #{val}; "]
       val -> raise(
         ArgumentError,
-        "set_dateformat: #{inspect(val)} has ivalid value, " <>
+        "set_dateformat: #{inspect(val)} is an invalid value, " <>
         "valid values are [:mdy, :dmy, :ymd, :ydm, :myd, :dym]"
       )
     end
@@ -896,7 +896,7 @@ defmodule Tds.Protocol do
         conn ++ ["SET DEADLOCK_PRIORITY #{val}; "]
       val -> raise(
         ArgumentError,
-        "set_deadlock_priority: #{inspect(val)} has ivalid value, " <>
+        "set_deadlock_priority: #{inspect(val)} is an invalid value, " <>
         "valid values are #{inspect([:low, :high, :normal|-10..10])}"
       )
     end
@@ -909,7 +909,7 @@ defmodule Tds.Protocol do
         conn ++ ["SET LOCK_TIMEOUT #{val}; "]
       val -> raise(
         ArgumentError,
-        "set_lock_timeout: #{inspect(val)} has ivalid value, " <>
+        "set_lock_timeout: #{inspect(val)} is an invalid value, " <>
         "must be an positive integer."
       )
     end
@@ -923,7 +923,7 @@ defmodule Tds.Protocol do
         conn ++ ["SET REMOTE_PROC_TRANSACTIONS #{val}; "]
       val -> raise(
         ArgumentError,
-        "set_remote_proc_transactions: #{inspect(val)} has ivalid value, " <>
+        "set_remote_proc_transactions: #{inspect(val)} is an invalid value, " <>
         "should be either :on, :off, nil"
       )
     end
@@ -937,7 +937,7 @@ defmodule Tds.Protocol do
         conn ++ ["SET IMPLICIT_TRANSACTIONS #{val}; "]
       val -> raise(
         ArgumentError,
-        "set_implicit_transactions: #{inspect(val)} has ivalid value, " <>
+        "set_implicit_transactions: #{inspect(val)} is an invalid value, " <>
         "should be either :on, :off, nil"
       )
     end
@@ -952,12 +952,11 @@ defmodule Tds.Protocol do
               |> Atom.to_string()
               |> String.replace("_", " ")
               |> String.upcase()
-        conn ++ ["SET TRANSACTION_ISOLATION_LEVEL #{t}; "]
+        conn ++ ["SET TRANSACTION ISOLATION LEVEL #{t}; "]
       val -> raise(
         ArgumentError,
-        "set_transaction_isolation_level: #{inspect(val)} has ivalid value, " <>
-        "should be one of [:read_uncommited, :read_commited, :repeatable_read, " <>
-        ":snapshot, :serializable] or nil"
+        "set_transaction_isolation_level: #{inspect(val)} is an invalid value, " <>
+        "should be one of #{inspect(@trans_levels)} or nil"
       )
     end
   end
@@ -971,7 +970,7 @@ defmodule Tds.Protocol do
         conn ++ ["ALTER DATABASE [#{database}] SET ALLOW_SNAPSHOT_ISOLATION #{val}; "]
       val -> raise(
         ArgumentError,
-        "set_allow_snapshot_isolation: #{inspect(val)} has ivalid value, " <>
+        "set_allow_snapshot_isolation: #{inspect(val)} is an invalid value, " <>
         "should be either :on, :off, nil"
       )
     end
