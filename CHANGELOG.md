@@ -1,3 +1,7 @@
+# v1.0.17
+* Bugfix
+  - Fix for SET TRANSACTION_ISOLATION_LEVEL issue
+
 # v1.0.16
 * Improvements
   - expsing connection options such as:
