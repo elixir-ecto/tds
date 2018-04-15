@@ -1,4 +1,8 @@
 # v1.0.17
+* bugfix
+  - Fixing missing case when string/varchar length is between 2_000 and 4_000 characters long.
+
+# v1.0.17
 * Bugfix
   - Fix for SET TRANSACTION_ISOLATION_LEVEL issue
 
