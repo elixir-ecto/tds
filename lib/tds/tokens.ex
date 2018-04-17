@@ -248,15 +248,18 @@ defmodule Tds.Tokens do
           old_value::binary(old_value_size, 16),
           rest::binary
         >> = tail
+        new_value = ucs2_to_utf(new_value)
+        old_value = ucs2_to_utf(old_value)
+        if(new_value != old_value) do
+          Logger.debug(fn ->
+            """
+            Database server configured packetsize to #{new_value} where old value
+            was #{old_value}
+            """
+          end)
+        end
 
-        Logger.debug(fn ->
-          """
-          Database server configured packetsize to #{ucs2_to_utf(new_value)} where old value
-          was #{ucs2_to_utf(old_value)}
-          """
-        end)
-
-        {tokens |> Keyword.put(:packetsize, ucs2_to_utf(new_value)), rest}
+        {tokens |> Keyword.put(:packetsize, new_value), rest}
 
       @tds_envtype_begintrans ->
         <<
@@ -436,7 +439,7 @@ defmodule Tds.Tokens do
           @tds_token_loginack,
           _length::little-uint16,
           interface :: size(8),
-          tds_version::binary(4), 
+          tds_version::binary(4),
           prog_name_len::size(8),
           prog_name::binary(prog_name_len, 16),
           major_ver::size(8),
@@ -444,13 +447,13 @@ defmodule Tds.Tokens do
           build_hi::size(8),
           build_low::size(8),
           tail::binary
-        >>, 
+        >>,
         tokens
       ) do
     token = %{
-      t_sql_only: interface == 1, 
-      tds_version: "0x#{Base.encode16(tds_version)}", 
-      program: "#{ucs2_to_utf(prog_name)}", 
+      t_sql_only: interface == 1,
+      tds_version: "0x#{Base.encode16(tds_version)}",
+      program: "#{ucs2_to_utf(prog_name)}",
       version: "#{major_ver}.#{minor_ver}.#{build_hi}.#{build_low}"
     }
     {Keyword.put(tokens, :login_ack, token), tail}
