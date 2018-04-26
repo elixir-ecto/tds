@@ -39,12 +39,9 @@ defmodule Tds.Parameter do
   Prepares parameters by giving them names, define missing type, encoding value
   if necessary.
   """
-  def prepare_params(nil) do
-    []
-  end
-
   def prepare_params(params) do
     params
+    |> List.wrap()
     |> name(0)
     |> Enum.map(&fix_data_type/1)
   end
@@ -138,6 +135,12 @@ defmodule Tds.Parameter do
 
   def fix_data_type(%Tds.Parameter{value: {{_, _, _}, {_, _, _}, _}} = param) do
     %{param | type: :datetimeoffset}
+  end
+
+  def fix_data_type(%Tds.Parameter{type: nil, value: nil}=param) do
+    # should fix ecto has_one, on_change :nulify issue where type is not know when ecto
+    # build query/statement for on_chage callback
+    %{param | type: :binary}
   end
 
   def fix_data_type(%Tds.Parameter{} = raw_param, acc) do
