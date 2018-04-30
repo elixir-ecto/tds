@@ -31,7 +31,7 @@ defmodule Tds.TransactionTest do
       assert {:ok, %Tds.Result{columns: [""], num_rows: 1, rows: ['*']}} =
         Tds.query(conn, "SELECT 42", [])
       :hi
-    end) == {:ok, :hi}
+    end) == :hi
     assert [[42]] = query("SELECT 42", [])
   end
 

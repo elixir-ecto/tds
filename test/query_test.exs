@@ -84,33 +84,13 @@ defmodule QueryTest do
     assert [["string"]] = query("SELECT 'string'", [])
     assert [["ẽstring"]] = query("SELECT N'ẽstring'", [])
     assert [[true, false]] = query("SELECT CAST(1 AS BIT), CAST(0 AS BIT)", [])
-
-    assert [
-             [
-               <<
-                 0x82,
-                 0x25,
-                 0xF2,
-                 0xA9,
-                 0xAF,
-                 0xBA,
-                 0x45,
-                 0xC5,
-                 0xA4,
-                 0x31,
-                 0x86,
-                 0xB9,
-                 0xA8,
-                 0x67,
-                 0xE0,
-                 0xF7
-               >>
-             ]
-           ] =
+    uuid = Tds.Types.UUID.bingenerate()
+    {:ok, uuid_string} = Tds.Types.UUID.load(uuid)
+    assert [[^uuid]] =
              query(
                """
                SELECT
-               CAST('8225F2A9-AFBA-45C5-A431-86B9A867E0F7' AS uniqueidentifier)
+               CAST('#{uuid_string}' AS uniqueidentifier)
                """,
                []
              )

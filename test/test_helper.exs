@@ -86,9 +86,9 @@ GO
 CREATE SCHEMA test;
 """
 
-:dbg.tracer()
-:dbg.p(:all,:c)
-:dbg.tpl(Tds, :query, :x)
+# :dbg.tracer()
+# :dbg.p(:all,:c)
+# :dbg.tpl(Tds, :query, :x)
 
 
 ExUnit.start()
