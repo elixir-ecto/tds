@@ -634,30 +634,23 @@ defmodule Tds.Types do
   end
 
   # UUID
-  def decode_uuid(<<
-        v1::little-signed-32,
-        v2::little-signed-16,
-        v3::little-signed-16,
-        v4::signed-64
-      >>) do
-    <<v1::32, v2::16, v3::16, v4::64>>
-  end
+  def decode_uuid(<<_::128>>=bin), do: bin
 
-  def encode_uuid(<<v1::32, v2::16, v3::16, v4::64>>) do
-    <<
-      v1::little-signed-32,
-      v2::little-signed-16,
-      v3::little-signed-16,
-      v4::signed-64
-    >>
+  def encode_uuid(<<_::64, ?-, _::32, ?-, _::32, ?-, _::32, ?-, _::96>> = string) do
+    raise ArgumentError, "trying to load string UUID as Tds.Types.UUID: #{inspect string}. " <>
+                         "Maybe you wanted to declare :uuid as your database field?"
   end
+  def encode_uuid(<<_::128>>=bin), do: bin
+  def encode_uuid(any), do: raise ArgumentError, "Invalid uuid value #{inspect(any)}"
 
+  # Decimal
   def decode_decimal(precision, scale, <<sign::int8, value::binary>>) do
     size = byte_size(value)
     <<value::little-size(size)-unit(8)>> = value
-    d_ctx = Decimal.get_context()
-    d_ctx = %{d_ctx | precision: precision}
-    Decimal.set_context(d_ctx)
+
+    Decimal.get_context()
+    |> Map.put(:precision, precision)
+    |> Decimal.set_context()
 
     case sign do
       0 -> Decimal.new(-1, value, scale * -1)

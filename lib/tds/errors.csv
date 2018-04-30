@@ -1,0 +1,88 @@
+unique,2627,Violation of UNIQUE KEY constraint '%.*ls'\..*
+unique,2627,Verletzung der UNIQUE KEY-Einschränkung "(\S+?)"\..*
+unique,2627,Violation de la contrainte UNIQUE KEY « (\S+?) »\..*
+unique,2627,制約 '(\S+?)' の UNIQUE KEY 違反.*
+unique,2627,Overtrædelse af UNIQUE KEY-begrænsningen '(\S+?)'\..*
+unique,2627,Infracción de la restricción UNIQUE KEY '(\S+?)'\..*
+unique,2627,Violazione del vincolo UNIQUE KEY '(\S+?)'\..*
+unique,2627,Er is een schending van de UNIQUE KEY-beperking (\S+?) opgetreden\..*
+unique,2627,Violação da restrição UNIQUE KEY '(\S+?)'\..*
+unique,2627,Kohteen UNIQUE KEY rajoituksen (\S+?) rikkomus\..*
+unique,2627,Överträdelse av UNIQUE KEY begränsning (\S+?)\..*
+unique,2627,Porušení omezení UNIQUE KEY (\S+?)\..*
+unique,2627,A következő UNIQUE KEY korlátozás megsértése: „(\S+?)”\..*
+unique,2627,Naruszenie podreguły UNIQUE KEY ograniczenia „(\S+?)”\..*
+unique,2627,Παραβίαση του περιορισμού UNIQUE KEY '(\S+?)'\..*
+unique,2627,Нарушено "(\S+?)" ограничения UNIQUE KEY\..*
+unique,2627,UNIQUE KEY kısıtlaması '(\S+?)' ihlal edildi\..*
+unique,2627,Violação da restrição UNIQUE KEY '(\S+?)'\..*
+unique,2627,違反 UNIQUE KEY 條件約束 '(\S+?)'.*
+unique,2627,UNIQUE KEY 제약 조건 '(\S+?)'을(를) 위반했습니다\..*
+unique,2627,违反了 UNIQUE KEY 约束“(\S+?)”.*
+unique,2627,Brudd på UNIQUE KEY-begrensningen (\S+?)\..*
+unique,2601,Cannot insert duplicate key row in object '.*' with unique index '(\S+?)'\..*
+unique,2601,Eine Zeile mit doppeltem Schlüssel kann in das .*-Objekt mit dem eindeutigen (\S+?)-Index nicht eingefügt werden\..*
+unique,2601,Impossible d'insérer une ligne de clé en double dans l'objet « .* » avec un index unique « (\S+?) »\..*
+unique,2601,一意インデックス '(\S+?)' を含むオブジェクト '.*' には重複するキー行を挿入できません.*
+unique,2601,Dubletnøglerække kan ikke indsættes i objektet '.*' med det entydige indeks '(\S+?)'\..*
+unique,2601,No se puede insertar una fila de clave duplicada en el objeto '.*' con índice único '(\S+?)'\..*
+unique,2601,Non è possibile inserire la riga di chiave duplicata nell'oggetto '.*' con indice univoco '(\S+?)'\..*
+unique,2601,Kan geen rij met dubbele sleutel invoegen in object .* met unieke index (\S+?)\..*
+unique,2601,Não é possível inserir uma linha de chave duplicada no objeto '.*' com o índice exclusivo '(\S+?)'\..*
+unique,2601,Avainrivin kaksoiskappaletta ei voi lisätä objektiin .* käyttäen yksilöivää indeksiä (\S+?)\..*
+unique,2601,Det går inte att infoga rad med dubblettnyckel i objektet .* med det unika indexet (\S+?)\..*
+unique,2601,Do objektu .* s jedinečným indexem (\S+?) nelze vložit duplicitní klíčový řádek\..*
+unique,2601,Nem szúrható be duplikált kulcssor az egyedi „(\S+?)” indexszel rendelkező „.*” objektumba\..*
+unique,2601,Nie można wstawić wiersza zduplikowanego klucza w obiekcie .* o unikatowym indeksie (\S+?)\..*
+unique,2601,Δεν είναι δυνατή η εισαγωγή της σειράς διπλότυπου κλειδιού στο αντικείμενο '.*' με μοναδικό ευρετήριο '(\S+?)'\..*
+unique,2601,Не удается вставить повторяющуюся строку ключа в объект ".*" с уникальным индексом "(\S+?)"\..*
+unique,2601,Benzersiz '(\S+?)' dizinine sahip '.*' nesnesine yinelenen anahtar satırı eklenemiyor\..*
+unique,2601,Não é possível inserir uma linha de chave duplicada no objeto '.*' com índice exclusivo '(\S+?)'\..*
+unique,2601,無法以唯一索引 '(\S+?)' 在物件 '.*' 中插入重複的索引鍵資料列.*
+unique,2601,고유 인덱스 '(\S+?)'을(를) 포함하는 개체 '.*'에 중복 키 행을 삽입할 수 없습니다\. .*
+unique,2601,不能在具有唯一索引“(\S+?)”的对象“.*”中插入重复键的行.*
+unique,2601,Kan ikke sette inn duplisert nøkkelrad i objektet .* med den unike indeksen (\S+?)\. .*
+foreign_key,547,The .* statement conflicted with the (?:FOREIGN KEY|REFERENCE) constraint "(\S+?)"\..*
+foreign_key,547,Die .*-Anweisung steht in Konflikt mit der (?:FOREIGN KEY|REFERENCE)-Einschränkung "(\S+?)"\..*
+foreign_key,547,L'instruction .* est en conflit avec la contrainte (?:FOREIGN KEY|REFERENCE) "(\S+?)"\..*
+foreign_key,547,.* ステートメントは (?:FOREIGN KEY|REFERENCE) 制約 "(\S+?)" と競合しています.*
+foreign_key,547,Sætningen .* kom i konflikt med (?:FOREIGN KEY|REFERENCE)-begrænsningen "(\S+?)"\..*
+foreign_key,547,Instrucción .* en conflicto con la restricción (?:FOREIGN KEY|REFERENCE) '(\S+?)'\..*
+foreign_key,547,L'istruzione .* è in conflitto con il vincolo (?:FOREIGN KEY|REFERENCE) "(\S+?)"\..*
+foreign_key,547,De instructie .* is strijdig met de (?:FOREIGN KEY|REFERENCE)-beperking (\S+?)\..*
+foreign_key,547,Conflito entre a instrução .* e a restrição (?:FOREIGN KEY|REFERENCE) "(\S+?)"\..*
+foreign_key,547,Lauseke .* oli ristiriidassa kohteen (?:FOREIGN KEY|REFERENCE) rajoituksen (\S+?) kanssa\..*
+foreign_key,547,En konflikt inträffade mellan instruktionen .* och (?:FOREIGN KEY|REFERENCE)-begränsningen "(\S+?)"\..*
+foreign_key,547,Příkaz .* způsobil konflikt s omezením (?:FOREIGN KEY|REFERENCE) s názvem (\S+?)\..*
+foreign_key,547,A(z) .* utasítás ütközést eredményezett a(z) „(\S+?)” (?:FOREIGN KEY|REFERENCE) megkötéssel\..*
+foreign_key,547,Instrukcja .* powoduje konflikt z ograniczeniem (?:FOREIGN KEY|REFERENCE) „(\S+?)”\..*
+foreign_key,547,Η πρόταση .* δημιούργησε διένεξη με τον περιορισμό (?:FOREIGN KEY|REFERENCE) "(\S+?)"\..*
+foreign_key,547,Конфликт инструкции .* с ограничением (?:FOREIGN KEY|REFERENCE) "(\S+?)"\..*
+foreign_key,547,.* deyimi (?:FOREIGN KEY|REFERENCE) kısıtlaması "(\S+?)" ile çakıştı\..*
+foreign_key,547,A instrução .* conflitou com a restrição do (?:FOREIGN KEY|REFERENCE) "(\S+?)"\..*
+foreign_key,547,.* 陳述式與 (?:FOREIGN KEY|REFERENCE) 條件約束 "(\S+?)" 衝突.*
+foreign_key,547,.* 문이 (?:FOREIGN KEY|REFERENCE) 제약 조건 "(\S+?)"과(와) 충돌했습니다\..*
+foreign_key,547,.* 语句与 (?:FOREIGN KEY|REFERENCE) 约束"(\S+?)"冲突.*
+foreign_key,547,Setningen .* er i konflikt med begrensningen (\S+?) i (?:FOREIGN KEY|REFERENCE)\..*
+check,547,The .* statement conflicted with the CHECK constraint "(\S+?)"\..*
+check,547,Die .*-Anweisung steht in Konflikt mit der CHECK-Einschränkung "(\S+?)"\..*
+check,547,L'instruction .* est en conflit avec la contrainte CHECK "(\S+?)"\..*
+check,547,.* ステートメントは CHECK 制約 "(\S+?)" と競合しています.*
+check,547,Sætningen .* kom i konflikt med CHECK-begrænsningen "(\S+?)"\..*
+check,547,Instrucción .* en conflicto con la restricción CHECK '(\S+?)'\..*
+check,547,L'istruzione .* è in conflitto con il vincolo CHECK "(\S+?)"\..*
+check,547,De instructie .* is strijdig met de CHECK-beperking (\S+?)\..*
+check,547,Conflito entre a instrução .* e a restrição CHECK "(\S+?)"\..*
+check,547,Lauseke .* oli ristiriidassa kohteen CHECK rajoituksen (\S+?) kanssa\..*
+check,547,En konflikt inträffade mellan instruktionen .* och CHECK-begränsningen "(\S+?)"\..*
+check,547,Příkaz .* způsobil konflikt s omezením CHECK s názvem (\S+?)\..*
+check,547,A(z) .* utasítás ütközést eredményezett a(z) „(\S+?)” CHECK megkötéssel\..*
+check,547,Instrukcja .* powoduje konflikt z ograniczeniem CHECK „(\S+?)”\..*
+check,547,Η πρόταση .* δημιούργησε διένεξη με τον περιορισμό CHECK "(\S+?)"\..*
+check,547,Конфликт инструкции .* с ограничением CHECK "(\S+?)"\..*
+check,547,.* deyimi CHECK kısıtlaması "(\S+?)" ile çakıştı\..*
+check,547,A instrução .* conflitou com a restrição do CHECK "(\S+?)"\..*
+check,547,.* 陳述式與 CHECK 條件約束 "(\S+?)" 衝突.*
+check,547,.* 문이 CHECK 제약 조건 "(\S+?)"과(와) 충돌했습니다.*
+check,547,.* 语句与 CHECK 约束"(\S+?)"冲突.*
+check,547,Setningen .* er i konflikt med begrensningen (\S+?) i CHECK\..*

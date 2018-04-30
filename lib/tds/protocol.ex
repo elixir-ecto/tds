@@ -46,7 +46,6 @@ defmodule Tds.Protocol do
       |> Keyword.put_new(:hostname, System.get_env("MSSQLHOST") || "localhost")
       |> Enum.reject(fn {_k, v} -> is_nil(v) end)
 
-    _timeout = opts[:timeout] || @timeout
     s = %__MODULE__{}
 
     case opts[:instance] do
@@ -151,19 +150,19 @@ defmodule Tds.Protocol do
   end
 
   def handle_first(_query, _cursor, _opts, state) do
-    {:error, UndefinedFunctionError.exception("Not supported yet."), state}
+    {:error, RuntimeError.exception("Not supported yet."), state}
   end
 
   def handle_deallocate(_query, _cursor, _opts, state) do
-    {:error, UndefinedFunctionError.exception("Not supported yet."), state}
+    {:error, RuntimeError.exception("Not supported yet."), state}
   end
 
   def handle_declare(_query, _params, _opts, state) do
-    {:error, UndefinedFunctionError.exception("Not supported yet."), state}
+    {:error, RuntimeError.exception("Not supported yet."), state}
   end
 
   def handle_next(_query, _cursor, _opts, state) do
-    {:error, UndefinedFunctionError.exception("Not supported yet."), state}
+    {:error, RuntimeError.exception("Not supported yet."), state}
   end
 
   # CONNECTION
@@ -369,8 +368,8 @@ defmodule Tds.Protocol do
 
   defp flush(%{sock: sock} = s) do
     receive do
-      {:tcp, ^sock, _data} ->
-        new_data(sock, s)
+      {:tcp, ^sock, data} ->
+        _ = new_data(data, s)
         {:ok, s}
 
       {:tcp_closed, ^sock} ->
@@ -391,11 +390,14 @@ defmodule Tds.Protocol do
     msg = msg_prelogin(params: opts)
 
     case msg_send(msg, s) do
-      :ok ->
+      {:ok, s} ->
         {:noreply, %{s | state: :prelogin}}
 
       {:error, reason, s} ->
         error(%Tds.Error{message: "tcp send: #{reason}"}, s)
+
+      any ->
+        any
     end
   end
 
@@ -758,7 +760,7 @@ defmodule Tds.Protocol do
         raise("Other statuses todo!")
 
       {:error, exception} ->
-        {:disconnect, exception, s}
+        {:disconnect, Tds.Error.exception(exception), s}
     end
   end
 
@@ -837,7 +839,6 @@ defmodule Tds.Protocol do
       "SET QUOTED_IDENTIFIER ON; ",
       "SET CURSOR_CLOSE_ON_COMMIT OFF; ",
       "SET ANSI_NULL_DFLT_ON ON; ",
-      "SET IMPLICIT_TRANSACTIONS OFF; ",
       "SET ANSI_PADDING ON; ",
       "SET ANSI_WARNINGS ON; ",
       "SET CONCAT_NULL_YIELDS_NULL ON; ",
@@ -931,7 +932,7 @@ defmodule Tds.Protocol do
 
   defp append_opts(conn, opts, :set_implicit_transactions) do
     case Keyword.get(opts, :set_implicit_transactions) do
-      nil  -> conn
+      nil  -> conn ++ ["SET IMPLICIT_TRANSACTIONS OFF; "]
       val when val in [:on, :off] ->
         val = val |> Atom.to_string() |> String.upcase()
         conn ++ ["SET IMPLICIT_TRANSACTIONS #{val}; "]

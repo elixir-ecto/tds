@@ -1,3 +1,30 @@
+# v1.1.0
+## Breaking Changes
+UUID/UNIQUEIDENTIFER column is now stored AS IS in database, meaning that compatibility with Ecto.UUID is broken, 
+if you are using `tds_ecto` please use Tds.UUID to encode/decode value to its sting representation. MSSQL has its way of 
+parsing binary UUID value into string representation as following string illustration:
+
+  Ecto.UUID string representation:
+  `f72f71ce-ee18-4db3-74d9-f5662a7691b8`
+
+  MSSQL string representation:
+  `ce712ff7-18ee-b34d-74d9-f5662a7691b8`
+
+To allow other platforms to interprect corectly uuids we had to introduce 
+`Tds.UUID` in `tds_ecto` library and `Tds.Types.UUID` in `tds` both are trying to 
+keep binary storage in valid byte order so each platform can corectly decode it into string.
+So far unique identifiers were and will be returned in resultset as binary, if you need to convert it into 
+formatted string, use `Tds.Types.UUID.parse(<<_::128>>=uuid)` to get that string. 
+It is safe to call this function several times since it will not fail if value is valid uuid string,
+it will just return same value. But if value do not match `<<_::128>>` or 
+`<<a::32, ?-, b::16, ?-, c::16, ?- d::16, ?-, e::48>>` it will throw runtime error. 
+
+If you are using `tds_ecto` :uuid, :binary_id, and Tds.UUID are types you want to use in your models.
+For any of those 3 types auto encode/decode will be performed.
+
+Since there was a bug where in some cases old version of `tds_ecto` library 
+could not detemine if binary is of uuid type, it interpeted such values as raw binary which caused some issues when non elixir apps interpreted that binary in wrong string format. This was ok as long as parsed string values were not shared between elixir and other platforms trough e.g. json messages, but if they did, this could be a problem where other app is not kapable to find object which missparsed uuid value.
+
 # v1.0.17
 * bugfix
   - Fixing missing case when string/varchar length is between 2_000 and 4_000 characters long.

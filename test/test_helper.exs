@@ -35,6 +35,16 @@ defmodule Tds.TestHelper do
     end
   end
 
+  defmacro transaction(fun, opts \\ []) do
+    quote do
+      Tds.transaction(
+        var!(context)[:pid],
+        unquote(fun),
+        unquote(opts)
+      )
+    end
+  end
+
   def sqlcmd(params, sql, args \\ []) do
     args = [
       "-U",
@@ -54,11 +64,32 @@ end
 opts = Application.get_env(:tds, :opts)
 database = opts[:database]
 {"", 0} = Tds.TestHelper.sqlcmd(opts, """
-IF NOT EXISTS(SELECT * FROM sys.databases where name = '#{database}')
+IF EXISTS(SELECT * FROM sys.databases where name = '#{database}')
 BEGIN
-  CREATE DATABASE [#{database}];
+  DROP DATABASE [#{database}];
 END;
+CREATE DATABASE [#{database}];
 """)
+{"Changed database context to 'test'.\n", 0} = Tds.TestHelper.sqlcmd(opts, """
+USE [test];
+
+CREATE TABLE altering ([a] int)
+
+CREATE TABLE [composite1] ([a] int, [b] text);
+CREATE TABLE [composite2] ([a] int, [b] int, [c] int);
+CREATE TABLE [uniques] ([id] int NOT NULL, CONSTRAINT UIX_uniques_id UNIQUE([id]))
+""")
+
+{"Changed database context to 'test'.\n", 0} = Tds.TestHelper.sqlcmd opts, """
+USE test
+GO
+CREATE SCHEMA test;
+"""
+
+:dbg.tracer()
+:dbg.p(:all,:c)
+:dbg.tpl(Tds, :query, :x)
+
 
 ExUnit.start()
 ExUnit.configure(exclude: [:manual])
