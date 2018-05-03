@@ -460,16 +460,9 @@ defmodule Tds.Types do
 
         data_type_code == @tds_data_type_floatn ->
           data = data <> tail
-
-          case length do
-            4 ->
-              <<val::little-float-32, _tail::binary>> = data
+          len = length * 8
+          <<val::little-float-size(len), _::binary>> = data
               val
-
-            8 ->
-              <<val::little-float-64, _tail::binary>> = data
-              val
-          end
 
         data_type_code == @tds_data_type_moneyn ->
           case length do
@@ -937,7 +930,7 @@ defmodule Tds.Types do
 
   def encode_float_type(%Parameter{value: value} = param)
       when is_float(value) do
-    value = value |> Decimal.new()
+    value = Decimal.new(value)
     encode_float_type(%{param | value: value})
   end
 
@@ -971,11 +964,11 @@ defmodule Tds.Types do
 
     value_size = byte_size(value)
 
-    len =
-      cond do
-        precision <= 9 -> 4
-        precision <= 19 -> 8
-      end
+    len = 8 # keep max precision
+      # cond do
+      #   precision <= 9 -> 4
+      #   precision <= 19 -> 8
+      # end
 
     padding = len - value_size
     value_size = value_size + padding
@@ -1243,27 +1236,28 @@ defmodule Tds.Types do
     encode_float_descriptor(param)
   end
 
-  def encode_float_descriptor(%Parameter{value: %Decimal{} = dec}) do
-    d_ctx = Decimal.get_context()
-    d_ctx = %{d_ctx | precision: 38}
-    Decimal.set_context(d_ctx)
+  def encode_float_descriptor(%Parameter{value: %Decimal{} = _dec}) do
+    # to save precisoon as much as possible, below is commented out
+    # d_ctx = Decimal.get_context()
+    # d_ctx = %{d_ctx | precision: 38}
+    # Decimal.set_context(d_ctx)
 
-    value_list =
-      dec
-      |> Decimal.abs()
-      |> Decimal.to_string(:normal)
-      |> String.split(".")
+    # value_list =
+    #   dec
+    #   |> Decimal.abs()
+    #   |> Decimal.to_string(:normal)
+    #   |> String.split(".")
 
-    precision =
-      case value_list do
-        [p, s] ->
-          String.length(p) + String.length(s)
+    # precision =
+    #   case value_list do
+    #     [p, s] ->
+    #       String.length(p) + String.length(s)
 
-        [p] ->
-          String.length(p)
-      end
+    #     [p] ->
+    #       String.length(p)
+    #   end
 
-    "float(#{precision})"
+    "float(53)"
   end
 
   @doc """
@@ -1344,33 +1338,33 @@ defmodule Tds.Types do
   end
 
   def encode_data(@tds_data_type_floatn, value, _) do
-    d_ctx = Decimal.get_context()
-    d_ctx = %{d_ctx | precision: 38}
-    Decimal.set_context(d_ctx)
+    # d_ctx = Decimal.get_context()
+    # d_ctx = %{d_ctx | precision: 38}
+    # Decimal.set_context(d_ctx)
 
-    value_list =
-      value
-      |> Decimal.new()
-      |> Decimal.abs()
-      |> Decimal.to_string(:scientific)
-      |> String.split(".")
+    # value_list =
+    #   value
+    #   |> Decimal.new()
+    #   |> Decimal.abs()
+    #   |> Decimal.to_string(:scientific)
+    #   |> String.split(".")
 
-    precision =
-      case value_list do
-        [p, s] ->
-          String.length(p) + String.length(s)
+    # precision =
+    #   case value_list do
+    #     [p, s] ->
+    #       String.length(p) + String.length(s)
 
-        [p] ->
-          String.length(p)
-      end
+    #     [p] ->
+    #       String.length(p)
+    #   end
 
-    if precision <= 7 + 1 do
-      <<0x04, value::little-float-32>>
-    else
+    # if precision <= 7 + 1 do
+    #   <<0x04, value::little-float-32>>
+    # else
       # up to 15 digits of precision
       # https://docs.microsoft.com/en-us/sql/t-sql/data-types/float-and-real-transact-sql
       <<0x08, value::little-float-64>>
-    end
+    # end
   end
 
   @doc """

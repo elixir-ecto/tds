@@ -1,3 +1,7 @@
+# v1.1.1
+* Bugfix
+  - Float loses precision. Fix will force floats to be encoded as 64bit floats and param type as float(53) in order to keep all bits
+
 # v1.1.0
 ## Breaking Changes
 UUID/UNIQUEIDENTIFER column is now stored AS IS in database, meaning that compatibility with Ecto.UUID is broken, 

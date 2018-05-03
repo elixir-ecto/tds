@@ -1,6 +1,6 @@
 defmodule Tds.TransactionTest do
   use ExUnit.Case, async: true
-  import ExUnit.CaptureLog
+  # import ExUnit.CaptureLog
   import Tds.TestHelper
 
   setup context do

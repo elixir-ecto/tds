@@ -12,7 +12,48 @@ defmodule TdsIssuesTest do
     {:ok, [pid: pid]}
   end
 
-  @tag :manual
+  @tag :float
+  test "float read and write", context do
+    query("DROP TABLE [float_tests]", [])
+    :ok = query("""
+      CREATE TABLE [float_tests] (
+        [id] int NOT NULL identity(1,1) primary key,
+        [float_value] float
+      )
+    """, [])
+    test_vals = [
+      {-1234.1234,          << 78, 209, 145,  92, 126,  72, 147, 192>>},
+      {-1234.0,             <<  0,   0,   0,   0,   0,  72, 147, 192>>},
+      {-1.0,                <<  0,   0,   0,   0,   0,   0, 240, 191>>},
+      {-0.5,                <<  0,   0,   0,   0,   0,   0, 224, 191>>},
+      {-0.3333333333333333, << 85,  85,  85,  85,  85,  85, 213, 191>>},
+      {-0.25,               <<  0,   0,   0,   0,   0,   0, 208, 191>>},
+      {-0.2,                <<154, 153, 153, 153, 153, 153, 201, 191>>},
+      {0.0,                 <<  0,   0,   0,   0,   0,   0,   0,   0>>},
+      {0.0,                 <<  0,   0,   0,   0,   0,   0,   0,   0>>},
+      {0.2,                 <<154, 153, 153, 153, 153, 153, 201,  63>>},
+      {0.25,                <<  0,   0,   0,   0,   0,   0, 208,  63>>},
+      {0.3333333333333333,  << 85,  85,  85,  85,  85,  85, 213,  63>>},
+      {0.5,                 <<  0,   0,   0,   0,   0,   0, 224,  63>>},
+      {1.0,                 <<  0,   0,   0,   0,   0,   0, 240,  63>>},
+      {1234.0,              <<  0,   0,   0,   0,   0,  72, 147,  64>>},
+      {1234.1234,           << 78, 209, 145,  92, 126,  72, 147,  64>>}
+    ]
+    Enum.each(test_vals, fn {val, _} ->
+      :ok = query("INSERT INTO [float_tests] values (#{val})", [])
+    end)
+
+    values = Enum.map(test_vals, fn {val, _} -> [val] end)
+    assert values == query("SELECT float_value FROM [float_tests]", [])
+    Enum.each(values, fn [val] ->
+      assert [[val]] == query("SELECT cast(#{val} as float)", [])
+    end)
+
+
+    query("DROP TABLE [float_tests]", [])
+  end
+
+  @tag :float
   test "issue 33: Sending Float with more than 9 characters should not fail",
        context do
     query("DROP TABLE hades_sealed_cfdis", [])
@@ -49,7 +90,6 @@ defmodule TdsIssuesTest do
       assert :ok == res
 
       assert [[val]] ==
-               inspect(
                  query(
                    """
                    SELECT [total] FROM hades_sealed_cfdis
@@ -57,7 +97,6 @@ defmodule TdsIssuesTest do
                    """,
                    []
                  )
-               )
     end
 
     1..17
@@ -75,12 +114,13 @@ defmodule TdsIssuesTest do
       [id] [int] NOT NULL PRIMARY KEY,
       [name] [nvarchar] (52) NOT NULL
     );
-    INSERT INTO [dbo].[dummy_tbl] 
-    VALUES 
+    INSERT INTO [dbo].[dummy_tbl]
+    VALUES
     (1, 'Elixir'), (2, 'Elm'), (3, 'Sql');
     """
+
     create_procedure = """
-    CREATE PROCEDURE RetrieveDummyValues 
+    CREATE PROCEDURE RetrieveDummyValues
       -- Add the parameters for the stored procedure here
       @filterId INT
     AS
@@ -88,21 +128,26 @@ defmodule TdsIssuesTest do
       -- SET NOCOUNT ON added to prevent extra result sets from
       -- interfering with SELECT statements.
       SET NOCOUNT ON;
-    
+
         -- Insert statements for procedure here
       select id, name from dummy_tbl where id = @filterId
     END
     """
+
     query(create_table, [])
     query(create_procedure, [])
-    assert [[1, "Elixir"]] == query(
-      "exec RetrieveDummyValues @filterId",
-      [
+
+    assert [[1, "Elixir"]] ==
+             query("exec RetrieveDummyValues @filterId", [
         %Tds.Parameter{name: "@filterId", value: 1}
       ])
-    query("""
-    IF EXISTS(SELECT * FROM sys.objects where name ='RetrieveDummyValues' and type ='P') DROP PROCEDURE [dbo].[RetrieveDummyValues];
-    IF OBJECT_ID('[dbo].[dummy_tbl]', 'U') IS NOT NULL DROP TABLE [dbo].[dummy_tbl];
-    """, [])
+
+    query(
+      """
+      IF EXISTS(SELECT * FROM sys.objects where name ='RetrieveDummyValues' and type ='P') DROP PROCEDURE [dbo].[RetrieveDummyValues];
+      IF OBJECT_ID('[dbo].[dummy_tbl]', 'U') IS NOT NULL DROP TABLE [dbo].[dummy_tbl];
+      """,
+      []
+    )
   end
 end
