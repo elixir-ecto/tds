@@ -15,7 +15,7 @@ defmodule Tds.Messages do
   defrecord :msg_ready, [:status]
   defrecord :msg_sql, [:query]
   defrecord :msg_trans, [:trans]
-  defrecord :msg_transmgr, [:command]
+  defrecord :msg_transmgr, [:command, :name]
   defrecord :msg_sql_result, [:columns, :rows, :done]
   defrecord :msg_sql_empty, []
   defrecord :msg_rpc, [:proc, :query, :params]
@@ -325,34 +325,20 @@ defmodule Tds.Messages do
     # pak
   end
 
-  defp encode(msg_transmgr(command: "TM_COMMIT_XACT"), %{trans: trans}) do
-    q_ucs = <<7::little-size(2)-unit(8)>>
-    _req_type = q_ucs
-
-    # Transaction Descriptor header
-    header_type = <<2::little-size(2)-unit(8)>>
-    trans_size = byte_size(trans)
-    padding = 8 - trans_size
-    transaction_descriptor = trans <> <<0::size(padding)-unit(8)>>
-    outstanding_request_count = <<1::little-size(4)-unit(8)>>
-
-    td_header =
-      header_type <> transaction_descriptor <> outstanding_request_count
-
-    td_header_len = byte_size(td_header) + 4
-    td_header = <<td_header_len::little-size(4)-unit(8)>> <> td_header
-
-    headers = td_header
-    total_length = byte_size(headers) + 4
-    all_headers = <<total_length::little-size(32)>> <> headers
-    data = all_headers <> q_ucs <> <<0::size(2)-unit(8)>>
-    encode_packets(0x0E, data, [])
-  end
-
   defp encode(msg_transmgr(command: "TM_BEGIN_XACT"), %{trans: trans}) do
-    q_ucs = <<5::little-size(2)-unit(8)>>
-    _req_type = q_ucs
+    encode_trans(5, trans)
+  end
+  defp encode(msg_transmgr(command: "TM_COMMIT_XACT"), %{trans: trans}) do
+    encode_trans(7, trans)
+  end
+  defp encode(msg_transmgr(command: "TM_ROLLBACK_XACT", name: name), %{trans: trans}) do
+    encode_trans(8, trans, name)
+  end
+  defp encode(msg_transmgr(command: "TM_SAVE_XACT", name: name), %{trans: trans}) do
+    encode_trans(9, trans, name)
+  end
 
+  def encode_trans(request_type, trans, savepoint \\ nil) do
     # Transaction Descriptor header
     header_type = <<2::little-size(2)-unit(8)>>
     trans_size = byte_size(trans)
@@ -369,32 +355,44 @@ defmodule Tds.Messages do
     headers = td_header
     total_length = byte_size(headers) + 4
     all_headers = <<total_length::little-size(32)>> <> headers
-    data = all_headers <> q_ucs <> <<0::size(2)-unit(8)>>
+    request_payload = encode_trans_request(request_type, savepoint)
+    data = all_headers <> <<request_type::little-size(2)-unit(8)>> <> request_payload
     encode_packets(0x0E, data, [])
   end
 
-  defp encode(msg_transmgr(command: "TM_ROLLBACK_XACT"), %{trans: trans}) do
-    q_ucs = <<8::little-size(2)-unit(8)>>
-    _req_type = q_ucs
+  @trans_iso_no_isolation_level 0x00
+  # @trans_iso_read_uncommited 0x01
+  # @trans_iso_read_commited 0x02
+  # @trans_iso_repeatable_read 0x03
+  # @trans_iso_serializable 0x03
+  # @trans_iso_snapshot 0x05
 
-    # Transaction Descriptor header
-    header_type = <<2::little-size(2)-unit(8)>>
-    trans_size = byte_size(trans)
-    padding = 8 - trans_size
-    transaction_descriptor = trans <> <<0::size(padding)-unit(8)>>
-    outstanding_request_count = <<1::little-size(4)-unit(8)>>
+  @trans_iso_level @trans_iso_no_isolation_level
 
-    td_header =
-      header_type <> transaction_descriptor <> outstanding_request_count
 
-    td_header_len = byte_size(td_header) + 4
-    td_header = <<td_header_len::little-size(4)-unit(8)>> <> td_header
+  # begin transaction
+  defp encode_trans_request(5, _) do
+    <<@trans_iso_level::size(1)-unit(8), 0x0::size(1)-unit(8)>>
+  end
+  # commit transaction
+  defp encode_trans_request(7, _) do
+    <<0x00::size(2)-unit(8)>>
+  end
+  # rollback transaction
+  defp encode_trans_request(8, savepoint) when savepoint > 0 do
+    # rollback to save point
 
-    headers = td_header
-    total_length = byte_size(headers) + 4
-    all_headers = <<total_length::little-size(32)>> <> headers
-    data = all_headers <> q_ucs <> <<0::size(2)-unit(8)>>
-    encode_packets(0x0E, data, [])
+    <<
+    2::unsigned-8,  savepoint::little-size(2)-unit(8),
+    0x0::size(1)-unit(8)
+    >>
+  end
+  defp encode_trans_request(8, _) do
+    <<0x00::size(2)-unit(8)>>
+  end
+  # save trans [name]
+  defp encode_trans_request(9, savepoint) when is_number(savepoint) do
+    <<2::unsigned-8,  savepoint::little-size(2)-unit(8)>>
   end
 
   defp encode_rpc(:sp_executesql, params) do

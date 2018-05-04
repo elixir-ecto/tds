@@ -1,6 +1,6 @@
 defmodule Tds.TransactionTest do
   use ExUnit.Case, async: true
-  # import ExUnit.CaptureLog
+  import ExUnit.CaptureLog
   import Tds.TestHelper
 
   setup context do
@@ -31,7 +31,7 @@ defmodule Tds.TransactionTest do
       assert {:ok, %Tds.Result{columns: [""], num_rows: 1, rows: ['*']}} =
         Tds.query(conn, "SELECT 42", [])
       :hi
-    end) == :hi
+    end) == {:ok, :hi}
     assert [[42]] = query("SELECT 42", [])
   end
 
@@ -66,6 +66,7 @@ defmodule Tds.TransactionTest do
   #   end
   # end
 
+  # @tag :transaction_disconnec
   # @tag mode: :transaction
   # test "idle status during transaction returns error and disconnects", context do
   #   Process.flag(:trap_exit, true)

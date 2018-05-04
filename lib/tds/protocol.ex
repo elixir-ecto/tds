@@ -32,7 +32,7 @@ defmodule Tds.Protocol do
             result: nil,
             query: nil,
             transaction: nil,
-            env: %{trans: <<0x00>>}
+            env: %{trans: <<0x00>>, savepoint: 0}
 
   def connect(opts) do
     opts =
@@ -131,22 +131,49 @@ defmodule Tds.Protocol do
     send_close(query, params, s)
   end
 
-  def handle_begin(_opts, %{sock: _sock} = s) do
-    send_transaction("TM_BEGIN_XACT", %{s | transaction: :started})
-  end
+  def handle_begin(opts, %{sock: _, env: env}=s) do
+    case Keyword.get(opts, :mode, :transaction) do
+      :transaction ->
+        send_transaction("TM_BEGIN_XACT", nil, %{s|transaction: :started})
 
-  def handle_commit(_opts, %{transaction: status} = s) do
-    case status do
-      :failed ->
-        handle_rollback([], s)
-
-      _ ->
-        send_transaction("TM_COMMIT_XACT", %{s | transaction: :successful})
+      :savepoint ->
+        savepoint = env.savepoint + 1
+        env = %{env| savepoint: savepoint}
+        s = %{s | transaction: :started, env: env}
+        send_transaction("TM_SAVE_XACT", savepoint, s)
     end
   end
 
-  def handle_rollback(_opts, %{sock: _sock} = s) do
-    send_transaction("TM_ROLLBACK_XACT", %{s | transaction: :failed})
+  def handle_commit(opts, %{transaction: transaction} = s) do
+    case Keyword.get(opts, :mode, :transaction) do
+      :transaction when transaction == :failed ->
+        handle_rollback(opts, s)
+
+      :transaction ->
+        send_transaction("TM_COMMIT_XACT", nil, %{s | transaction: :successful})
+
+      :savepoint when transaction == :failed ->
+        handle_rollback(opts, s)
+
+      :savepoint ->
+        # we don't need to call release savepoint as in postgresql for instance,
+        # when transaction DIDN'T failed. SQL will wait for
+        {:ok, %Tds.Result{rows: [], num_rows: 0}, s}
+
+    end
+  end
+
+  def handle_rollback(opts, %{sock: _sock, env: env} = s) do
+    case Keyword.get(opts, :mode, :transaction) do
+      :transaction ->
+        env = %{env| savepoint: 0}
+        s = %{s | transaction: :failed, env: env}
+        send_transaction("TM_ROLLBACK_XACT", 0, s)
+
+      :savepoint ->
+        send_transaction("TM_ROLLBACK_XACT", env.savepoint, %{s | transaction: :failed})
+
+    end
   end
 
   def handle_first(_query, _cursor, _opts, state) do
@@ -454,8 +481,8 @@ defmodule Tds.Protocol do
     end
   end
 
-  def send_transaction(command, s) do
-    msg = msg_transmgr(command: command)
+  def send_transaction(command, name, s) do
+    msg = msg_transmgr(command: command, name: name)
 
     case msg_send(msg, s) do
       {:ok, %{result: result} = s} ->
@@ -667,10 +694,10 @@ defmodule Tds.Protocol do
     {:ok, %{s | state: :executing, result: result}}
   end
 
-  def message(:executing, msg_trans(trans: trans), %{} = s) do
+  def message(:executing, msg_trans(trans: trans), %{env: env} = s) do
     result = %Tds.Result{columns: [], rows: [], num_rows: 0}
 
-    {:ok, %{s | state: :ready, result: result, env: %{trans: trans}}}
+    {:ok, %{s | state: :ready, result: result, env: %{trans: trans, savepoint: env.savepoint}}}
   end
 
   def message(:executing, msg_prepared(params: params), %{} = s) do
@@ -756,8 +783,20 @@ defmodule Tds.Protocol do
         (buffer <> header)
         |> package_recv(s, length - 8)
 
-      {:ok, _} ->
-        raise("Other statuses todo!")
+      {:ok, <<
+        _type::int8,
+        status::int8,
+        length::int16,
+        _spid::int16,
+        _package::int8,
+        _window::int8
+      >> = header } ->
+        (buffer <> header)
+        |> package_recv(s, length - 8)
+        raise "Status #{inspect(status)} of tds package is not yer supported!"
+
+      {:error, :closed} ->
+        raise DBConnection.ConnectionError, "connection is closed"
 
       {:error, exception} ->
         {:disconnect, Tds.Error.exception(exception), s}

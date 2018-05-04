@@ -29,7 +29,7 @@ defmodule Tds do
 
   def prepare(pid, statement, opts \\ []) do
     query = %Query{statement: statement}
-    
+
     case DBConnection.prepare(pid, query, opts) do
       {:ok, query} -> {:ok, query}
       {:error, err} -> {:error, err}
@@ -74,12 +74,10 @@ defmodule Tds do
   end
 
   def transaction(pid, fun, opts \\ []) do
-    case DBConnection.transaction(pid, fun, opts) do
-      {:ok, result} -> result
-      err -> err
-    end
+    DBConnection.transaction(pid, fun, opts)
   end
 
+  @spec rollback(DBConnection.t, reason :: any) :: no_return
   defdelegate rollback(conn, any), to: DBConnection
 
   def child_spec(opts) do
