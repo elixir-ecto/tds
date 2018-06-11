@@ -138,6 +138,10 @@ defmodule Tds.Messages do
   end
 
   defp encode(msg_login(params: params), _env) do
+    {:ok, hostname} = :inet.gethostname()
+    hostname = String.Chars.to_string(hostname)
+    app_name = Node.self() |> Atom.to_string()
+
     tds_version = <<0x04, 0x00, 0x00, 0x74>>
     message_size = <<@tds_pack_size::little-size(4)-unit(8)>>
     client_prog_ver = <<0x04, 0x00, 0x00, 0x07>>
@@ -168,6 +172,8 @@ defmodule Tds.Messages do
     username_ucs = to_little_ucs2(username)
     password_ucs = to_little_ucs2(password)
     servername_ucs = to_little_ucs2(servername)
+    app_name_ucs = to_little_ucs2(app_name)
+    hostname_ucs = to_little_ucs2(hostname)
 
     password_ucs_xor = encode_tdspassword(password_ucs)
     # Before submitting a password from the client to the server,
@@ -181,11 +187,18 @@ defmodule Tds.Messages do
     database_ucs = to_little_ucs2(database)
 
     login_data =
-      username_ucs <> password_ucs_xor <> servername_ucs <> clt_int_name_ucs <> database_ucs
+      hostname_ucs <>
+      username_ucs <>
+      password_ucs_xor <>
+      app_name_ucs <>
+      servername_ucs <>
+      clt_int_name_ucs <>
+      database_ucs
 
     curr_offset = offset_start + 58
     ibHostName = <<curr_offset::little-size(16)>>
-    cchHostName = <<0::size(16)>>
+    cchHostName = <<String.length(hostname)::little-size(16)>>
+    curr_offset = curr_offset + byte_size(hostname_ucs)
 
     ibUserName = <<curr_offset::little-size(16)>>
     cchUserName = <<String.length(username)::little-size(16)>>
@@ -195,8 +208,9 @@ defmodule Tds.Messages do
     cchPassword = <<String.length(password)::little-size(16)>>
     curr_offset = curr_offset + byte_size(password_ucs)
 
-    ibAppName = <<0::size(16)>>
-    cchAppName = <<0::size(16)>>
+    ibAppName = <<curr_offset::little-size(16)>>
+    cchAppName = <<String.length(app_name)::little-size(16)>>
+    curr_offset = curr_offset + byte_size(app_name_ucs)
 
     ibServerName = <<curr_offset::little-size(16)>>
     cchServerName = <<String.length(servername)::little-size(16)>>
