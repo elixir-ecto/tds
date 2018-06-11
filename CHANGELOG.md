@@ -1,3 +1,7 @@
+# v1.1.3
+* Improvements
+  - Improving traceability. Adding hostname and application/program name to login7 tds package so one could easier trace rpc calls in SQL Server. Program name is equal to FQ erlang node name, while hostname is what ever :inet.gethostname() returns. May fail to connect if `:inet` is unable to read hostname.
+
 # v1.1.2
 * Bugfix
   - Float loses precision. Fix will force floats to be encoded as 64bit floats and param type as float(53) in order to keep all bits
