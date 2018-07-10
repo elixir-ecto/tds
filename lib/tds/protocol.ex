@@ -16,7 +16,13 @@ defmodule Tds.Protocol do
   @timeout 5000
   @max_packet 4 * 1024
   @sock_opts [packet: :raw, mode: :binary, active: false, recbuf: 4096]
-  @trans_levels [:read_uncommited, :read_commited, :repeatable_read, :snapshot, :serializable]
+  @trans_levels [
+    :read_uncommited,
+    :read_commited,
+    :repeatable_read,
+    :snapshot,
+    :serializable
+  ]
 
   defstruct sock: nil,
             usock: nil,
@@ -104,23 +110,34 @@ defmodule Tds.Protocol do
   end
 
   def handle_execute(
-      %Query{statement: statement} = query,
-      params,
-      opts,
-      %{sock: _sock} = s
-    ) do
+        %Query{handle: handle, statement: statement} = query,
+        params,
+        opts,
+        %{sock: _sock} = s
+      ) do
     params = opts[:parameters] || params
 
-    if params != [] do
-      send_param_query(query, params, s)
-    else
-      send_query(statement, s)
+    try do
+      if params != [] do
+        send_param_query(query, params, s)
+      else
+        send_query(statement, s)
+      end
+    rescue
+      exception ->
+        stacktrace = System.stacktrace()
+        reraise exception, stacktrace
+    after
+      unless is_nil(handle) do
+        handle_close(query, opts, s)
+      end
     end
   end
 
   def handle_prepare(%{statement: statement}, opts, %{sock: _sock} = s) do
-    params = opts[:parameters]
-             |> Parameter.prepared_params()
+    params =
+      opts[:parameters]
+      |> Parameter.prepared_params()
 
     send_prepare(statement, params, s)
   end
@@ -131,14 +148,14 @@ defmodule Tds.Protocol do
     send_close(query, params, s)
   end
 
-  def handle_begin(opts, %{sock: _, env: env}=s) do
+  def handle_begin(opts, %{sock: _, env: env} = s) do
     case Keyword.get(opts, :mode, :transaction) do
       :transaction ->
-        send_transaction("TM_BEGIN_XACT", nil, %{s|transaction: :started})
+        send_transaction("TM_BEGIN_XACT", nil, %{s | transaction: :started})
 
       :savepoint ->
         savepoint = env.savepoint + 1
-        env = %{env| savepoint: savepoint}
+        env = %{env | savepoint: savepoint}
         s = %{s | transaction: :started, env: env}
         send_transaction("TM_SAVE_XACT", savepoint, s)
     end
@@ -159,20 +176,21 @@ defmodule Tds.Protocol do
         # we don't need to call release savepoint as in postgresql for instance,
         # when transaction DIDN'T failed. SQL will wait for
         {:ok, %Tds.Result{rows: [], num_rows: 0}, s}
-
     end
   end
 
   def handle_rollback(opts, %{sock: _sock, env: env} = s) do
     case Keyword.get(opts, :mode, :transaction) do
       :transaction ->
-        env = %{env| savepoint: 0}
+        env = %{env | savepoint: 0}
         s = %{s | transaction: :failed, env: env}
         send_transaction("TM_ROLLBACK_XACT", 0, s)
 
       :savepoint ->
-        send_transaction("TM_ROLLBACK_XACT", env.savepoint, %{s | transaction: :failed})
-
+        send_transaction("TM_ROLLBACK_XACT", env.savepoint, %{
+          s
+          | transaction: :failed
+        })
     end
   end
 
@@ -504,40 +522,44 @@ defmodule Tds.Protocol do
   # end
 
   def send_param_query(
-    %Query{handle: handle, statement: statement} = _,
-    params,
-    %{transaction: :started} = s
-  ) do
-    msg = case handle do
-      nil ->
-        p = [
-          %Parameter{
-            name: "@statement",
-            type: :string,
-            direction: :input,
-            value: statement
-          },
-          %Parameter{
-            name: "@params",
-            type: :string,
-            direction: :input,
-            value: Parameter.prepared_params(params)
-          }
-          | Parameter.prepare_params(params)
-        ]
-        msg_rpc(proc: :sp_executesql, params: p)
-      handle ->
-        p = [
-          %Parameter{
-            name: "@handle",
-            type: :integer,
-            direction: :input,
-            value: handle
-          }
-          | Parameter.prepare_params(params)
-        ]
-        msg_rpc(proc: :sp_execute, params: p)
-    end
+        %Query{handle: handle, statement: statement} = _,
+        params,
+        %{transaction: :started} = s
+      ) do
+    msg =
+      case handle do
+        nil ->
+          p = [
+            %Parameter{
+              name: "@statement",
+              type: :string,
+              direction: :input,
+              value: statement
+            },
+            %Parameter{
+              name: "@params",
+              type: :string,
+              direction: :input,
+              value: Parameter.prepared_params(params)
+            }
+            | Parameter.prepare_params(params)
+          ]
+
+          msg_rpc(proc: :sp_executesql, params: p)
+
+        handle ->
+          p = [
+            %Parameter{
+              name: "@handle",
+              type: :integer,
+              direction: :input,
+              value: handle
+            }
+            | Parameter.prepare_params(params)
+          ]
+
+          msg_rpc(proc: :sp_execute, params: p)
+      end
 
     case msg_send(msg, s) do
       {:ok, %{result: result} = s} ->
@@ -552,40 +574,44 @@ defmodule Tds.Protocol do
   end
 
   def send_param_query(
-    %Query{handle: handle, statement: statement} = _,
-    params,
-    s
-  ) do
-    msg = case handle do
-      nil ->
-        p = [
-          %Parameter{
-            name: "@statement",
-            type: :string,
-            direction: :input,
-            value: statement
-          },
-          %Parameter{
-            name: "@params",
-            type: :string,
-            direction: :input,
-            value: Parameter.prepared_params(params)
-          }
-          | Parameter.prepare_params(params)
-        ]
-        msg_rpc(proc: :sp_executesql, params: p)
-      handle ->
-        p = [
-          %Parameter{
-            name: "@handle",
-            type: :integer,
-            direction: :input,
-            value: handle
-          }
-          | Parameter.prepare_params(params)
-        ]
-        msg_rpc(proc: :sp_execute, params: p)
-    end
+        %Query{handle: handle, statement: statement} = _,
+        params,
+        s
+      ) do
+    msg =
+      case handle do
+        nil ->
+          p = [
+            %Parameter{
+              name: "@statement",
+              type: :string,
+              direction: :input,
+              value: statement
+            },
+            %Parameter{
+              name: "@params",
+              type: :string,
+              direction: :input,
+              value: Parameter.prepared_params(params)
+            }
+            | Parameter.prepare_params(params)
+          ]
+
+          msg_rpc(proc: :sp_executesql, params: p)
+
+        handle ->
+          p = [
+            %Parameter{
+              name: "@handle",
+              type: :integer,
+              direction: :input,
+              value: handle
+            }
+            | Parameter.prepare_params(params)
+          ]
+
+          msg_rpc(proc: :sp_execute, params: p)
+      end
 
     case msg_send(msg, s) do
       {:ok, %{result: result} = s} ->
@@ -645,19 +671,26 @@ defmodule Tds.Protocol do
   # def message(:prelogin, _state) do
   # end
 
-  def message(:login, msg_login_ack(redirect: true, tokens: tokens), %{opts: opts} = s) do
+  def message(
+        :login,
+        msg_login_ack(redirect: true, tokens: tokens),
+        %{opts: opts} = s
+      ) do
     # we got an ENVCHANGE:redirection token, we need to disconnect and start over with new server
     disconnect("redirected", s)
     %{hostname: host, port: port} = tokens[:env_redirect]
+
     new_opts =
       opts
       |> Keyword.put(:hostname, host)
       |> Keyword.put(:port, port)
+
     connect(new_opts)
   end
 
   def message(:login, msg_login_ack(), %{opts: opts} = s) do
     state = %{s | opts: clean_opts(opts)}
+
     opts
     |> conn_opts()
     |> IO.iodata_to_binary()
@@ -697,7 +730,13 @@ defmodule Tds.Protocol do
   def message(:executing, msg_trans(trans: trans), %{env: env} = s) do
     result = %Tds.Result{columns: [], rows: [], num_rows: 0}
 
-    {:ok, %{s | state: :ready, result: result, env: %{trans: trans, savepoint: env.savepoint}}}
+    {:ok,
+     %{
+       s
+       | state: :ready,
+         result: result,
+         env: %{trans: trans, savepoint: env.savepoint}
+     }}
   end
 
   def message(:executing, msg_prepared(params: params), %{} = s) do
@@ -717,9 +756,9 @@ defmodule Tds.Protocol do
 
   ## ATTN Ack
   def message(:attn, _, %{} = s) do
-   result = %Tds.Result{columns: [], rows: [], num_rows: 0}
+    result = %Tds.Result{columns: [], rows: [], num_rows: 0}
 
-   { :ok, %{s | statement: "", state: :ready, result: result} }
+    {:ok, %{s | statement: "", state: :ready, result: result}}
   end
 
   # defp simple_send(msg, %{sock: {mod, sock}, env: env}) do
@@ -783,16 +822,18 @@ defmodule Tds.Protocol do
         (buffer <> header)
         |> package_recv(s, length - 8)
 
-      {:ok, <<
-        _type::int8,
-        status::int8,
-        length::int16,
-        _spid::int16,
-        _package::int8,
-        _window::int8
-      >> = header } ->
+      {:ok,
+       <<
+         _type::int8,
+         status::int8,
+         length::int16,
+         _spid::int16,
+         _package::int8,
+         _window::int8
+       >> = header} ->
         (buffer <> header)
         |> package_recv(s, length - 8)
+
         raise "Status #{inspect(status)} of tds package is not yer supported!"
 
       {:error, :closed} ->
@@ -896,123 +937,162 @@ defmodule Tds.Protocol do
 
   defp append_opts(conn, opts, :set_language) do
     case Keyword.get(opts, :set_language) do
-      nil  -> conn
+      nil -> conn
       val -> conn ++ ["SET LANGUAGE #{val}; "]
     end
   end
 
   defp append_opts(conn, opts, :set_datefirst) do
     case Keyword.get(opts, :set_datefirst) do
-      nil  -> conn
-      val when val in 1..7 -> conn ++ ["SET DATEFIRST #{val}; "]
-      val -> raise(
-        ArgumentError,
-        "set_datefirst: #{inspect(val)} is out of bounds, valid range is 1..7"
-      )
+      nil ->
+        conn
+
+      val when val in 1..7 ->
+        conn ++ ["SET DATEFIRST #{val}; "]
+
+      val ->
+        raise(
+          ArgumentError,
+          "set_datefirst: #{inspect(val)} is out of bounds, valid range is 1..7"
+        )
     end
   end
 
   defp append_opts(conn, opts, :set_dateformat) do
     case Keyword.get(opts, :set_dateformat) do
-      nil  -> conn
+      nil ->
+        conn
+
       val when val in [:mdy, :dmy, :ymd, :ydm, :myd, :dym] ->
         conn ++ ["SET DATEFORMAT #{val}; "]
-      val -> raise(
-        ArgumentError,
-        "set_dateformat: #{inspect(val)} is an invalid value, " <>
-        "valid values are [:mdy, :dmy, :ymd, :ydm, :myd, :dym]"
-      )
+
+      val ->
+        raise(
+          ArgumentError,
+          "set_dateformat: #{inspect(val)} is an invalid value, " <>
+            "valid values are [:mdy, :dmy, :ymd, :ydm, :myd, :dym]"
+        )
     end
   end
 
-
   defp append_opts(conn, opts, :set_deadlock_priority) do
     case Keyword.get(opts, :set_deadlock_priority) do
-      nil  -> conn
+      nil ->
+        conn
+
       val when val in [:low, :high, :normal] ->
         conn ++ ["SET DEADLOCK_PRIORITY #{val}; "]
-      nil  -> conn
+
+      nil ->
+        conn
+
       val when val in -10..10 ->
         conn ++ ["SET DEADLOCK_PRIORITY #{val}; "]
-      val -> raise(
-        ArgumentError,
-        "set_deadlock_priority: #{inspect(val)} is an invalid value, " <>
-        "valid values are #{inspect([:low, :high, :normal|-10..10])}"
-      )
+
+      val ->
+        raise(
+          ArgumentError,
+          "set_deadlock_priority: #{inspect(val)} is an invalid value, " <>
+            "valid values are #{inspect([:low, :high, :normal | -10..10])}"
+        )
     end
   end
 
   defp append_opts(conn, opts, :set_lock_timeout) do
     case Keyword.get(opts, :set_lock_timeout) do
-      nil  -> conn
+      nil ->
+        conn
+
       val when val > 0 ->
         conn ++ ["SET LOCK_TIMEOUT #{val}; "]
-      val -> raise(
-        ArgumentError,
-        "set_lock_timeout: #{inspect(val)} is an invalid value, " <>
-        "must be an positive integer."
-      )
+
+      val ->
+        raise(
+          ArgumentError,
+          "set_lock_timeout: #{inspect(val)} is an invalid value, " <>
+            "must be an positive integer."
+        )
     end
   end
 
   defp append_opts(conn, opts, :set_remote_proc_transactions) do
     case Keyword.get(opts, :set_remote_proc_transactions) do
-      nil  -> conn
+      nil ->
+        conn
+
       val when val in [:on, :off] ->
         val = val |> Atom.to_string() |> String.upcase()
         conn ++ ["SET REMOTE_PROC_TRANSACTIONS #{val}; "]
-      val -> raise(
-        ArgumentError,
-        "set_remote_proc_transactions: #{inspect(val)} is an invalid value, " <>
-        "should be either :on, :off, nil"
-      )
+
+      val ->
+        raise(
+          ArgumentError,
+          "set_remote_proc_transactions: #{inspect(val)} is an invalid value, " <>
+            "should be either :on, :off, nil"
+        )
     end
   end
 
   defp append_opts(conn, opts, :set_implicit_transactions) do
     case Keyword.get(opts, :set_implicit_transactions) do
-      nil  -> conn ++ ["SET IMPLICIT_TRANSACTIONS OFF; "]
+      nil ->
+        conn ++ ["SET IMPLICIT_TRANSACTIONS OFF; "]
+
       val when val in [:on, :off] ->
         val = val |> Atom.to_string() |> String.upcase()
         conn ++ ["SET IMPLICIT_TRANSACTIONS #{val}; "]
-      val -> raise(
-        ArgumentError,
-        "set_implicit_transactions: #{inspect(val)} is an invalid value, " <>
-        "should be either :on, :off, nil"
-      )
+
+      val ->
+        raise(
+          ArgumentError,
+          "set_implicit_transactions: #{inspect(val)} is an invalid value, " <>
+            "should be either :on, :off, nil"
+        )
     end
   end
 
-
   defp append_opts(conn, opts, :set_transaction_isolation_level) do
     case Keyword.get(opts, :set_transaction_isolation_level) do
-      nil  -> conn
+      nil ->
+        conn
+
       val when val in @trans_levels ->
-        t = val
-              |> Atom.to_string()
-              |> String.replace("_", " ")
-              |> String.upcase()
+        t =
+          val
+          |> Atom.to_string()
+          |> String.replace("_", " ")
+          |> String.upcase()
+
         conn ++ ["SET TRANSACTION ISOLATION LEVEL #{t}; "]
-      val -> raise(
-        ArgumentError,
-        "set_transaction_isolation_level: #{inspect(val)} is an invalid value, " <>
-        "should be one of #{inspect(@trans_levels)} or nil"
-      )
+
+      val ->
+        raise(
+          ArgumentError,
+          "set_transaction_isolation_level: #{inspect(val)} is an invalid value, " <>
+            "should be one of #{inspect(@trans_levels)} or nil"
+        )
     end
   end
 
   defp append_opts(conn, opts, :set_allow_snapshot_isolation) do
     database = Keyword.get(opts, :database)
+
     case Keyword.get(opts, :set_allow_snapshot_isolation) do
-      nil  -> conn
+      nil ->
+        conn
+
       val when val in [:on, :off] ->
         val = val |> Atom.to_string() |> String.upcase()
-        conn ++ ["ALTER DATABASE [#{database}] SET ALLOW_SNAPSHOT_ISOLATION #{val}; "]
-      val -> raise(
-        ArgumentError,
-        "set_allow_snapshot_isolation: #{inspect(val)} is an invalid value, " <>
-        "should be either :on, :off, nil"
-      )
+
+        conn ++
+          ["ALTER DATABASE [#{database}] SET ALLOW_SNAPSHOT_ISOLATION #{val}; "]
+
+      val ->
+        raise(
+          ArgumentError,
+          "set_allow_snapshot_isolation: #{inspect(val)} is an invalid value, " <>
+            "should be either :on, :off, nil"
+        )
     end
   end
 end

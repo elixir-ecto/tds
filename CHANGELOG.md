@@ -1,3 +1,7 @@
+# v1.1.4
+* Improvements
+  - Adding `sp_unprepare` after SQL statement is executed.
+
 # v1.1.3
 * Improvements
   - Improving traceability. Adding hostname and application/program name to login7 tds package so one could easier trace rpc calls in SQL Server. Program name is equal to FQ erlang node name, while hostname is what ever :inet.gethostname() returns. May fail to connect if `:inet` is unable to read hostname.
