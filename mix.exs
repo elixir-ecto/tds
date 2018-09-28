@@ -36,7 +36,7 @@ defmodule Tds.Mixfile do
     [
       {:credo, "~> 0.8", only: [:dev, :test], runtime: false},
       {:decimal, "~> 1.4"},
-      {:db_connection, "~> 1.1"},
+      {:db_connection, github: "elixir-ecto/db_connection", branch: :master},
       {:dialyxir, "~> 0.5", only: [:dev], runtime: false},
       {:excoveralls, "~> 0.7", only: :test},
       {:ex_doc, "~> 0.18", only: :dev}

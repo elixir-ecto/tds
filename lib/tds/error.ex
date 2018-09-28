@@ -22,7 +22,7 @@ defmodule Tds.Error do
 
   defexception [:message, :mssql]
 
-  def exception(message) when is_binary(message) do
+  def exception(message) when is_binary(message) or is_atom(message) do
     %__MODULE__{message: message}
   end
 
