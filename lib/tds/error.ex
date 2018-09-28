@@ -49,3 +49,11 @@ defmodule Tds.Error do
     message
   end
 end
+
+defmodule Tds.ConfigError do
+  defexception message: "Tds configuration error."
+
+  def exception(message) when is_binary(message) or is_atom(message) do
+    %__MODULE__{message: message}
+  end
+end

@@ -158,6 +158,7 @@ defmodule Tds.Protocol do
         %{sock: _sock} = s
       ) do
     params = opts[:parameters] || params
+
     try do
       if params != [] do
         send_param_query(query, params, s)
@@ -170,7 +171,9 @@ defmodule Tds.Protocol do
     else
       {:ok, result, state} ->
         {:ok, query, result, state}
-      other -> other
+
+      other ->
+        other
     after
       unless is_nil(handle) do
         handle_close(query, opts, s)
@@ -282,9 +285,28 @@ defmodule Tds.Protocol do
   @spec handle_status(opts :: Keyword.t(), state :: Protocol.t()) ::
           {:idle | :transaction | :error, new_state :: Protocol.t()}
           | {:disconnect, Exception.t(), new_state :: Protocol.t()}
-  def handle_status(_opts, _state) do
-    _query = "SELECT @@trancount AS tran_count"
-    raise "Not yet implemented"
+  def handle_status(_opts, %{transaction: status} = state) do
+    case status do
+      nil ->
+        {:idle, state}
+
+      :successful ->
+        {:idle, state}
+
+      :started ->
+        {:transaction, state}
+
+      :failed ->
+        {:error, state}
+
+      other ->
+        exception =
+          Tds.Error.exception(
+            "Transaction is aborted, due transaction status #{other}"
+          )
+
+        {:disconnect, exception, state}
+    end
   end
 
   @impl DBConnection
@@ -421,10 +443,11 @@ defmodule Tds.Protocol do
     end
   end
 
-  @impl true
-  def handle_info({:udp_error, _, :econnreset}, _s) do
-    raise "Tds encountered an error while connecting to the Sql Server " <>
-            "Browser: econnreset"
+  def handle_info({:udp_error, _, :econnreset}, s) do
+    msg =
+      "Tds encountered an error while connecting to the Sql Server " <>
+        "Browser: econnreset"
+    {:stop, Tds.Error.exception(msg), s}
   end
 
   def handle_info(
@@ -440,11 +463,11 @@ defmodule Tds.Protocol do
   end
 
   def handle_info({tag, _}, s) when tag in [:tcp_closed, :ssl_closed] do
-    error(%Tds.Error{message: "tcp closed"}, s)
+    {:stop, Tds.Error.exception("tcp closed"), s}
   end
 
   def handle_info({tag, _, reason}, s) when tag in [:tcp_error, :ssl_error] do
-    error(%Tds.Error{message: "tcp error: #{reason}"}, s)
+    {:stop, Tds.Error.exception("tcp error: #{reason}"), s}
   end
 
   def handle_info(msg, s) do
@@ -880,14 +903,6 @@ defmodule Tds.Protocol do
     {:ok, %{s | statement: "", state: :ready, result: result}}
   end
 
-  # defp simple_send(msg, %{sock: {mod, sock}, env: env}) do
-  #  paks = encode_msg(msg, env)
-
-  #  Enum.each(paks, fn(pak) ->
-  #    mod.send(sock, pak)
-  #  end)
-  # end
-
   defp msg_send(msg, %{sock: {mod, sock}, env: env} = s) do
     :inet.setopts(sock, active: false)
 
@@ -907,69 +922,47 @@ defmodule Tds.Protocol do
   end
 
   defp msg_recv(buffer, %{sock: {mod, sock}} = s) do
-    # IO.puts("buffer: #{inspect buffer}")
     case mod.recv(sock, 8) do
       # there is more tds packages after this one
-      {
-        :ok,
-        <<
-          _type::int8,
-          0x00,
-          length::int16,
-          _spid::int16,
-          _package::int8,
-          _window::int8
-        >> = header
-      } ->
+      {:ok,
+       <<_type::int8, 0x00, length::int16, _spid::int16, _package::int8,
+         _window::int8>> = header} ->
         (buffer <> header)
         |> package_recv(s, length - 8)
         |> msg_recv(s)
 
       # this heder belongs to last package
-      {
-        :ok,
-        <<
-          _type::int8,
-          0x01,
-          length::int16,
-          _spid::int16,
-          _package::int8,
-          _window::int8
-        >> = header
-      } ->
-        # IO.puts("header: #{inspect header}")
-        (buffer <> header)
-        |> package_recv(s, length - 8)
+      {:ok,
+       <<_type::int8, 0x01, length::int16, _spid::int16, _package::int8,
+         _window::int8>> = header} ->
+        package_recv(buffer <> header, s, length - 8)
 
       {:ok,
-       <<
-         _type::int8,
-         status::int8,
-         length::int16,
-         _spid::int16,
-         _package::int8,
-         _window::int8
-       >> = header} ->
-        (buffer <> header)
-        |> package_recv(s, length - 8)
-
-        raise "Status #{inspect(status)} of tds package is not yer supported!"
+       <<_type::int8, stat::int8, _length::int16, _spid::int16, _package::int8,
+         _window::int8>> = _header} ->
+        # package_recv(buffer <> header, s, length - 8)
+        msg = "Status #{inspect(stat)} of tds package is not yer supported!"
+        {:disconnect, Tds.Error.exception(msg), s}
 
       {:error, :closed} ->
-        raise DBConnection.ConnectionError, "connection is closed"
+        ex = DBConnection.ConnectionError.exception("connection is closed")
+        {:disconnect, ex, s}
 
-      {:error, exception} ->
-        {:disconnect, Tds.Error.exception(exception), s}
+      {:error, error} ->
+        {:disconnect, Tds.Error.exception(error), s}
     end
   end
 
   defp package_recv(buffer, %{sock: {mod, sock}} = s, length) do
     case mod.recv(sock, min(length, @max_packet)) do
+      # TODO: not much likely but since case `byte_size(data) > length` is not handled
+      # it could be that here we have a bug
+      # since more than one package could arrive for any reason
+      # it should put to state tail and then return buffered package.
+      # When respond to client parsed result, then continue receiving and processing tail
       {:ok, data} when byte_size(data) < length ->
         length = length - byte_size(data)
-
-        (buffer <> data)
-        |> package_recv(s, length)
+        package_recv(buffer <> data, s, length)
 
       {:ok, data} ->
         buffer <> data
@@ -978,21 +971,6 @@ defmodule Tds.Protocol do
         {:disconnect, exception, s}
     end
   end
-
-  # defp msg_cast(msg, %{sock: {mod, sock}, env: env} = s) do
-  #   :inet.setopts(sock, active: false)
-
-  #   paks = encode_msg(msg, env)
-  #   Enum.each(paks, fn(pak) ->
-  #     mod.send(sock, pak)
-  #   end)
-  #   # NOTE: this method can not be used since it is not receiving packages
-  #     from SQL server!
-  #   # TODO: add :gen_tcp.recv/flush since it should flush next package if
-  #     there is such case where we don't care about
-  #   # what package contains.
-  #   {:ok, s}
-  # end
 
   defp login_send(msg, %{sock: {mod, sock}, env: env} = s) do
     paks = encode_msg(msg, env)
@@ -1009,23 +987,6 @@ defmodule Tds.Protocol do
         new_data(buffer, %{s | state: :login})
     end
   end
-
-  # defp send_to_result(msg, s) do
-  #  case msg_send(msg, s) do
-  #    :ok ->
-  #      {:ok, s}
-  #    {:error, reason} ->
-  #      {:error, %Tds.Error{message: "tcp send: #{reason}"} , s}
-  #  end
-  # end
-  #
-  # case send_attn(%{s | pak_header: "", pak_data: "", tail: "", state: :attn})
-  #  do
-  #  {:ok, s} ->
-  #    {:ok, s}
-  #  err ->
-  #    {:disconnect, %Tds.Error{message: "attn error: #{err}"}}
-  # end
 
   defp clean_opts(opts) do
     Keyword.put(opts, :password, :REDACTED)
@@ -1071,7 +1032,7 @@ defmodule Tds.Protocol do
 
       val ->
         raise(
-          ArgumentError,
+          Tds.ConfigError,
           "set_datefirst: #{inspect(val)} is out of bounds, valid range is 1..7"
         )
     end
@@ -1087,7 +1048,7 @@ defmodule Tds.Protocol do
 
       val ->
         raise(
-          ArgumentError,
+          Tds.ConfigError,
           "set_dateformat: #{inspect(val)} is an invalid value, " <>
             "valid values are [:mdy, :dmy, :ymd, :ydm, :myd, :dym]"
         )
@@ -1110,7 +1071,7 @@ defmodule Tds.Protocol do
 
       val ->
         raise(
-          ArgumentError,
+          Tds.ConfigError,
           "set_deadlock_priority: #{inspect(val)} is an invalid value, " <>
             "valid values are #{inspect([:low, :high, :normal | -10..10])}"
         )
@@ -1127,7 +1088,7 @@ defmodule Tds.Protocol do
 
       val ->
         raise(
-          ArgumentError,
+          Tds.ConfigError,
           "set_lock_timeout: #{inspect(val)} is an invalid value, " <>
             "must be an positive integer."
         )
@@ -1145,7 +1106,7 @@ defmodule Tds.Protocol do
 
       val ->
         raise(
-          ArgumentError,
+          Tds.ConfigError,
           "set_remote_proc_transactions: #{inspect(val)} is an invalid value, " <>
             "should be either :on, :off, nil"
         )
@@ -1163,7 +1124,7 @@ defmodule Tds.Protocol do
 
       val ->
         raise(
-          ArgumentError,
+          Tds.ConfigError,
           "set_implicit_transactions: #{inspect(val)} is an invalid value, " <>
             "should be either :on, :off, nil"
         )
@@ -1186,7 +1147,7 @@ defmodule Tds.Protocol do
 
       val ->
         raise(
-          ArgumentError,
+          Tds.ConfigError,
           "set_transaction_isolation_level: #{inspect(val)} is an invalid value, " <>
             "should be one of #{inspect(@trans_levels)} or nil"
         )
@@ -1208,7 +1169,7 @@ defmodule Tds.Protocol do
 
       val ->
         raise(
-          ArgumentError,
+          Tds.ConfigError,
           "set_allow_snapshot_isolation: #{inspect(val)} is an invalid value, " <>
             "should be either :on, :off, nil"
         )
