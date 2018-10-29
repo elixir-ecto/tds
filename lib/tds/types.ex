@@ -427,8 +427,6 @@ defmodule Tds.Types do
           decode_uuid(data)
 
         data_type_code == @tds_data_type_intn ->
-          data = data <> tail
-
           case length do
             1 ->
               <<val::unsigned-8, _tail::binary>> = data
