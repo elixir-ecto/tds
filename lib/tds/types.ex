@@ -656,7 +656,8 @@ defmodule Tds.Types do
   end
 
   def decode_nchar(<<data::binary>>) do
-    data |> :unicode.characters_to_binary({:utf16, :little}, :utf8)
+    # iconv is significantly faster than Erlang unicode when converting large binaries
+    :iconv.convert("utf-16le", "utf-8", data)
   end
 
   def decode_xml(_data_info, <<_data::binary>>) do
