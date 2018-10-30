@@ -2,6 +2,7 @@ defmodule Tds do
   alias Tds.Query
 
   @timeout 5000
+  @execution_mode :prepare_execute
 
   def start_link(opts \\ []) do
     DBConnection.start_link(Tds.Protocol, default(opts))
@@ -85,6 +86,8 @@ defmodule Tds do
   end
 
   defp default(opts) do
-    Keyword.put_new(opts, :idle_timeout, @timeout)
+    opts
+    |> Keyword.put_new(:idle_timeout, @timeout)
+    |> Keyword.put_new(:execution_mode, @execution_mode)
   end
 end
