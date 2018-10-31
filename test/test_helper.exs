@@ -85,10 +85,11 @@ USE test
 GO
 CREATE SCHEMA test;
 """
-
+# :dbg.start()
 # :dbg.tracer()
-# :dbg.p(:all,:c)
-# :dbg.tpl(Tds, :query, :x)
+# :dbg.p(:all, [:call, :timestamp])
+# :dbg.tpl(Tds, :_, :x)
+# :dbg.tpl(DBConnection, :_, :x)
 
 
 ExUnit.start()

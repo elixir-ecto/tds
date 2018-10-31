@@ -9,10 +9,15 @@ defmodule Tds.Protocol do
   alias Tds.Protocol
   alias Tds.Parameter
   alias Tds.Query
+  import Bitwise
 
   require Logger
 
   @behaviour DBConnection
+
+  # @packet_status_NORMAL 0x0 # more messaes
+  # end of message
+  @packet_status_EOM 0x1
 
   @timeout 5000
   @max_packet 4 * 1024
@@ -36,7 +41,7 @@ defmodule Tds.Protocol do
           pak_data: binary(),
           result: list() | nil,
           query: list() | nil,
-          transaction: :started | :successful | :failed,
+          transaction_status: :idle | :transaction | :error,
           env: map()
         }
 
@@ -53,7 +58,7 @@ defmodule Tds.Protocol do
             pak_data: "",
             result: nil,
             query: nil,
-            transaction: nil,
+            transaction_status: :idle,
             env: %{trans: <<0x00>>, savepoint: 0}
 
   @impl DBConnection
@@ -225,16 +230,22 @@ defmodule Tds.Protocol do
           {:ok, Tds.Result.t(), new_state :: Protocol.t()}
           | {DBConnection.status(), new_state :: Protocol.t()}
           | {:error | :disconnect, Exception.t(), new_state :: Prototcol.t()}
-  def handle_begin(opts, %{sock: _, env: env} = s) do
+  def handle_begin(opts, %{sock: _, env: env, transaction_status: status} = s) do
     case Keyword.get(opts, :mode, :transaction) do
-      :transaction ->
-        send_transaction("TM_BEGIN_XACT", nil, %{s | transaction: :started})
+      :transaction when status in [:idle] ->
+        send_transaction("TM_BEGIN_XACT", nil, %{
+          s
+          | transaction_status: :transaction
+        })
 
-      :savepoint ->
+      :savepoint when status in [:transaction] ->
         savepoint = env.savepoint + 1
         env = %{env | savepoint: savepoint}
-        s = %{s | transaction: :started, env: env}
+        s = %{s | env: env}
         send_transaction("TM_SAVE_XACT", savepoint, s)
+
+      mode when mode in [:transaction, :savepoint] ->
+        {status, s}
     end
   end
 
@@ -243,21 +254,16 @@ defmodule Tds.Protocol do
           {:ok, Tds.Result.t(), new_state :: Protocol.t()}
           | {DBConnection.status(), new_state :: Protocol.t()}
           | {:error | :disconnect, Exception.t(), new_state :: Protocol.t()}
-  def handle_commit(opts, %{transaction: transaction} = s) do
+  def handle_commit(opts, %{transaction_status: status, env: env} = s) do
     case Keyword.get(opts, :mode, :transaction) do
-      :transaction when transaction == :failed ->
-        handle_rollback(opts, s)
+      :transaction when status == :transaction ->
+        send_transaction("TM_COMMIT_XACT", nil, %{s | transaction_status: :idle})
 
-      :transaction ->
-        send_transaction("TM_COMMIT_XACT", nil, %{s | transaction: :successful})
+      :savepoint when status == :transaction ->
+        send_transaction("TM_SAVE_XACT", env.savepoint, s)
 
-      :savepoint when transaction == :failed ->
-        handle_rollback(opts, s)
-
-      :savepoint ->
-        # we don't need to call release savepoint as in postgresql for instance,
-        # when transaction DIDN'T failed. SQL will wait for
-        {:ok, %Tds.Result{rows: [], num_rows: 0}, s}
+      mode when mode in [:transaction, :savepoint] ->
+        {status, s}
     end
   end
 
@@ -266,47 +272,28 @@ defmodule Tds.Protocol do
           {:ok, Tds.Result.t(), new_state :: Protocol.t()}
           | {:idle, new_state :: Protocol.t()}
           | {:error | :disconnect, Exception.t(), new_state :: Protocol.t()}
-  def handle_rollback(opts, %Protocol{sock: _sock, env: env} = s) do
+  def handle_rollback(opts, %{env: env, transaction_status: status} = s) do
     case Keyword.get(opts, :mode, :transaction) do
-      :transaction ->
+      :transaction when status == :transaction ->
         env = %{env | savepoint: 0}
-        s = %{s | transaction: :failed, env: env}
+        s = %{s | transaction_status: :idle, env: env}
         send_transaction("TM_ROLLBACK_XACT", 0, s)
 
-      :savepoint ->
-        send_transaction("TM_ROLLBACK_XACT", env.savepoint, %{
-          s
-          | transaction: :failed
-        })
+      :savepoint when status == :transaction ->
+        s = %{s | transaction_status: :error}
+        send_transaction("TM_ROLLBACK_XACT", env.savepoint, s)
+
+      mode when mode in [:transaction, :savepoint] ->
+        {status, s}
     end
   end
 
   @impl DBConnection
-  @spec handle_status(opts :: Keyword.t(), state :: Protocol.t()) ::
-          {:idle | :transaction | :error, new_state :: Protocol.t()}
-          | {:disconnect, Exception.t(), new_state :: Protocol.t()}
-  def handle_status(_opts, %{transaction: status} = state) do
-    case status do
-      nil ->
-        {:idle, state}
-
-      :successful ->
-        {:idle, state}
-
-      :started ->
-        {:transaction, state}
-
-      :failed ->
-        {:error, state}
-
-      other ->
-        exception =
-          Tds.Error.exception(
-            "Transaction is aborted, due transaction status #{other}"
-          )
-
-        {:disconnect, exception, state}
-    end
+  @spec handle_status(Keyword.t(), Protocol.t()) ::
+          {:idle | :transaction | :error, Protocol.t()}
+          | {:disconnect, Exception.t(), Protocol.t()}
+  def handle_status(_, %Protocol{transaction_status: status} = state) do
+    {status, state}
   end
 
   @impl DBConnection
@@ -447,6 +434,7 @@ defmodule Tds.Protocol do
     msg =
       "Tds encountered an error while connecting to the Sql Server " <>
         "Browser: econnreset"
+
     {:stop, Tds.Error.exception(msg), s}
   end
 
@@ -520,10 +508,12 @@ defmodule Tds.Protocol do
     case data do
       <<package::binary(size), tail::binary>> ->
         # satisfied size specified in packet header
-        case status do
+        case status &&& @packet_status_EOM do
           1 ->
             # status 1 means last packet of message
             # TODO Messages.parse does not use pak_header
+
+            # :binpp.pprint(pak_header <> pak_data)
 
             msg = parse(state, type, pak_header, pak_data <> package)
 
@@ -607,8 +597,8 @@ defmodule Tds.Protocol do
       {:ok, %{result: result} = s} ->
         {:ok, result, %{s | state: :ready}}
 
-      {:error, err, %{transaction: :started} = s} ->
-        {:error, err, %{s | transaction: :failed}}
+      {:error, err, %{transaction_status: :transaction} = s} ->
+        {:error, err, %{s | transaction_status: :error}}
 
       err ->
         err
@@ -633,8 +623,8 @@ defmodule Tds.Protocol do
       {:ok, %{query: query} = s} ->
         {:ok, %{query | statement: statement}, %{s | state: :ready}}
 
-      {:error, err, %{transaction: :started} = s} ->
-        {:error, err, %{s | transaction: :failed}}
+      {:error, err, %{transaction_status: :transaction} = s} ->
+        {:error, err, %{s | transaction_status: :error}}
 
       err ->
         err
@@ -647,68 +637,6 @@ defmodule Tds.Protocol do
     case msg_send(msg, s) do
       {:ok, %{result: result} = s} ->
         {:ok, result, %{s | state: :ready}}
-
-      err ->
-        err
-    end
-  end
-
-  # def send_command(statement, s) do
-  #  Logger.debug "CALLED send_command/2"
-  #  Logger.debug "STATEMENT: #{inspect statement}"
-
-  #  msg = msg_sql(query: statement)
-  #  simple_send(msg, s)
-
-  #  {:ok, %{s | statement: nil, state: :ready}}
-  # end
-
-  def send_param_query(
-        %Query{handle: handle, statement: statement} = _,
-        params,
-        %{transaction: :started} = s
-      ) do
-    msg =
-      case handle do
-        nil ->
-          p = [
-            %Parameter{
-              name: "@statement",
-              type: :string,
-              direction: :input,
-              value: statement
-            },
-            %Parameter{
-              name: "@params",
-              type: :string,
-              direction: :input,
-              value: Parameter.prepared_params(params)
-            }
-            | Parameter.prepare_params(params)
-          ]
-
-          msg_rpc(proc: :sp_executesql, params: p)
-
-        handle ->
-          p = [
-            %Parameter{
-              name: "@handle",
-              type: :integer,
-              direction: :input,
-              value: handle
-            }
-            | Parameter.prepare_params(params)
-          ]
-
-          msg_rpc(proc: :sp_execute, params: p)
-      end
-
-    case msg_send(msg, s) do
-      {:ok, %{result: result} = s} ->
-        {:ok, result, %{s | state: :ready}}
-
-      {:error, err, %{transaction: :started} = s} ->
-        {:error, err, %{s | transaction: :failed}}
 
       err ->
         err
@@ -759,8 +687,8 @@ defmodule Tds.Protocol do
       {:ok, %{result: result} = s} ->
         {:ok, result, %{s | state: :ready}}
 
-      {:error, err, %{transaction: :started} = s} ->
-        {:error, err, %{s | transaction: :failed}}
+      {:error, err, %{transaction_status: :transaction} = s} ->
+        {:error, err, %{s | transaction_status: :error}}
 
       err ->
         err
@@ -783,8 +711,8 @@ defmodule Tds.Protocol do
       {:ok, %{result: result} = s} ->
         {:ok, result, %{s | state: :ready}}
 
-      {:error, err, %{transaction: :started} = s} ->
-        {:error, err, %{s | transaction: :failed}}
+      {:error, err, %{transaction_status: :transaction} = s} ->
+        {:error, err, %{s | transaction_status: :error}}
 
       err ->
         err

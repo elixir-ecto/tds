@@ -26,33 +26,21 @@ defmodule Tds.TransactionTest do
   end
 
   @tag mode: :transaction
+  @tag :transaction
   test "connection works after failure during commit transaction", context do
-    assert transaction(fn conn ->
-             assert {:error, %Tds.Error{mssql: %{class: 14, number: 2627}}} =
-                      Tds.query(
-                        conn,
-                        "insert into uniques values (1), (1);",
-                        []
-                      )
-
-             assert {:ok, %Tds.Result{columns: [""], num_rows: 1, rows: ['*']}} =
-                      Tds.query(conn, "SELECT 42", [])
-
-             assert {:ok, %Tds.Result{columns: nil, num_rows: 2, rows: []}} =
-                      Tds.query(
-                        conn,
-                        "insert into uniques values (1), (2);",
-                        []
-                      )
-
-             :hi
-           end) == {:ok, :hi}
-
+    assert transaction(fn(conn) ->
+      assert {:error, %Tds.Error{mssql: %{class: 14, number: 2627}}} =
+        Tds.query(conn, "insert into uniques values (1), (1);", [])
+      assert {:ok, %Tds.Result{columns: [""], num_rows: 1, rows: ['*']}} =
+        Tds.query(conn, "SELECT 42", [])
+      :hi
+    end) == {:error, :rollback}
     assert [[42]] = query("SELECT 42", [])
     assert [[0]] = query("SELECT COUNT(*) FROM uniques", [])
   end
 
   @tag mode: :transaction
+  @tag :transaction
   test "connection works after failure during rollback transaction", context do
     assert transaction(fn conn ->
              Tds.query(conn, "insert into uniques values (1), (2);", [])
@@ -74,6 +62,8 @@ defmodule Tds.TransactionTest do
   end
 
   @tag mode: :transaction
+  @tag :transaction
+  @tag :transaction_status
   test "transaction shows correct transaction status", context do
     pid = context[:pid]
     opts = [mode: :transaction]

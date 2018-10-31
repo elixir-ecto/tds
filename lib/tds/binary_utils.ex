@@ -1,6 +1,9 @@
 defmodule Tds.BinaryUtils do
   @moduledoc false
 
+  @doc """
+  A single bit value of either 0 or 1
+  """
   defmacro bit(), do: quote(do: size(1))
 
   @doc """
@@ -79,17 +82,35 @@ defmodule Tds.BinaryUtils do
   defmacro scale(), do: quote(do: unsigned - 8)
 
   @doc """
-  A single byte (8-bit) value representing a NULL value.
+  A single byte (8-bit) value representing a NULL value. 0x00
+
+  ## Example
+      iex> import Tds.BinaryUtils
+      iex> <<_::gen_null()>> = <<0x00 :: size(8)>>
   """
-  defmacro gen_null(), do: quote(do: 0x00 :: size(8))
+  defmacro gen_null(), do: quote(do: size(8))
 
   @doc """
-  A 2-byte (16-bit) or 4-byte (32-bit) value representing a T-SQL NULL value for a character or binary data type.
+  A 2-byte (16-bit) value representing a T-SQL NULL value for a character or binary data type.
+
+  ## Example
+      iex> import Tds.BinaryUtils
+      iex> <<_::charbin_null32>> = <<0xFFFF :: size(32)>>
 
   Please refer to TYPE_VARBYTE (see MS-TDS.pdf section 2.2.5.2.3) for additional details.
   """
-  defmacro charbin_null(2), do: quote(do: 0x0000 :: size(16))
-  defmacro charbin_null(4), do: quote(do: 0x00000000 :: size(32))
+  defmacro charbin_null16(), do: quote(do: size(16))
+
+  @doc """
+  A 4-byte (32-bit) value representing a T-SQL NULL value for a character or binary data type.
+
+  ## Example
+      iex> import Tds.BinaryUtils
+      iex> <<_::charbin_null32>> = <<0xFFFFFFFF :: size(32)>>
+
+  Please refer to TYPE_VARBYTE (see MS-TDS.pdf section 2.2.5.2.3) for additional details.
+  """
+  defmacro charbin_null32(), do: quote(do: size(32))
 
   @doc """
   A FRESERVEDBIT is a BIT value used for padding that does not transmit information.
@@ -103,37 +124,58 @@ defmodule Tds.BinaryUtils do
   """
   defmacro freservedbyte(), do: quote(do: 0x00 :: size(8))
 
-  defmacro int16(), do: quote(do: signed - 16)
+  @doc """
+  A 8-bit little endian signed integer
+  """
+  defmacro int8(), do: quote(do: little - signed - 8)
 
-  defmacro int32(), do: quote(do: signed - 32)
+  @doc """
+  A 16-bit little endian signed integer
+  """
+  defmacro int16(), do: quote(do: little - signed - 16)
 
-  defmacro int64(), do: quote(do: signed - 64)
+  @doc """
+  A 16-bit little endian signed integer
+  """
+  defmacro int32(), do: quote(do: little - signed - 32)
 
-  defmacro uint16 do
-    quote do: unsigned - 16
-  end
+  @doc """
+  A 16-bit little endian signed integer
+  """
+  defmacro int64(), do: quote(do: little - signed - 64)
 
-  defmacro int8 do
-    quote do: signed - 8
-  end
+  @doc """
+  A 16-bit little endian signed integer
+  """
+  defmacro uint8(), do: quote(do: little - unsigned - 8)
 
-  defmacro float64 do
-    quote do: float - 64
-  end
+  @doc """
+  A 16-bit little endian signed integer
+  """
+  defmacro uint16(), do: quote(do: little - unsigned - 16)
 
-  defmacro float32 do
-    quote do: float - 32
-  end
+  @doc """
+  A 32-bit little endian signed integer
+  """
+  defmacro uint32(), do: quote(do: little - unsigned - 32)
 
-  defmacro binary(size) do
-    quote do: binary - size(unquote(size))
-  end
+  @doc """
+  A 64-bit little endian signed integer
+  """
+  defmacro uint64(), do: quote(do: little - unsigned - 64)
 
-  defmacro binary(size, unit) do
-    quote do: binary - size(unquote(size)) - unit(unquote(unit))
-  end
+  @doc """
+  A 64-bit little endian signed integer
+  """
+  defmacro float64(), do: quote(do: little - signed - float - 64)
 
-  defmacro unicode(size) do
-    quote do: little - binary - size(unquote(size)) - unit(16)
-  end
+  defmacro float32(), do: quote(do: little - signed - float - 32)
+
+  defmacro binary(size), do: quote(do: binary - size(unquote(size)))
+
+  defmacro binary(size, unit),
+    do: quote(do: binary - size(unquote(size)) - unit(unquote(unit)))
+
+  defmacro unicode(size),
+    do: quote(do: little - binary - size(unquote(size)) - unit(16))
 end
