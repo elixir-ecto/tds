@@ -134,12 +134,23 @@ defmodule Tds.Protocol do
     end
   end
 
-  def handle_prepare(%{statement: statement}, opts, %{sock: _sock} = s) do
-    params =
-      opts[:parameters]
-      |> Parameter.prepared_params()
+  def handle_prepare(%{statement: statement} = query, opts, %{sock: _sock} = s) do
+    case Keyword.get(opts, :execution_mode, :prepare_execute) do
+      :prepare_execute ->
+        params =
+          opts[:parameters]
+          |> Parameter.prepared_params()
 
-    send_prepare(statement, params, s)
+        send_prepare(statement, params, s)
+
+      :executesql ->
+        {:ok, query, %{s | state: :ready}}
+
+      execution_mode ->
+        message = "Unknown execution mode #{inspect(execution_mode)}, please check your config." <>
+          "Supported modes are :prepare_execute and :executesql"
+        {:error, %Tds.Error{message: message}, s}
+    end
   end
 
   def handle_close(query, opts, %{sock: _sock} = s) do

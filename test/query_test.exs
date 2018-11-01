@@ -140,4 +140,44 @@ defmodule QueryTest do
   test "char nulls", context do
     assert [[nil]] = query("SELECT CAST(NULL as nvarchar(255))", [])
   end
+
+  describe "execution mode" do
+    test ":prepare_execute" do
+      opts =
+        Application.fetch_env!(:tds, :opts)
+        |> Keyword.put(:execution_mode, :prepare_execute)
+
+      {:ok, pid} = Tds.start_link(opts)
+      context = [pid: pid]
+
+      params = [%Tds.Parameter{name: "@1", value: 1}]
+      assert [[1]] = query("SELECT 1 WHERE 1 = @1", params, opts)
+    end
+
+    test ":executesql" do
+      opts =
+        Application.fetch_env!(:tds, :opts)
+        |> Keyword.put(:execution_mode, :executesql)
+
+      {:ok, pid} = Tds.start_link(opts)
+      context = [pid: pid]
+
+      params = [%Tds.Parameter{name: "@1", value: 1}]
+      assert [[1]] = query("SELECT 1 WHERE 1 = @1", params, opts)
+    end
+
+    test "unknown errors out" do
+      opts =
+        Application.fetch_env!(:tds, :opts)
+        |> Keyword.put(:execution_mode, :invalid)
+
+      {:ok, pid} = Tds.start_link(opts)
+      context = [pid: pid]
+
+      params = [%Tds.Parameter{name: "@1", value: 1}]
+      assert %Tds.Error{
+        message: "Unknown execution mode :invalid, please check your config.Supported modes are :prepare_execute and :executesql"
+      } = query("SELECT 1 WHERE 1 = @1", params, opts)
+    end
+  end
 end
