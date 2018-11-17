@@ -40,6 +40,7 @@ defmodule Tds.Protocol do
             transaction: nil,
             env: %{trans: <<0x00>>, savepoint: 0}
 
+  @impl DBConnection
   def connect(opts) do
     opts =
       opts
@@ -66,6 +67,7 @@ defmodule Tds.Protocol do
     end
   end
 
+  @impl DBConnection
   def disconnect(_err, %{sock: {mod, sock}} = s) do
     # If socket is active we flush any socket messages so the next
     # socket does not get the messages.
@@ -73,6 +75,7 @@ defmodule Tds.Protocol do
     mod.close(sock)
   end
 
+  @impl DBConnection
   @spec ping(any) :: {:ok, any} | {:disconnect, Exception.t(), any}
   def ping(state) do
     case send_query(~s{SELECT 'pong' as [msg]}, state) do
@@ -97,18 +100,21 @@ defmodule Tds.Protocol do
     end
   end
 
+  @impl DBConnection
   def checkout(%{sock: {_mod, sock}} = s) do
     :ok = :inet.setopts(sock, active: false)
 
     {:ok, s}
   end
 
+  @impl DBConnection
   def checkin(%{sock: {_mod, sock}} = s) do
     :ok = :inet.setopts(sock, active: :once)
 
     {:ok, s}
   end
 
+  @impl DBConnection
   def handle_execute(
         %Query{handle: handle, statement: statement} = query,
         params,
@@ -134,6 +140,7 @@ defmodule Tds.Protocol do
     end
   end
 
+  @impl DBConnection
   def handle_prepare(%{statement: statement} = query, opts, %{sock: _sock} = s) do
     case Keyword.get(opts, :execution_mode, :prepare_execute) do
       :prepare_execute ->
@@ -147,18 +154,22 @@ defmodule Tds.Protocol do
         {:ok, query, %{s | state: :ready}}
 
       execution_mode ->
-        message = "Unknown execution mode #{inspect(execution_mode)}, please check your config." <>
-          "Supported modes are :prepare_execute and :executesql"
+        message =
+          "Unknown execution mode #{inspect(execution_mode)}, please check your config." <>
+            "Supported modes are :prepare_execute and :executesql"
+
         {:error, %Tds.Error{message: message}, s}
     end
   end
 
+  @impl DBConnection
   def handle_close(query, opts, %{sock: _sock} = s) do
     params = opts[:parameters]
 
     send_close(query, params, s)
   end
 
+  @impl DBConnection
   def handle_begin(opts, %{sock: _, env: env} = s) do
     case Keyword.get(opts, :mode, :transaction) do
       :transaction ->
@@ -172,6 +183,7 @@ defmodule Tds.Protocol do
     end
   end
 
+  @impl DBConnection
   def handle_commit(opts, %{transaction: transaction} = s) do
     case Keyword.get(opts, :mode, :transaction) do
       :transaction when transaction == :failed ->
@@ -190,6 +202,7 @@ defmodule Tds.Protocol do
     end
   end
 
+  @impl DBConnection
   def handle_rollback(opts, %{sock: _sock, env: env} = s) do
     case Keyword.get(opts, :mode, :transaction) do
       :transaction ->
@@ -205,18 +218,22 @@ defmodule Tds.Protocol do
     end
   end
 
+  @impl DBConnection
   def handle_first(_query, _cursor, _opts, state) do
     {:error, RuntimeError.exception("Not supported yet."), state}
   end
 
+  @impl DBConnection
   def handle_deallocate(_query, _cursor, _opts, state) do
     {:error, RuntimeError.exception("Not supported yet."), state}
   end
 
+  @impl DBConnection
   def handle_declare(_query, _params, _opts, state) do
     {:error, RuntimeError.exception("Not supported yet."), state}
   end
 
+  @impl DBConnection
   def handle_next(_query, _cursor, _opts, state) do
     {:error, RuntimeError.exception("Not supported yet."), state}
   end
@@ -314,6 +331,7 @@ defmodule Tds.Protocol do
     end
   end
 
+  @impl true
   def handle_info({:udp_error, _, :econnreset}, _s) do
     raise "Tds encountered an error while connecting to the Sql Server " <>
             "Browser: econnreset"

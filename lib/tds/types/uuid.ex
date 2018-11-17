@@ -26,7 +26,9 @@ defmodule Tds.Types.UUID do
   else
     casted -> {:ok, casted}
   end
+
   def cast(<< _::128 >> = binary), do: encode(binary)
+
   def cast(_), do: :error
 
   @doc """
@@ -89,6 +91,7 @@ defmodule Tds.Types.UUID do
         {:ok, binary}
     end
   end
+
   def dump(_), do: :error
 
   def dump!(value) do
@@ -130,10 +133,12 @@ defmodule Tds.Types.UUID do
   def load(<<_::128>> = uuid) do
     encode(uuid)
   end
+
   def load(<<_::64, ?-, _::32, ?-, _::32, ?-, _::32, ?-, _::96>> = string) do
     raise ArgumentError, "trying to load string UUID as Tds.Types.UUID: #{inspect string}. " <>
                          "Maybe you wanted to declare :uuid as your database field?"
   end
+
   def load(_), do: :error
 
   @doc """

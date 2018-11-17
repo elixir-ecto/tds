@@ -37,6 +37,42 @@ iex> Tds.query!(pid, "INSERT INTO MyTable (MyColumn) VALUES (@my_value)",
 * Automatic decoding and encoding of Elixir values to and from MSSQL's binary format
 * Support of TDS Versions 7.3, 7.4
 
+## Configuration
+
+Example configuration
+
+```elixr
+import Mix.Config
+
+config :your_app, tds_conn,
+  hostname: "localhost", 
+  username: "test_user", 
+  password: "test_password", 
+  database: "test_db", 
+  port: 1433
+```
+
+Then using `Application.get_env(:your_app, :tds_conn)` use this as first parameter in `Tds.start_link/1` function.
+
+There is additional parameter that can be used in configuration and 
+can improve query execution in sql server. If you find out that 
+your queries suffer form "denst estimation" as described [here](https://www.brentozar.com/archive/2018/03/sp_prepare-isnt-good-sp_executesql-performance/)
+
+you can try switching  how tds executes queries as below:
+
+```elixr
+import Mix.Config
+
+config :your_app, tds_conn,
+  hostname: "localhost", 
+  username: "test_user", 
+  password: "test_password", 
+  database: "test_db", 
+  port: 1433,
+  execution_mode: :executesql
+```
+This will skip calling `sp_prepare` and query will be executed using `sp_executesql` instead. Please note that only single  execution mode can be set at the time and SQL will probably use single execution plan (since it is NOT estimated by checking data density!).
+
 ## Connecting to SQL Instances
 
 Tds supports SQL instances by passing `instance: "instancename"` to the connection options.

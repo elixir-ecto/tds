@@ -265,7 +265,7 @@ defmodule Tds.Types do
 
         col_info =
           def_col_info
-          |> Map.put(:collation, collation)
+          |> Map.put(:collation, decode_collation(collation))
           |> Map.put(
                :data_reader,
                if(length == 0xFFFF, do: :plp, else: :shortlen)
@@ -350,6 +350,16 @@ defmodule Tds.Types do
 
         {col_info, rest}
     end
+  end
+
+  def decode_collation(<<lcid::size(20), colFlags::size(6), _::size(2),
+  version::size(4), sortId::size(8)>>) do
+    %{
+      lcid: lcid,
+      col_flags: colFlags,
+      version: version,
+      sort_id: sortId
+    }
   end
 
   #
@@ -516,7 +526,7 @@ defmodule Tds.Types do
           @tds_data_type_nvarchar,
           @tds_data_type_nchar
         ] ->
-          decode_nchar(data)
+          decode_nchar(data_info, data)
 
         data_type_code == @tds_data_type_udt ->
           decode_udt(data_info, data)
@@ -541,8 +551,8 @@ defmodule Tds.Types do
       ) do
     value =
       case data_type_code do
-        @tds_data_type_text -> decode_char(data_info[:collation], data)
-        @tds_data_type_ntext -> decode_nchar(data)
+        @tds_data_type_text -> decode_char(data_info, data)
+        @tds_data_type_ntext -> decode_nchar(data_info, data)
         @tds_data_type_image -> data
         _ -> nil
       end
@@ -588,7 +598,7 @@ defmodule Tds.Types do
           @tds_data_type_nchar,
           @tds_data_type_ntext
         ] ->
-          decode_nchar(data)
+          decode_nchar(data_info, data)
 
         data_type_code == @tds_data_type_udt ->
           decode_udt(data_info, data)
@@ -620,7 +630,7 @@ defmodule Tds.Types do
         money_m::little-unsigned-32,
         money_l::little-unsigned-32
       >>) do
-    <<money::signed-64>> = <<money_m::32>> <> <<money_l::32>>
+    <<money::signed-64>> = <<money_m::32, money_l::32>>
     Float.round(money * 0.0001, 4)
   end
 
@@ -649,12 +659,12 @@ defmodule Tds.Types do
     end
   end
 
-  def decode_char(_collation, <<data::binary>>) do
+  def decode_char(_data_info, <<data::binary>>) do
     data
   end
 
-  def decode_nchar(<<data::binary>>) do
-    data |> :unicode.characters_to_binary({:utf16, :little}, :utf8)
+  def decode_nchar(_data_info, <<data::binary>>) do
+    :unicode.characters_to_binary(data, {:utf16, :little}, :utf8)
   end
 
   def decode_xml(_data_info, <<_data::binary>>) do

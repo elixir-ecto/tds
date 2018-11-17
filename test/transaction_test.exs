@@ -1,49 +1,75 @@
 defmodule Tds.TransactionTest do
   use ExUnit.Case, async: true
-  import ExUnit.CaptureLog
+  # import ExUnit.CaptureLog
   import Tds.TestHelper
 
   setup context do
     transactions =
       case context[:mode] do
         :transaction -> :strict
-        :savepoint   -> :naive
+        :savepoint -> :naive
       end
 
     opts = [
-      database: "test",
-      username: "sa",
-      password: "some!Password",
       transactions: transactions,
       idle: :active,
       backoff_type: :stop,
       prepare: context[:prepare] || :named
     ]
+
+    opts =
+      Application.get_env(:tds, :opts)
+      |> Keyword.merge(opts)
+
     {:ok, pid} = Tds.start_link(opts)
     {:ok, [pid: pid]}
   end
 
   @tag mode: :transaction
   test "connection works after failure during commit transaction", context do
-    assert transaction(fn(conn) ->
-      assert {:error, %Tds.Error{mssql: %{class: 14, number: 2627}}} =
-        Tds.query(conn, "insert into uniques values (1), (1);", [])
-      assert {:ok, %Tds.Result{columns: [""], num_rows: 1, rows: ['*']}} =
-        Tds.query(conn, "SELECT 42", [])
-      :hi
-    end) == {:ok, :hi}
+    assert transaction(fn conn ->
+             assert {:error, %Tds.Error{mssql: %{class: 14, number: 2627}}} =
+                      Tds.query(
+                        conn,
+                        "insert into uniques values (1), (1);",
+                        []
+                      )
+
+             assert {:ok, %Tds.Result{columns: [""], num_rows: 1, rows: ['*']}} =
+                      Tds.query(conn, "SELECT 42", [])
+
+             assert {:ok, %Tds.Result{columns: nil, num_rows: 2, rows: []}} =
+                      Tds.query(
+                        conn,
+                        "insert into uniques values (1), (2);",
+                        []
+                      )
+
+             :hi
+           end) == {:ok, :hi}
+
     assert [[42]] = query("SELECT 42", [])
+    assert [[0]] = query("SELECT COUNT(*) FROM uniques", [])
   end
 
   @tag mode: :transaction
   test "connection works after failure during rollback transaction", context do
-    assert transaction(fn(conn) ->
-      assert {:error, %Tds.Error{mssql: %{class: 14, number: 2627}}} =
-        Tds.query(conn, "insert into uniques values (1), (1);", [])
-      assert {:ok, %Tds.Result{columns: [""], num_rows: 1, rows: ['*']}} =
-        Tds.query(conn, "SELECT 42", [])
-        Tds.rollback(conn, :oops)
-    end) == {:error, :oops}
+    assert transaction(fn conn ->
+             Tds.query(conn, "insert into uniques values (1), (2);", [])
+
+             assert {:error, %Tds.Error{mssql: %{class: 14, number: 2627}}} =
+                      Tds.query(
+                        conn,
+                        "insert into uniques values (3), (3);",
+                        []
+                      )
+
+             assert {:ok, %Tds.Result{columns: [""], num_rows: 1, rows: ['*']}} =
+                      Tds.query(conn, "SELECT 42", [])
+
+             Tds.rollback(conn, :oops)
+           end) == {:error, :oops}
+
     assert [[42]] = query("SELECT 42", [])
   end
 
@@ -451,5 +477,4 @@ defmodule Tds.TransactionTest do
   #     assert %Tds.Result{rows: [[42]]} = Tds.query!(conn, "SELECT 42", [])
   #   end)
   # end
-
 end

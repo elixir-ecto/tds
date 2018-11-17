@@ -39,6 +39,8 @@ defmodule Tds.Tokens do
   @tds_envtype_begintrans 8
   @tds_envtype_committrans 9
   @tds_envtype_rollbacktrans 10
+  @tds_envtype_defecttrans 12
+  @tds_envtype_mirroring_partner 13
   @tds_envtype_routing 20
 
   ## Decode Token Stream
@@ -225,6 +227,7 @@ defmodule Tds.Tokens do
          tokens
        ) do
     case env_type do
+      # 0x01
       @tds_envtype_database ->
         <<
           new_value_size::unsigned-8,
@@ -240,6 +243,13 @@ defmodule Tds.Tokens do
 
         {tokens |> Keyword.put(:database, new_value), rest}
 
+      # 0x02
+      # @tds_envtype_language ->
+
+      # 0x03
+      # @tds_envtype_characterset ->
+
+      # 0x04
       @tds_envtype_packetsize ->
         <<
           new_value_size::unsigned-8,
@@ -253,7 +263,7 @@ defmodule Tds.Tokens do
         if(new_value != old_value) do
           Logger.debug(fn ->
             """
-            Database server configured packetsize to #{new_value} where old value
+            Database server configured TDS packetsize to #{new_value} where old value
             was #{old_value}
             """
           end)
@@ -261,6 +271,16 @@ defmodule Tds.Tokens do
 
         {tokens |> Keyword.put(:packetsize, new_value), rest}
 
+      # 0x05
+      # @tds_envtype_unicode_data_storing_local_id ->
+
+      # 0x06
+      # @tds_envtype_uncode_data_string_comparison_flag ->
+
+      # 0x07
+      # @tds_envtype_sql_collation ->
+
+      # 0x08
       @tds_envtype_begintrans ->
         <<
           value_size::unsigned-8,
@@ -271,6 +291,7 @@ defmodule Tds.Tokens do
 
         {tokens |> Keyword.put(:trans, new_value), rest}
 
+      # 0x09
       @tds_envtype_committrans ->
         <<
           0x00,
@@ -281,6 +302,7 @@ defmodule Tds.Tokens do
 
         {tokens |> Keyword.put(:trans, <<0x00>>), rest}
 
+      # 0x0A
       @tds_envtype_rollbacktrans ->
         <<
           0x00,
@@ -290,6 +312,31 @@ defmodule Tds.Tokens do
         >> = tail
 
         {tokens |> Keyword.put(:trans, <<0x00>>), rest}
+
+      # 0x0B
+      # @tds_envtype_enlist_dtc_transaction ->
+
+      # 0x0C
+      @tds_envtype_defecttrans ->
+        <<
+          value_size::unsigned-8,
+          new_value::binary-little-size(value_size)-unit(8),
+          0x00,
+          rest::binary
+        >> = tail
+        Logger.warn("Defect transaction env change received #{inspect(new_value)}")
+        {tokens, rest}
+
+      # 0x0D
+      @tds_envtype_mirroring_partner ->
+        <<
+          0x00,
+          new_value_size::unsigned-8,
+          _new_value::binary(new_value_size, 16),
+          rest::binary
+        >> = tail
+
+        {tokens, rest}
 
       @tds_envtype_routing ->
         <<

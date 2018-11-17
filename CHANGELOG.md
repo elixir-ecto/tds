@@ -1,3 +1,10 @@
+# v1.1.5
+* Improvements
+  - Allow users to choose between `:prepare_execute` and `:executesql` style (PR #71) default is `:prepare_execute`
+  - Fix unnecessary append of possibly large binaries #70
+* Bugfix
+  - Unexpected Environment Change message kills the connection #72
+
 # v1.1.4
 * Improvements
   - Adding `sp_unprepare` after SQL statement is executed.
