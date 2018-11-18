@@ -48,14 +48,14 @@ defmodule Tds do
 
   def execute(pid, query, params, opts \\ []) do
     case DBConnection.execute(pid, query, params, opts) do
-      {:ok, result} -> {:ok, result}
+      {:ok, q, result} -> {:ok, q, result}
       {:error, err} -> {:error, err}
     end
   end
 
   def execute!(pid, query, params, opts \\ []) do
     case DBConnection.execute(pid, query, params, opts) do
-      {:ok, result} -> result
+      {:ok, _q, result} -> result
       {:error, err} -> err.mssql.msg_text
     end
   end

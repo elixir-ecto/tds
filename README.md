@@ -4,9 +4,10 @@
 
 MSSQL / TDS Database driver for Elixir.
 
-Supports Ecto 2.0. It (mostly) implements the [db_connection](https://github.com/elixir-ecto/db_connection) behaviour and has support for transactions and prepared queries.
+### NOTE: 
+Since TDS version 2.0, tds_ecto package is deprecated, this version supports `ecto_sql` since version 3.1.0. 
 
-Please check out the issues for a more complete overview. This branch should not be considered stable or ready for production yet.
+Please check out the [issues](https://github.com/livehelpnow/tds/issues) for a more complete overview or [CHNAGELOG.md](CHANGELOG.md). 
 
 ## Usage
 
@@ -14,7 +15,7 @@ Add Tds as a dependency in your `mix.exs` file.
 
 ```elixir
 def deps do
-  [{:tds, "~> 1.1"} ]
+  [{:tds, "~> 2.0"} ]
 end
 ```
 
@@ -77,6 +78,7 @@ This will skip calling `sp_prepare` and query will be executed using `sp_execute
 
 Tds supports SQL instances by passing `instance: "instancename"` to the connection options.
 Since v1.0.16, additional connection parameters are:
+  - `:set_xact_abort` - tell sql to abort transaction and auto rollback when transaction fails. Default is `:on`, can be set to `:off`
   - `:set_language` - check stored procedure output `exec sp_helplanguage` name column value should be used here
   - `:set_datefirst` - number in range `1..7`
   - `:set_dateformat` - atom `:mdy | :dmy | :ymd | :ydm | :myd | :dym`
