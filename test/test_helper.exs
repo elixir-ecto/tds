@@ -87,8 +87,9 @@ CREATE SCHEMA test;
 """
 # :dbg.start()
 # :dbg.tracer()
-# :dbg.p(:all, [:call, :timestamp])
-# :dbg.tpl(Tds, :_, :x)
+# :dbg.p(:all, :c)
+# :dbg.tpl(:gen_tcp, :_, [])
+# :dbg.tpl(Tds.Protocol, :_, [])
 # :dbg.tpl(DBConnection, :_, :x)
 
 

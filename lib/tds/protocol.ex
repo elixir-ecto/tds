@@ -761,8 +761,7 @@ defmodule Tds.Protocol do
     state = %{s | opts: clean_opts(opts)}
 
     opts
-    |> conn_opts()
-    |> IO.iodata_to_binary()
+    |> prepare_envvars()
     |> send_query(state)
   end
 
@@ -919,8 +918,8 @@ defmodule Tds.Protocol do
     Keyword.put(opts, :password, :REDACTED)
   end
 
-  @spec conn_opts(Keyword.t()) :: list() | no_return
-  defp conn_opts(opts) do
+  @spec prepare_envvars(Keyword.t()) :: list() | no_return
+  defp prepare_envvars(opts) do
     [
       "SET ANSI_NULLS ON; ",
       "SET QUOTED_IDENTIFIER ON; ",
@@ -929,33 +928,44 @@ defmodule Tds.Protocol do
       "SET ANSI_PADDING ON; ",
       "SET ANSI_WARNINGS ON; ",
       "SET CONCAT_NULL_YIELDS_NULL ON; ",
-      "SET TEXTSIZE 2147483647; "
+      "SET TEXTSIZE 2147483647; ",
+      append_envvar(opts, :set_xact_abort),
+      append_envvar(opts, :set_language),
+      append_envvar(opts, :set_datefirst),
+      append_envvar(opts, :set_dateformat),
+      append_envvar(opts, :set_deadlock_priority),
+      append_envvar(opts, :set_lock_timeout),
+      append_envvar(opts, :set_remote_proc_transactions),
+      append_envvar(opts, :set_implicit_transactions),
+      append_envvar(opts, :set_transaction_isolation_level),
+      append_envvar(opts, :set_allow_snapshot_isolation)
     ]
-    |> append_opts(opts, :set_language)
-    |> append_opts(opts, :set_datefirst)
-    |> append_opts(opts, :set_dateformat)
-    |> append_opts(opts, :set_deadlock_priority)
-    |> append_opts(opts, :set_lock_timeout)
-    |> append_opts(opts, :set_remote_proc_transactions)
-    |> append_opts(opts, :set_implicit_transactions)
-    |> append_opts(opts, :set_transaction_isolation_level)
-    |> append_opts(opts, :set_allow_snapshot_isolation)
+    |> Enum.reject(&is_nil/1)
+    |> IO.iodata_to_binary()
   end
 
-  defp append_opts(conn, opts, :set_language) do
-    case Keyword.get(opts, :set_language) do
-      nil -> conn
-      val -> conn ++ ["SET LANGUAGE #{val}; "]
+  defp append_envvar(opts, :set_xact_abort) do
+    case Keyword.get(opts, :set_xact_abort) do
+      nil -> "SET XACT_ABORT ON; "
+      :on -> "SET XACT_ABORT ON; "
+      :off -> "SET XACT_ABORT OFF; "
     end
   end
 
-  defp append_opts(conn, opts, :set_datefirst) do
+  defp append_envvar(opts, :set_language) do
+    case Keyword.get(opts, :set_language) do
+      nil -> nil
+      val -> "SET LANGUAGE #{val}; "
+    end
+  end
+
+  defp append_envvar(opts, :set_datefirst) do
     case Keyword.get(opts, :set_datefirst) do
       nil ->
-        conn
+        nil
 
       val when val in 1..7 ->
-        conn ++ ["SET DATEFIRST #{val}; "]
+        "SET DATEFIRST #{val}; "
 
       val ->
         raise(
@@ -965,13 +975,13 @@ defmodule Tds.Protocol do
     end
   end
 
-  defp append_opts(conn, opts, :set_dateformat) do
+  defp append_envvar(opts, :set_dateformat) do
     case Keyword.get(opts, :set_dateformat) do
       nil ->
-        conn
+        nil
 
       val when val in [:mdy, :dmy, :ymd, :ydm, :myd, :dym] ->
-        conn ++ ["SET DATEFORMAT #{val}; "]
+        "SET DATEFORMAT #{val}; "
 
       val ->
         raise(
@@ -982,19 +992,16 @@ defmodule Tds.Protocol do
     end
   end
 
-  defp append_opts(conn, opts, :set_deadlock_priority) do
+  defp append_envvar(opts, :set_deadlock_priority) do
     case Keyword.get(opts, :set_deadlock_priority) do
       nil ->
-        conn
+        nil
 
       val when val in [:low, :high, :normal] ->
-        conn ++ ["SET DEADLOCK_PRIORITY #{val}; "]
-
-      nil ->
-        conn
+        "SET DEADLOCK_PRIORITY #{val}; "
 
       val when val in -10..10 ->
-        conn ++ ["SET DEADLOCK_PRIORITY #{val}; "]
+        "SET DEADLOCK_PRIORITY #{val}; "
 
       val ->
         raise(
@@ -1005,13 +1012,13 @@ defmodule Tds.Protocol do
     end
   end
 
-  defp append_opts(conn, opts, :set_lock_timeout) do
+  defp append_envvar(opts, :set_lock_timeout) do
     case Keyword.get(opts, :set_lock_timeout) do
       nil ->
-        conn
+        nil
 
       val when val > 0 ->
-        conn ++ ["SET LOCK_TIMEOUT #{val}; "]
+        "SET LOCK_TIMEOUT #{val}; "
 
       val ->
         raise(
@@ -1022,14 +1029,16 @@ defmodule Tds.Protocol do
     end
   end
 
-  defp append_opts(conn, opts, :set_remote_proc_transactions) do
+  defp append_envvar(opts, :set_remote_proc_transactions) do
     case Keyword.get(opts, :set_remote_proc_transactions) do
       nil ->
-        conn
+        nil
 
-      val when val in [:on, :off] ->
-        val = val |> Atom.to_string() |> String.upcase()
-        conn ++ ["SET REMOTE_PROC_TRANSACTIONS #{val}; "]
+      :on ->
+        "SET REMOTE_PROC_TRANSACTIONS ON; "
+
+      :off ->
+        "SET REMOTE_PROC_TRANSACTIONS OFF; "
 
       val ->
         raise(
@@ -1040,14 +1049,16 @@ defmodule Tds.Protocol do
     end
   end
 
-  defp append_opts(conn, opts, :set_implicit_transactions) do
+  defp append_envvar(opts, :set_implicit_transactions) do
     case Keyword.get(opts, :set_implicit_transactions) do
       nil ->
-        conn ++ ["SET IMPLICIT_TRANSACTIONS OFF; "]
+        "SET IMPLICIT_TRANSACTIONS OFF; "
 
-      val when val in [:on, :off] ->
-        val = val |> Atom.to_string() |> String.upcase()
-        conn ++ ["SET IMPLICIT_TRANSACTIONS #{val}; "]
+      :on ->
+        "SET IMPLICIT_TRANSACTIONS ON; "
+
+      :off ->
+        "SET IMPLICIT_TRANSACTIONS OFF; "
 
       val ->
         raise(
@@ -1058,10 +1069,10 @@ defmodule Tds.Protocol do
     end
   end
 
-  defp append_opts(conn, opts, :set_transaction_isolation_level) do
+  defp append_envvar(opts, :set_transaction_isolation_level) do
     case Keyword.get(opts, :set_transaction_isolation_level) do
       nil ->
-        conn
+        nil
 
       val when val in @trans_levels ->
         t =
@@ -1070,7 +1081,7 @@ defmodule Tds.Protocol do
           |> String.replace("_", " ")
           |> String.upcase()
 
-        conn ++ ["SET TRANSACTION ISOLATION LEVEL #{t}; "]
+        "SET TRANSACTION ISOLATION LEVEL #{t}; "
 
       val ->
         raise(
@@ -1081,24 +1092,31 @@ defmodule Tds.Protocol do
     end
   end
 
-  defp append_opts(conn, opts, :set_allow_snapshot_isolation) do
+  defp append_envvar(opts, :set_allow_snapshot_isolation) do
     database = Keyword.get(opts, :database)
+    level = Keyword.get(opts, :set_allow_snapshot_isolation)
 
-    case Keyword.get(opts, :set_allow_snapshot_isolation) do
-      nil ->
-        conn
-
-      val when val in [:on, :off] ->
-        val = val |> Atom.to_string() |> String.upcase()
-
-        conn ++
-          ["ALTER DATABASE [#{database}] SET ALLOW_SNAPSHOT_ISOLATION #{val}; "]
-
-      val ->
+    case {database, level} do
+      {nil, _} ->
         raise(
           Tds.ConfigError,
-          "set_allow_snapshot_isolation: #{inspect(val)} is an invalid value, " <>
-            "should be either :on, :off, nil"
+          "Option :set_allow_snapshot_isolation requires :database to be set."
+        )
+
+      {_, nil} ->
+        nil
+
+      {db, :on} ->
+        "ALTER DATABASE [#{db}] SET ALLOW_SNAPSHOT_ISOLATION ON; "
+
+      {db, :off} ->
+        "ALTER DATABASE [#{db}] SET ALLOW_SNAPSHOT_ISOLATION OFF; "
+
+      {_, val} ->
+        raise(
+          Tds.ConfigError,
+          "Option :set_allow_snapshot_isolation has has invalid value " <>
+            "'#{inspect(val)}'. should be either :on, :off, nil"
         )
     end
   end
