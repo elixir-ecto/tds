@@ -946,7 +946,7 @@ defmodule Tds.Protocol do
 
   defp append_envvar(opts, :set_xact_abort) do
     case Keyword.get(opts, :set_xact_abort) do
-      nil -> "SET XACT_ABORT ON; "
+      nil -> nil
       :on -> "SET XACT_ABORT ON; "
       :off -> "SET XACT_ABORT OFF; "
     end

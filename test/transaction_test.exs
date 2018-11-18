@@ -28,13 +28,21 @@ defmodule Tds.TransactionTest do
   @tag mode: :transaction
   @tag :transaction
   test "connection works after failure during commit transaction", context do
-    assert transaction(fn(conn) ->
-      assert {:error, %Tds.Error{mssql: %{class: 14, number: 2627}}} =
-        Tds.query(conn, "insert into uniques values (1), (1);", [])
-      assert {:ok, %Tds.Result{columns: [""], num_rows: 1, rows: ['*']}} =
-        Tds.query(conn, "SELECT 42", [])
-      :hi
-    end) == {:error, :rollback}
+    assert transaction(fn conn ->
+             assert {:error, %Tds.Error{mssql: %{class: 14, number: 2627}}} =
+                      Tds.query(
+                        conn,
+                        "insert into uniques values (1), (1);",
+                        []
+                      )
+
+             #  assert {:error, %Tds.Error{mssql: %{class: 16, number: 3971}}} =
+             assert {:ok, %Tds.Result{columns: [""], num_rows: 1, rows: ['*']}} =
+                      Tds.query(conn, "SELECT 42", [])
+
+             :hi
+           end) == {:error, :rollback}
+
     assert [[42]] = query("SELECT 42", [])
     assert [[0]] = query("SELECT COUNT(*) FROM uniques", [])
   end
@@ -52,6 +60,7 @@ defmodule Tds.TransactionTest do
                         []
                       )
 
+             #  assert {:error, %Tds.Error{mssql: %{class: 16, number: 3971}}} =
              assert {:ok, %Tds.Result{columns: [""], num_rows: 1, rows: ['*']}} =
                       Tds.query(conn, "SELECT 42", [])
 
@@ -72,24 +81,33 @@ defmodule Tds.TransactionTest do
     assert query("SELECT 42", []) == [[42]]
     assert DBConnection.status(pid, opts) == :idle
 
-    assert DBConnection.transaction(pid, fn conn ->
-             assert DBConnection.status(conn, opts) == :transaction
+    assert DBConnection.transaction(
+             pid,
+             fn conn ->
+               assert DBConnection.status(conn, opts) == :transaction
 
-             assert {:error, %Tds.Error{mssql: %{class: 14, number: 2627}}} =
-                      Tds.query(conn, "insert into uniques values (1), (1);", [], opts)
+               assert {:error, %Tds.Error{mssql: %{class: 14, number: 2627}}} =
+                        Tds.query(
+                          conn,
+                          "insert into uniques values (1), (1);",
+                          [],
+                          opts
+                        )
 
-             assert DBConnection.status(conn, opts) == :error
+               assert DBConnection.status(conn, opts) == :error
 
-            #  assert {:error, %Tds.Error{message: :in_failed_sql_transaction}} =
-             assert {:ok, %Tds.Result{columns: [""], num_rows: 1, rows: ['*']}} =
-                      Tds.query(conn, "SELECT 42", [], opts)
+               #  assert {:error, %Tds.Error{mssql: %{class: 16, number: 3971}}} =
+               assert {:ok,
+                       %Tds.Result{columns: [""], num_rows: 1, rows: ['*']}} =
+                        Tds.query(conn, "SELECT 42", [], opts)
 
-             assert DBConnection.status(conn, opts) == :error
-           end, opts) == {:error, :rollback}
+               assert DBConnection.status(conn, opts) == :error
+             end,
+             opts
+           ) == {:error, :rollback}
 
     assert DBConnection.status(pid, opts) == :idle
     assert query("SELECT 42", []) == [[42]]
     assert DBConnection.status(pid) == :idle
   end
-
 end

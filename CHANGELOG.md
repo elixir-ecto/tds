@@ -1,8 +1,6 @@
 # v2.0.0
 * Improvements:
     - Implements DBConnection v2.0 to support `ecto_sql`. Please note that starting from this version [tds_ecto](https://hex.pm/packages/tds_ecto) is not anymore improved and will not use tds version 2.0.0+, instead use [ecto_sql](https://hex.pm/packages/ecto_sql) where tds_ecto will become part of it starting from version 3.1.0.
-    - New connection configuration option `:set_xact_abort` is added. Valid values `:on`, `:off` default is `:on` it will set connection variable
-    `SET XACT_ABORT <value>` so failed transaction is aborted when batch fails. Since TDS uses savepoints, in most cases only last batch will be aoutomaticaly rolledback that belongs to automaticaly rolledback savepoint. More details about save point can be found [here](https://docs.microsoft.com/en-us/sql/t-sql/language-elements/save-transaction-transact-sql?view=sql-server-2017). If you want to contine transaction, reardless on failure, set this option to `:off`.
 
 # v1.1.5
 * Improvements

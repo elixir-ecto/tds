@@ -78,7 +78,6 @@ This will skip calling `sp_prepare` and query will be executed using `sp_execute
 
 Tds supports SQL instances by passing `instance: "instancename"` to the connection options.
 Since v1.0.16, additional connection parameters are:
-  - `:set_xact_abort` - tell sql to abort transaction and auto rollback when transaction fails. Default is `:on`, can be set to `:off`
   - `:set_language` - check stored procedure output `exec sp_helplanguage` name column value should be used here
   - `:set_datefirst` - number in range `1..7`
   - `:set_dateformat` - atom `:mdy | :dmy | :ymd | :ydm | :myd | :dym`
