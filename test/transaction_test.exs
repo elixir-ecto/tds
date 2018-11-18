@@ -80,7 +80,8 @@ defmodule Tds.TransactionTest do
 
              assert DBConnection.status(conn, opts) == :error
 
-             assert {:error, %Tds.Error{message: :in_failed_sql_transaction}} =
+            #  assert {:error, %Tds.Error{message: :in_failed_sql_transaction}} =
+             assert {:ok, %Tds.Result{columns: [""], num_rows: 1, rows: ['*']}} =
                       Tds.query(conn, "SELECT 42", [], opts)
 
              assert DBConnection.status(conn, opts) == :error

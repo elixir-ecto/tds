@@ -232,16 +232,15 @@ defmodule Tds.Protocol do
           | {:error | :disconnect, Exception.t(), new_state :: Prototcol.t()}
   def handle_begin(opts, %{sock: _, env: env, transaction_status: status} = s) do
     case Keyword.get(opts, :mode, :transaction) do
-      :transaction when status in [:idle] ->
+      :transaction when status == :idle ->
         send_transaction("TM_BEGIN_XACT", nil, %{
           s
           | transaction_status: :transaction
         })
 
-      :savepoint when status in [:transaction] ->
+      :savepoint when status == :transaction ->
         savepoint = env.savepoint + 1
-        env = %{env | savepoint: savepoint}
-        s = %{s | env: env}
+        s = put_in(s[:env][:savepoint], savepoint)
         send_transaction("TM_SAVE_XACT", savepoint, s)
 
       mode when mode in [:transaction, :savepoint] ->
@@ -274,12 +273,12 @@ defmodule Tds.Protocol do
           | {:error | :disconnect, Exception.t(), new_state :: Protocol.t()}
   def handle_rollback(opts, %{env: env, transaction_status: status} = s) do
     case Keyword.get(opts, :mode, :transaction) do
-      :transaction when status == :transaction ->
+      :transaction when status in [:transaction, :error] ->
         env = %{env | savepoint: 0}
         s = %{s | transaction_status: :idle, env: env}
         send_transaction("TM_ROLLBACK_XACT", 0, s)
 
-      :savepoint when status == :transaction ->
+      :savepoint when status in [:transaction, :error] ->
         s = %{s | transaction_status: :error}
         send_transaction("TM_ROLLBACK_XACT", env.savepoint, s)
 
@@ -866,9 +865,9 @@ defmodule Tds.Protocol do
         package_recv(buffer <> header, s, length - 8)
 
       {:ok,
-       <<_type::int8, stat::int8, _length::int16, _spid::int16, _package::int8,
-         _window::int8>> = _header} ->
-        # package_recv(buffer <> header, s, length - 8)
+       <<_type::int8, stat::int8, length::int16, _spid::int16, _package::int8,
+         _window::int8>> = header} ->
+        package_recv(buffer <> header, s, length - 8)
         msg = "Status #{inspect(stat)} of tds package is not yer supported!"
         {:disconnect, Tds.Error.exception(msg), s}
 

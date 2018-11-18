@@ -125,51 +125,51 @@ defmodule Tds.BinaryUtils do
   defmacro freservedbyte(), do: quote(do: 0x00 :: size(8))
 
   @doc """
-  A 8-bit little endian signed integer
+  A 8-bit signed integer
   """
-  defmacro int8(), do: quote(do: little - signed - 8)
+  defmacro int8(), do: quote(do: signed - 8)
 
   @doc """
-  A 16-bit little endian signed integer
+  A 16-bit signed integer
   """
-  defmacro int16(), do: quote(do: little - signed - 16)
+  defmacro int16(), do: quote(do: signed - 16)
 
   @doc """
-  A 16-bit little endian signed integer
+  A 16-bit signed integer
   """
-  defmacro int32(), do: quote(do: little - signed - 32)
+  defmacro int32(), do: quote(do: signed - 32)
 
   @doc """
-  A 16-bit little endian signed integer
+  A 16-bit signed integer
   """
-  defmacro int64(), do: quote(do: little - signed - 64)
+  defmacro int64(), do: quote(do: signed - 64)
 
   @doc """
-  A 16-bit little endian signed integer
+  A 16-bit signed integer
   """
-  defmacro uint8(), do: quote(do: little - unsigned - 8)
+  defmacro uint8(), do: quote(do: unsigned - 8)
 
   @doc """
-  A 16-bit little endian signed integer
+  A 16-bit signed integer
   """
-  defmacro uint16(), do: quote(do: little - unsigned - 16)
+  defmacro uint16(), do: quote(do: unsigned - 16)
 
   @doc """
-  A 32-bit little endian signed integer
+  A 32-bit signed integer
   """
-  defmacro uint32(), do: quote(do: little - unsigned - 32)
+  defmacro uint32(), do: quote(do: unsigned - 32)
 
   @doc """
-  A 64-bit little endian signed integer
+  A 64-bit signed integer
   """
-  defmacro uint64(), do: quote(do: little - unsigned - 64)
+  defmacro uint64(), do: quote(do:  unsigned - 64)
 
   @doc """
-  A 64-bit little endian signed integer
+  A 64-bit signed float
   """
-  defmacro float64(), do: quote(do: little - signed - float - 64)
+  defmacro float64(), do: quote(do: signed - float - 64)
 
-  defmacro float32(), do: quote(do: little - signed - float - 32)
+  defmacro float32(), do: quote(do: signed - float - 32)
 
   defmacro binary(size), do: quote(do: binary - size(unquote(size)))
 
@@ -177,5 +177,5 @@ defmodule Tds.BinaryUtils do
     do: quote(do: binary - size(unquote(size)) - unit(unquote(unit)))
 
   defmacro unicode(size),
-    do: quote(do: little - binary - size(unquote(size)) - unit(16))
+    do: quote(do: binary - little - size(unquote(size)) - unit(16))
 end
