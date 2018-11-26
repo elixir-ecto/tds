@@ -32,7 +32,7 @@ defmodule Tds.Types.UUID do
   def cast(_), do: :error
 
   @doc """
-  Same as `cast/1` but raises `Ecto.CastError` on invalid arguments.
+  Same as `cast/1` but raises `ArgumentError` on invalid arguments.
   """
   def cast!(value) do
     case cast(value) do
