@@ -1,7 +1,5 @@
 defmodule Tds.Parameter do
   alias Tds.Types
-  alias Tds.DateTime
-  alias Tds.DateTime2
 
   @type t :: %__MODULE__{
     name: String.t() | nil,
@@ -109,12 +107,28 @@ defmodule Tds.Parameter do
     %{param | type: :decimal}
   end
 
-  def fix_data_type(%Tds.Parameter{value: %DateTime{}} = param) do
+  def fix_data_type(%Tds.Parameter{value: %NaiveDateTime{microsecond: {_, 6}}} = param) do
+    %{param | type: :datetime2}
+  end
+
+  def fix_data_type(%Tds.Parameter{value: %NaiveDateTime{}} = param) do
     %{param | type: :datetime}
   end
 
-  def fix_data_type(%Tds.Parameter{value: %DateTime2{}} = param) do
+  def fix_data_type(%Tds.Parameter{value: %DateTime{microsecond: {_, 6}}} = param) do
     %{param | type: :datetime2}
+  end
+
+  def fix_data_type(%Tds.Parameter{value: %DateTime{}} = param) do
+    %{param | type: :datetime2}
+  end
+
+  def fix_data_type(%Tds.Parameter{value: %Time{}} = param) do
+    %{param | type: :time}
+  end
+
+  def fix_data_type(%Tds.Parameter{value: %Date{}} = param) do
+    %{param | type: :date}
   end
 
   def fix_data_type(%Tds.Parameter{value: {{_, _, _}, {_, _, _}}} = param) do

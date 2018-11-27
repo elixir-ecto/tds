@@ -148,41 +148,28 @@ defmodule Tds.Protocol do
   end
 
   @impl DBConnection
-  @spec handle_execute(
-          Tds.Query.t(),
-          DBConnection.params(),
-          opts :: Keyword.t(),
-          state :: Protocol.t()
-        ) ::
-          {:ok, Tds.Query.t(), Tds.Result.t(), new_state :: Protocol.t()}
-          | {:error | :disconnect, Exception.t(), new_state :: Protocol.t()}
-  def handle_execute(
-        %Query{handle: handle, statement: statement} = query,
-        params,
-        opts,
-        %{sock: _sock} = s
-      ) do
+  @spec handle_execute(Tds.Query.t(), DBConnection.params(), Keyword.t(), Protocol.t()) ::
+    {:ok, Tds.Query.t(), Tds.Result.t(), new_state :: Protocol.t()}
+    | {:error | :disconnect, Exception.t(), new_state :: Protocol.t()}
+  def handle_execute(%Query{} = query, params, opts, %{sock: _sock} = s) do
     params = opts[:parameters] || params
-
-    try do
-      if params != [] do
-        send_param_query(query, params, s)
-      else
-        send_query(statement, s)
-      end
-    rescue
-      exception ->
-        {:error, exception, s}
+    if params != [] do
+      send_param_query(query, params, s)
     else
-      {:ok, result, state} ->
-        {:ok, query, result, state}
+      send_query(query.statement, s)
+    end
+  rescue
+    exception ->
+      {:error, exception, s}
+  else
+    {:ok, result, state} ->
+      {:ok, query, result, state}
 
-      other ->
-        other
-    after
-      unless is_nil(handle) do
-        handle_close(query, opts, s)
-      end
+    other ->
+      other
+  after
+    unless is_nil(query.handle) do
+      handle_close(query, opts, s)
     end
   end
 
@@ -642,20 +629,25 @@ defmodule Tds.Protocol do
     end
   end
 
-  def send_param_query(
-        %Query{handle: handle, statement: statement} = _,
-        params,
-        s
-      ) do
+  @spec send_param_query(Tds.Query.t(), list(), %{
+          env: any(),
+          sock: {atom(), port()}
+        }) ::
+          {:error, any()}
+          | {:ok, %{optional(:result) => none()}}
+          | {:disconnect, any(), %{env: any(), sock: {any(), any()}}}
+          | {:error, Tds.Error.t(), %{pak_header: <<>>, tail: <<>>}}
+          | {:ok, any(), %{result: any(), state: :ready}}
+  def send_param_query(%Query{} = query, params, s) do
     msg =
-      case handle do
+      case query.handle do
         nil ->
           p = [
             %Parameter{
               name: "@statement",
               type: :string,
               direction: :input,
-              value: statement
+              value: query.statement
             },
             %Parameter{
               name: "@params",
@@ -718,36 +710,13 @@ defmodule Tds.Protocol do
     end
   end
 
-  # def send_proc(proc, params, s) do
-  #  msg = msg_rpc(proc: proc, params: params)
-  #  case send_to_result(msg, s) do
-  #    {:ok, s} ->
-  #      {:ok, %{s | statement: nil, state: :executing}}
-  #    err ->
-  #      err
-  #  end
-  # end
-
-  # def send_attn(s) do
-  #  msg = msg_attn()
-  #  simple_send(msg, s)
-
-  #  {:ok, %{s | statement: nil, state: :attn}}
-  # end
-
-  ## SERVER Packet Responses
-
-  # def message(:prelogin, _state) do
-  # end
-
-  def message(
-        :login,
-        msg_login_ack(redirect: true, tokens: tokens),
-        %{opts: opts} = s
-      ) do
+  def message(:login, msg_login_ack(redirect: true)=msg, %{opts: opts} = s ) do
     # we got an ENVCHANGE:redirection token, we need to disconnect and start over with new server
     disconnect(Tds.Error.exception(:redirected), s)
-    %{hostname: host, port: port} = tokens[:env_redirect]
+    %{hostname: host, port: port} =
+      msg
+      |> msg_login_ack(:tokens)
+      |> Keyword.get(:env_redirect)
 
     new_opts =
       opts
@@ -767,30 +736,22 @@ defmodule Tds.Protocol do
 
   ## executing
 
-  def message(
-        :executing,
-        msg_sql_result(columns: columns, rows: rows, done: done),
-        %{} = s
-      ) do
+  def message(:executing, msg_sql_result(columns: cols, rows: rows, done: done), s) do
+    num_rows = done.rows
+    rows = List.wrap(rows)
+    rows = if num_rows > 0 and length(rows) == 0, do: nil, else: rows
     columns =
-      if columns != nil do
-        columns
+      unless is_nil(cols) do
+        cols
         |> Enum.reduce([], fn col, acc -> [col[:name] | acc] end)
         |> Enum.reverse()
-      else
-        columns
       end
 
-    num_rows = done.rows
-
-    # rows are correctly orrdered when they were parsed, so below is not needed
-    # anymore
-    # rows =
-    # if rows != nil, do:  Enum.reverse(rows), else: rows
-
-    rows = if num_rows == 0 && rows == nil, do: [], else: rows
-
-    result = %Tds.Result{columns: columns, rows: rows, num_rows: num_rows}
+    result = %Tds.Result{
+      columns: columns,
+      rows: rows,
+      num_rows: done.rows
+    }
 
     {:ok, %{s | state: :executing, result: result}}
   end

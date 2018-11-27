@@ -29,6 +29,7 @@ defimpl DBConnection.Query, for: Tds.Query do
     ] ++ params
   end
 
+  def decode(_query, %Result{rows: nil} = result, _opts), do: result
   def decode(_query, %Result{rows: rows} = result, opts) do
     mapper = opts[:decode_mapper] || fn x -> x end
     rows = do_decode(rows, mapper, [])

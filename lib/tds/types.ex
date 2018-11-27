@@ -4,8 +4,6 @@ defmodule Tds.Types do
   use Bitwise
 
   alias Tds.Parameter
-  alias Tds.DateTime
-  alias Tds.DateTime2
 
   @year_1900_days :calendar.date_to_gregorian_days({1900, 1, 1})
   # @days_in_month 30
@@ -689,8 +687,8 @@ defmodule Tds.Types do
       :integer -> encode_integer_type(param)
       :decimal -> encode_decimal_type(param)
       :float -> encode_float_type(param)
-      :datetime -> encode_datetime_type(param)
       :smalldatetime -> encode_smalldatetime_type(param)
+      :datetime -> encode_datetime_type(param)
       :datetime2 -> encode_datetime2_type(param)
       :datetimeoffset -> encode_datetimeoffset_type(param)
       :date -> encode_date_type(param)
@@ -742,12 +740,28 @@ defmodule Tds.Types do
     encode_data_type(%{param | type: :decimal})
   end
 
+  def encode_data_type(%Parameter{value: %Time{}} = param) do
+    encode_data_type(%{param | type: :time})
+  end
+
+  def encode_data_type(%Parameter{value: %Date{}} = param) do
+    encode_data_type(%{param | type: :date})
+  end
+
+  def encode_data_type(%Parameter{value: %DateTime{microsecond: {_, 6}}} = param) do
+    encode_data_type(%{param | type: :datetime2})
+  end
+
   def encode_data_type(%Parameter{value: %DateTime{}} = param) do
     encode_data_type(%{param | type: :datetime})
   end
 
-  def encode_data_type(%Parameter{value: %DateTime2{}} = param) do
+  def encode_data_type(%Parameter{value: %NaiveDateTime{microsecond: {_, 6}}} = param) do
     encode_data_type(%{param | type: :datetime2})
+  end
+
+  def encode_data_type(%Parameter{value: %NaiveDateTime{}} = param) do
+    encode_data_type(%{param | type: :datetime})
   end
 
   def encode_data_type(%Parameter{value: {{_, _, _}, {_, _, _}}} = param) do
@@ -1101,11 +1115,37 @@ defmodule Tds.Types do
     encode_param_descriptor(param)
   end
 
-  # DateTime
-  def encode_param_descriptor(%Parameter{value: %Tds.DateTime{}} = param) do
+  # DateTime/DateTime2
+  def encode_param_descriptor(%Parameter{value: %DateTime{microsecond: {_, 6}}} = param) do
+    param = %{param | type: :datetime2}
+    encode_param_descriptor(param)
+  end
+
+  def encode_param_descriptor(%Parameter{value: %DateTime{}} = param) do
     param = %{param | type: :datetime}
     encode_param_descriptor(param)
   end
+
+  def encode_param_descriptor(%Parameter{value: %NaiveDateTime{microsecond: {_, 6}}} = param) do
+    param = %{param | type: :datetime2}
+    encode_param_descriptor(param)
+  end
+
+  def encode_param_descriptor(%Parameter{value: %NaiveDateTime{}} = param) do
+    param = %{param | type: :datetime}
+    encode_param_descriptor(param)
+  end
+
+  def encode_param_descriptor(%Parameter{value: %Date{}} = param) do
+    param = %{param | type: :date}
+    encode_param_descriptor(param)
+  end
+
+  def encode_param_descriptor(%Parameter{value: %Time{}} = param) do
+    param = %{param | type: :time}
+    encode_param_descriptor(param)
+  end
+
 
   def encode_param_descriptor(
         %Parameter{
@@ -1116,16 +1156,9 @@ defmodule Tds.Types do
     encode_param_descriptor(param)
   end
 
-  # DateTime2
-  def encode_param_descriptor(%Parameter{value: %Tds.DateTime2{}} = param) do
-    param = %{param | type: :datetime2}
-    encode_param_descriptor(param)
-  end
-
   def encode_param_descriptor(
         %Parameter{value: {{_, _, _}, {_, _, _, _}}} = param
       ) do
-    # Logger.debug "Param Descriptor datetime2"
     param = %{param | type: :datetime2}
     encode_param_descriptor(param)
   end
@@ -1133,14 +1166,12 @@ defmodule Tds.Types do
   def encode_param_descriptor(
         %Parameter{value: {{_, _, _}, {_, _, _, _}, _}} = param
       ) do
-    ## Logger.debug "Param Descriptor datetime2"
     encode_param_descriptor(%{param | type: :datetimeoffset})
   end
 
   def encode_param_descriptor(
         %Parameter{value: {{_, _, _}, {_, _, _}, _}} = param
       ) do
-    ## Logger.debug "Param Descriptor datetime2"
     encode_param_descriptor(%{param | type: :datetimeoffset})
   end
 
@@ -1609,6 +1640,12 @@ defmodule Tds.Types do
     secs300 = trunc(secs * 300 + 0.5)
     # Logger.debug "#{inspect {days, secs300}}"
     <<days::little-signed-32, secs300::little-unsigned-32>>
+  end
+
+  def encode_datetime(%NaiveDateTime{}=datetime) do
+    datetime
+    |> NaiveDateTime.to_erl()
+    |> encode_datetime()
   end
 
   # Time

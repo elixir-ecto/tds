@@ -1,7 +1,7 @@
 defmodule Tds.Tokens do
   import Tds.BinaryUtils
   import Tds.Utils
-  import Bitwise
+  # import Bitwise
 
   require Logger
 
@@ -44,29 +44,23 @@ defmodule Tds.Tokens do
   @tds_envtype_mirroring_partner 13
   @tds_envtype_routing 20
 
-  @token_DONE_FINAL 0x0
-  @token_DONE_MORE 0x1
-  @token_DONE_ERROR 0x2
-  @token_DONE_INXACT 0x4
-  @token_DONE_COUNT 0x10
-  @token_DONE_ATTN 0x20
-  @token_DONE_SRVERROR 0x100
+  # @token_DONE_FINAL 0x0
+  # @token_DONE_MORE 0x1
+  # @token_DONE_ERROR 0x2
+  # @token_DONE_INXACT 0x4
+  # @token_DONE_COUNT 0x10
+  # @token_DONE_ATTN 0x20
+  # @token_DONE_SRVERROR 0x100
 
-  @done_tokens [
-    final: @token_DONE_FINAL,
-    more: @token_DONE_MORE,
-    error: @token_DONE_ERROR,
-    inxact: @token_DONE_INXACT,
-    count: @token_DONE_COUNT,
-    attn: @token_DONE_ATTN,
-    srverror: @token_DONE_SRVERROR
-  ]
-  defp print_status(status) do
-    Enum.map(@done_tokens, fn {key, v} ->
-      {key, (status &&& v) == v}
-    end)
-    |> IO.inspect(label: "DONE TOKENS")
-  end
+  # @done_tokens [
+  #   final: @token_DONE_FINAL,
+  #   more: @token_DONE_MORE,
+  #   error: @token_DONE_ERROR,
+  #   inxact: @token_DONE_INXACT,
+  #   count: @token_DONE_COUNT,
+  #   attn: @token_DONE_ATTN,
+  #   srverror: @token_DONE_SRVERROR
+  # ]
 
 
   ## Decode Token Stream
@@ -390,7 +384,7 @@ defmodule Tds.Tokens do
            status::int16,
            cur_cmd::binary(2),
            row_count::little-size(8)-unit(8),
-           tail::binary
+           _tail::binary
          >>,
          tokens
        ) do
