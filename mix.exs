@@ -5,7 +5,7 @@ defmodule Tds.Mixfile do
   def project do
     [
       app: :tds,
-      version: "2.0.0",
+      version: "2.1.0",
       elixir: "~> 1.0",
       deps: deps(),
       test_coverage: [tool: ExCoveralls],

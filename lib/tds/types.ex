@@ -6,10 +6,8 @@ defmodule Tds.Types do
   alias Tds.Parameter
 
   @year_1900_days :calendar.date_to_gregorian_days({1900, 1, 1})
-  # @days_in_month 30
   @secs_in_min 60
   @secs_in_hour 60 * @secs_in_min
-  # @secs_in_day 24 * @secs_in_hour
 
   @tds_data_type_null 0x1F
   @tds_data_type_tinyint 0x30
@@ -1589,10 +1587,15 @@ defmodule Tds.Types do
     date = :calendar.gregorian_days_to_date(@year_1900_days + days)
     hour = trunc(mins / 60)
     min = trunc(mins - hour * 60)
-    {date, {hour, min, 0, 0}}
+    {date, {hour, min, 0}}
+    |> NaiveDateTime.from_erl!()
   end
 
   def encode_smalldatetime(nil), do: nil
+
+  def encode_smalldatetime(%{calendar: _}=naive_datetime) do
+    NaiveDateTime.to_erl(naive_datetime)
+  end
 
   def encode_smalldatetime({date, {hour, min, _}}),
     do: encode_smalldatetime({date, {hour, min, 0, 0}})
@@ -1608,21 +1611,15 @@ defmodule Tds.Types do
   end
 
   # DateTime
-  def decode_datetime(<<
-        days::little-signed-32,
-        secs300::little-unsigned-32
-      >>) do
-    # Logger.debug "#{inspect {days, secs300}}"
+  def decode_datetime(<<days::little-signed-32, secs300::little-unsigned-32>>) do
     date = :calendar.gregorian_days_to_date(@year_1900_days + days)
-    secs = secs300 |> div(300)
+    secs = div(secs300, 300)
     {_, {h, m, s}} = secs |> :calendar.seconds_to_daystime()
-
-    # Logger.debug "#{inspect {secs}}"
-    # remaining fractional
     sub_sec = secs300 / 300 - secs
-    # Logger.debug "#{inspect {sub_sec}}"
-    usec = trunc(sub_sec * @usecs_in_sec + 0.5)
-    {date, {h, m, s, usec}}
+    case trunc(sub_sec * @usecs_in_sec + 0.5) do
+      0 -> NaiveDateTime.from_erl!({date, {h, m, s}})
+      usec -> NaiveDateTime.from_erl!({date, {h, m, s}}, {usec, 6})
+    end
   end
 
   def encode_datetime(nil), do: nil
@@ -1631,18 +1628,22 @@ defmodule Tds.Types do
     do: encode_datetime({date, {h, m, s, 0}})
 
   def encode_datetime({date, {h, m, s, us}}) do
-    # Logger.debug "#{inspect {h,m,s,us}}"
     days = :calendar.date_to_gregorian_days(date) - @year_1900_days
     secs = h * @secs_in_hour + m * @secs_in_min + s
-    # Logger.debug "secs #{inspect {secs}}"
     secs = secs + us / @usecs_in_sec
-    # Logger.debug "secs #{inspect {secs}}"
     secs300 = trunc(secs * 300 + 0.5)
-    # Logger.debug "#{inspect {days, secs300}}"
     <<days::little-signed-32, secs300::little-unsigned-32>>
   end
 
-  def encode_datetime(%NaiveDateTime{}=datetime) do
+  def encode_datetime(%{calendar: _, microsecond: ms}=datetime) do
+    {date, time} = datetime
+    |> NaiveDateTime.to_erl()
+
+    {date, time, ms}
+    |> encode_datetime()
+  end
+
+  def encode_datetime(%{calendar: _}=datetime) do
     datetime
     |> NaiveDateTime.to_erl()
     |> encode_datetime()
@@ -1734,11 +1735,33 @@ defmodule Tds.Types do
   end
 
   def encode_datetime2(nil), do: nil
+  def encode_datetime2(%NaiveDateTime{}=datetime) do
+    datetime
+    |> NaiveDateTime.to_erl()
+    |> encode_datetime2()
+  end
 
-  def encode_datetime2({date, time}, scale \\ @max_time_scale) do
+  def encode_datetime2(datetime, scale \\ @max_time_scale)
+  def encode_datetime2({date, time}, scale) do
     time = encode_time(time, scale)
     date = encode_date(date)
     time <> date
+  end
+
+  def encode_datetime2(%{calendar: _}=datetime, scale) do
+    datetime
+    |> NaiveDateTime.to_erl()
+    |> encode_datetime2(scale)
+  end
+
+  def encode_datetime2(%DateTime{}=datetime, scale) do
+    datetime
+    |> DateTime.to_naive()
+    |> encode_datetime2(scale)
+  end
+
+  def encode_datetime2(datetime, _scale) do
+    raise ArgumentError, inspect(datetime)
   end
 
   # DateTimeOffset

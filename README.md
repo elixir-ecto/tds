@@ -80,13 +80,14 @@ Tds supports SQL instances by passing `instance: "instancename"` to the connecti
 Since v1.0.16, additional connection parameters are:
   - `:set_language` - check stored procedure output `exec sp_helplanguage` name column value should be used here
   - `:set_datefirst` - number in range `1..7`
-  - `:set_dateformat` - atom `:mdy | :dmy | :ymd | :ydm | :myd | :dym`
-  - `:set_deadlock_priority` - one of `:low | :high | :normal | -10..10`
+  - `:set_dateformat` - atom, one of `:mdy | :dmy | :ymd | :ydm | :myd | :dym`
+  - `:set_deadlock_priority` - atom, one of `:low | :high | :normal | -10..10`
   - `:set_lock_timeout` - number in milliseconds > 0
-  - `:set_remote_proc_transactions` - atom `:on | :off`
-  - `:set_implicit_transactions` - atom `:on | :off`
-  - `:set_transaction_isolation_level` - atom `:read_uncommited | :read_commited | :repeatable_read | :snapshot | :serializable`
-  - `:set_allow_snapshot_isolation` - atom `:on | :off`
+  - `:set_remote_proc_transactions` - atom, one of `:on | :off`
+  - `:set_implicit_transactions` - atom, one of `:on | :off`
+  - `:set_transaction_isolation_level` - atom, one of `:read_uncommited | :read_commited | :repeatable_read | :snapshot | :serializable`
+  - `:set_allow_snapshot_isolation` - atom, one of `:on | :off`
+  - `:set_read_committed_snapshot` - atom, one of `:on | :off`
 
 Set this option to enable snapshot isolation on the database level. Requires connecting with a user with appropriate rights. More info [here](https://docs.microsoft.com/en-us/dotnet/framework/data/adonet/sql/snapshot-isolation-in-sql-server).
 

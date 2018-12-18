@@ -40,13 +40,13 @@ defmodule DatetimeTest do
 
     assert nil == Types.encode_datetime(nil)
     enc = Types.encode_datetime(@datetime)
-    assert {@date, {15, 16, 23, 0}} == Types.decode_datetime(enc)
+    assert ~N[2015-04-08 15:16:23] == Types.decode_datetime(enc)
     enc = Types.encode_datetime(@datetime_fsec)
-    assert {@date, {15, 16, 23, 123_333}} == Types.decode_datetime(enc)
+    assert ~N[2015-04-08 15:16:23.123333] == Types.decode_datetime(enc)
 
     assert [[nil]] == query("SELECT CAST(NULL AS datetime)", [])
 
-    assert [[{{2014, 06, 20}, {10, 21, 42, 0}}]] ==
+    assert [[~N[2014-06-20 10:21:42]]] ==
              query("SELECT CAST('20140620 10:21:42 AM' AS datetime)", [])
 
     assert [[nil]] ==
@@ -54,12 +54,12 @@ defmodule DatetimeTest do
                %Parameter{name: "@n1", value: nil, type: :datetime}
              ])
 
-    assert [[{{2015, 4, 8}, {15, 16, 23, 0}}]] ==
+    assert [[~N[2015-04-08 15:16:23]]] ==
              query("SELECT @n1", [
                %Parameter{name: "@n1", value: @datetime, type: :datetime}
              ])
 
-    assert [[{{2015, 4, 8}, {15, 16, 23, 123_333}}]] ==
+    assert [[~N[2015-04-08 15:16:23.123333]]] ==
              query("SELECT @n1", [
                %Parameter{name: "@n1", value: @datetime_fsec, type: :datetime}
              ])
@@ -76,10 +76,10 @@ defmodule DatetimeTest do
   test "smalldatetime", context do
     assert nil == Types.encode_smalldatetime(nil)
     enc = Types.encode_smalldatetime(@datetime)
-    assert {@date, {15, 16, 0, 0}} == Types.decode_smalldatetime(enc)
+    assert ~N[2015-04-08 15:16:00] == Types.decode_smalldatetime(enc)
     assert [[nil]] == query("SELECT CAST(NULL AS smalldatetime)", [])
 
-    assert [[{{2014, 06, 20}, {10, 40, 0, 0}}]] ==
+    assert [[~N[2014-06-20 10:40:00]]] ==
              query("SELECT CAST('20140620 10:40 AM' AS smalldatetime)", [])
 
     assert [[nil]] ==
@@ -87,12 +87,12 @@ defmodule DatetimeTest do
                %Parameter{name: "@n1", value: nil, type: :smalldatetime}
              ])
 
-    assert [[{{2015, 4, 8}, {15, 16, 0, 0}}]] ==
+    assert [[~N[2015-04-08 15:16:00]]] ==
              query("SELECT @n1", [
                %Parameter{name: "@n1", value: @datetime, type: :smalldatetime}
              ])
 
-    assert [[{{2015, 4, 8}, {15, 16, 0, 0}}]] ==
+    assert [[~N[2015-04-08 15:16:00]]] ==
              query("SELECT @n1", [
                %Parameter{
                  name: "@n1",
@@ -282,7 +282,7 @@ defmodule DatetimeTest do
     # assert [{{{2015, 4, 8}, {15, 16, 23, 123456}}}] ==
     #   query("SELECT @n1", [%Parameter{name: "@n1", value: @time_fsec}])
     # datetime {_,_,_}, {_,_,_}
-    assert [[{{2015, 4, 8}, {15, 16, 23, 0}}]] ==
+    assert [[~N[2015-04-08 15:16:23]]] ==
              query("SELECT @n1", [%Parameter{name: "@n1", value: @datetime}])
 
     # #datetime_fsec {_,_,_,}, {_,_,_,_}
