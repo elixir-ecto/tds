@@ -14,6 +14,7 @@ defmodule Tds.Protocol do
   require Logger
 
   @behaviour DBConnection
+  @behaviour Access
 
   # @packet_status_NORMAL 0x0 # more messaes
   # end of message
@@ -899,6 +900,7 @@ defmodule Tds.Protocol do
       append_envvar(opts, :set_remote_proc_transactions),
       append_envvar(opts, :set_implicit_transactions),
       append_envvar(opts, :set_transaction_isolation_level),
+      append_envvar(opts, :set_read_committed_snapshot),
       append_envvar(opts, :set_allow_snapshot_isolation)
     ]
     |> Enum.reject(&is_nil/1)
@@ -1053,6 +1055,33 @@ defmodule Tds.Protocol do
     end
   end
 
+  defp append_envvar(opts, :set_read_committed_snapshot) do
+    database = Keyword.get(opts, :database)
+    level = Keyword.get(opts, :set_read_committed_snapshot)
+
+    case {database, level} do
+      {nil, _} ->
+        raise(
+          Tds.Error,
+          "Option `:set_read_committed_snapshot` requres `:database` to be set."
+        )
+
+      {_, nil} ->
+        nil
+
+      {db, val} when val in [:on, :off] ->
+        on_off = val |> Atom.to_string() |> String.upcase()
+        "ALTER DATABASE [#{db}] SET READ_COMMITTED_SNAPSHOT #{on_off}; "
+
+      {_, val} ->
+        raise(
+          Tds.ConfigError,
+          "Option `:set_read_committed_snapshot` has has invalid value " <>
+            "'#{inspect(val)}'. should be either :on, :off, nil"
+        )
+    end
+  end
+
   defp append_envvar(opts, :set_allow_snapshot_isolation) do
     database = Keyword.get(opts, :database)
     level = Keyword.get(opts, :set_allow_snapshot_isolation)
@@ -1079,6 +1108,40 @@ defmodule Tds.Protocol do
           "Option :set_allow_snapshot_isolation has has invalid value " <>
             "'#{inspect(val)}'. should be either :on, :off, nil"
         )
+    end
+  end
+
+  # Access callbacks
+  @impl Access
+  def fetch(data, key) do
+    if Map.has_key?(data, key) do
+      {:ok, Map.get(data, key)}
+    else
+      :error
+    end
+  end
+
+  @impl Access
+  def get_and_update(data, key, fun) do
+    get_value = Map.get(data, key)
+    {get_value, new_data} = fun.(get_value)
+    data = Map.put(data, key, new_data)
+    {get_value, data}
+  end
+
+  @impl Access
+  def get(data, key, default) do
+    case fetch(data, key) do
+      {:ok, value} -> value
+      :error       -> default
+    end
+  end
+
+  @impl Access
+  def pop(data, key) do
+    case fetch(data, key) do
+      {:ok, value} -> {value, data}
+      :error       -> {nil, data}
     end
   end
 end
