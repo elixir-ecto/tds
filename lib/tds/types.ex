@@ -1635,11 +1635,11 @@ defmodule Tds.Types do
     <<days::little-signed-32, secs300::little-unsigned-32>>
   end
 
-  def encode_datetime(%{calendar: _, microsecond: ms}=datetime) do
-    {date, time} = datetime
+  def encode_datetime(%{calendar: _, microsecond: {ms, _}}=datetime) do
+    {date, {h, m, s}} = datetime
     |> NaiveDateTime.to_erl()
 
-    {date, time, ms}
+    {date, {h, m , s, ms}}
     |> encode_datetime()
   end
 
