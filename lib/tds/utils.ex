@@ -54,4 +54,10 @@ defmodule Tds.Utils do
   def error(error, _s) do
     {:error, error}
   end
+
+  if Kernel.function_exported?(Decimal, :from_float, 1) do
+    def to_decimal(float), do: Decimal.from_float(float)
+  else
+    def to_decimal(float), do: Decimal.new(float)
+  end
 end
