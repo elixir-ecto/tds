@@ -938,7 +938,7 @@ defmodule Tds.Types do
 
   def encode_float_type(%Parameter{value: value} = param)
       when is_float(value) do
-    encode_float_type(%{param | value: Decimal.from_float(value)})
+    encode_float_type(%{param | value: to_decimal(value)})
   end
 
   def encode_float_type(%Parameter{value: %Decimal{} = value}) do
@@ -1237,7 +1237,7 @@ defmodule Tds.Types do
   def encode_float_descriptor(%Parameter{value: value} = param)
       when is_float(value) do
     param
-    |> Map.put(:value, Decimal.from_float(value))
+    |> Map.put(:value, to_decimal(value))
     |> encode_float_descriptor
   end
 
