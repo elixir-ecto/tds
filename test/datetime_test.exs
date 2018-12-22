@@ -168,9 +168,9 @@ defmodule DatetimeTest do
   test "datetime2", context do
     assert nil == Types.encode_datetime2(nil)
     enc = Types.encode_datetime2(@datetime)
-    assert {@date, {15, 16, 23, 0}} == Types.decode_datetime2(7, enc)
+    assert ~N[2015-04-08 15:16:23.000000] == Types.decode_datetime2(7, enc)
     enc = Types.encode_datetime2(@datetime_fsec)
-    assert @datetime_fsec == Types.decode_datetime2(7, enc)
+    assert ~N[2015-04-08 15:16:23.123456] == Types.decode_datetime2(7, enc)
     enc = Types.encode_datetime2({@date, {131, 56, 23, 0}}, 0)
     assert {@date, {131, 56, 23, 0}} == Types.decode_datetime2(0, enc)
 
@@ -286,7 +286,7 @@ defmodule DatetimeTest do
              query("SELECT @n1", [%Parameter{name: "@n1", value: @datetime}])
 
     # #datetime_fsec {_,_,_,}, {_,_,_,_}
-    assert [[{{2015, 4, 8}, {15, 16, 23, 123_456}}]] ==
+    assert [[~N[2015-04-08 15:16:23.123456]]] ==
              query("SELECT @n1", [
                %Parameter{name: "@n1", value: @datetime_fsec}
              ])

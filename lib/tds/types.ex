@@ -1687,7 +1687,7 @@ defmodule Tds.Types do
   # 5 bytes if 5 <= n < = 7.
   def encode_time(nil), do: nil
   def encode_time({h, m, s}), do: encode_time({h, m, s, 0})
-  def encode_time(time), do: encode_time(time, @max_time_scale)
+
   def encode_time({h, m, s}, scale), do: encode_time({h, m, s, 0}, scale)
 
   def encode_time({hour, min, sec, fsec}, scale) do
@@ -1708,7 +1708,7 @@ defmodule Tds.Types do
         <<fsec::little-unsigned-40>>
     end
   end
-
+  def encode_time(time), do: encode_time(time, @max_time_scale)
   # DateTime2
   def decode_datetime2(scale, <<data::binary>>) do
     {time, date} =
@@ -1729,7 +1729,11 @@ defmodule Tds.Types do
           raise "DateTime Scale Unknown"
       end
 
-    {decode_date(date), decode_time(scale, time)}
+    {hour, min, sec, msec} = decode_time(scale, time)
+    date = decode_date(date)
+
+    # erlang scale is at maximum 6
+    NaiveDateTime.from_erl!({date, {hour, min, sec}}, {msec,  min(scale, 6)})
   end
 
   def encode_datetime2(nil), do: nil
