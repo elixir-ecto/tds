@@ -667,9 +667,8 @@ defmodule Tds.Types do
     :unicode.characters_to_binary(data, {:utf16, :little}, :utf8)
   end
 
-  def decode_xml(_data_info, <<_data::binary>>) do
-    # TODO: Decode XML Data
-    nil
+  def decode_xml(_data_info, <<data::binary>>) do
+    :unicode.characters_to_binary(data, {:utf16, :little}, :utf8)
   end
 
   def decode_udt(%{}, <<_data::binary>>) do
