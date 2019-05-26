@@ -39,7 +39,7 @@ defmodule Tds.Mixfile do
       {:db_connection, "~> 1.1"},
       {:dialyxir, "~> 0.5", only: [:dev], runtime: false},
       {:excoveralls, "~> 0.7", only: :test},
-      {:ex_doc, "~> 0.18", only: :dev}
+      {:ex_doc, "~> 0.19", only: :dev}
     ]
   end
 
