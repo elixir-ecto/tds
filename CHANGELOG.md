@@ -1,3 +1,7 @@
+# v1.1.7
+* Bugfix
+- Fix for "Error with set_transaction_isolation_level: :read_uncommited" [issue #72](https://github.com/livehelpnow/tds_ecto/issues/72) 
+
 # v1.1.5
 * Improvements
   - Allow users to choose between `:prepare_execute` and `:executesql` style (PR #71) default is `:prepare_execute`
