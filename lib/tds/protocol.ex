@@ -17,8 +17,8 @@ defmodule Tds.Protocol do
   @max_packet 4 * 1024
   @sock_opts [packet: :raw, mode: :binary, active: false, recbuf: 4096]
   @trans_levels [
-    :read_uncommited,
-    :read_commited,
+    :read_uncommitted,
+    :read_committed,
     :repeatable_read,
     :snapshot,
     :serializable

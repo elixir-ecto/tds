@@ -84,7 +84,7 @@ Since v1.0.16, additional connection parameters are:
   - `:set_lock_timeout` - number in milliseconds > 0
   - `:set_remote_proc_transactions` - atom `:on | :off`
   - `:set_implicit_transactions` - atom `:on | :off`
-  - `:set_transaction_isolation_level` - atom `:read_uncommited | :read_commited | :repeatable_read | :snapshot | :serializable`
+  - `:set_transaction_isolation_level` - atom `:read_uncommitted | :read_committed | :repeatable_read | :snapshot | :serializable`
   - `:set_allow_snapshot_isolation` - atom `:on | :off`
 
 Set this option to enable snapshot isolation on the database level. Requires connecting with a user with appropriate rights. More info [here](https://docs.microsoft.com/en-us/dotnet/framework/data/adonet/sql/snapshot-isolation-in-sql-server).
