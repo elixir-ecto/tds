@@ -305,7 +305,7 @@ defmodule Tds.Protocol do
         server =
           str
           |> String.split(";")
-          |> Enum.chunk(2)
+          |> Enum.chunk_every(2)
           |> Enum.reduce([], fn [k, v], acc ->
             k =
               k
