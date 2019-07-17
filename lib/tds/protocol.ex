@@ -34,7 +34,7 @@ defmodule Tds.Protocol do
             # current tds packet header
             pak_header: "",
             # current tds message holding previous tds packets
-            pak_data: "",
+            pak_data: [],
             result: nil,
             query: nil,
             transaction: nil,
@@ -364,7 +364,7 @@ defmodule Tds.Protocol do
   end
 
   # no data to process
-  defp new_data(<<_data::0>>, s) do
+  defp new_data(<<>>, s) do
     {:ok, s}
   end
 
@@ -374,33 +374,31 @@ defmodule Tds.Protocol do
          <<0xFD, 0x20, _cur_cmd::binary(2), 0::size(8)-unit(8), _tail::binary>>,
          %{state: :attn} = s
        ) do
-    s = %{s | pak_header: "", pak_data: "", tail: ""}
+    s = %{s | pak_header: "", pak_data: [], tail: ""}
     message(:attn, :attn, s)
   end
 
   # shift 8 bytes while in attention state, Protocol updates state
-  defp new_data(<<_b::size(1)-unit(8), tail::binary>>, %{state: :attn} = s) do
+  defp new_data(<<b::size(1)-unit(8), tail::binary>>, %{state: :attn} = s) do
+    Logger.debug(fn -> "Attn 0b#{Integer.to_string(b, 2)}" end)
     new_data(tail, s)
   end
 
+  defp new_data(<<pak_header::binary(8), tail::binary>>, %{pak_header: ""}=s) do
+    new_data(tail, %{s | pak_header: pak_header})
+  end
+
   # no packet header yet
-  defp new_data(<<data::binary>>, %{pak_header: ""} = s) do
-    if byte_size(data) >= 8 do
-      # assume incoming data starts with packet header, if it's long enough
-      # Logger.debug "S: #{inspect s}"
-      <<pak_header::binary(8), tail::binary>> = data
-      new_data(tail, %{s | pak_header: pak_header})
-    else
-      # have no packet header yet, wait for more data
-      {:ok, %{s | tail: data}}
-    end
+  defp new_data(data, %{pak_header: ""} = s) do
+    # have no packet header yet, wait for more data
+    {:ok, %{s | tail: data}}
   end
 
   defp new_data(
-         <<data::binary>>,
-         %{state: state, pak_header: pak_header, pak_data: pak_data} = s
+         data,
+         %{state: state, pak_header: <<type::int8, status::int8, size::int16, _head_rem::int32>>, pak_data: pak_data} = s
        ) do
-    <<type::int8, status::int8, size::int16, _head_rem::int32>> = pak_header
+
     # size includes packet header
     size = size - 8
 
@@ -412,17 +410,17 @@ defmodule Tds.Protocol do
             # status 1 means last packet of message
             # TODO Messages.parse does not use pak_header
 
-            msg = parse(state, type, pak_header, pak_data <> package)
+            msg = parse(state, type, IO.iodata_to_binary([pak_data | package]))
 
             case message(state, msg, s) do
               {:ok, s} ->
                 # message processed, reset header and msg buffer, then process
                 # tail
-                new_data(tail, %{s | pak_header: "", pak_data: ""})
+                new_data(tail, %{s | pak_header: "", pak_data: []})
 
               {:ok, _result, s} ->
                 # send_query returns a result
-                new_data(tail, %{s | pak_header: "", pak_data: ""})
+                new_data(tail, %{s | pak_header: "", pak_data: []})
 
               {:error, _, _} = err ->
                 err
@@ -431,12 +429,12 @@ defmodule Tds.Protocol do
           _ ->
             # not the last packet of message, more packets coming with new
             # packet header
-            new_data(tail, %{s | pak_header: "", pak_data: pak_data <> package})
+            new_data(tail, %{s | pak_header: "", pak_data: [pak_data | package]})
         end
 
       data ->
         # size specified in packet header still unsatisfied, wait for more data
-        {:ok, %{s | tail: data, pak_header: pak_header}}
+        {:ok, %{s | tail: data}}
     end
   end
 
@@ -812,7 +810,7 @@ defmodule Tds.Protocol do
         res
 
       buffer ->
-        new_data(buffer, %{s | state: :executing, pak_header: ""})
+        new_data(IO.iodata_to_binary(buffer), %{s | state: :executing, pak_header: ""})
     end
   end
 
@@ -831,7 +829,7 @@ defmodule Tds.Protocol do
           _window::int8
         >> = header
       } ->
-        (buffer <> header)
+        [buffer | header]
         |> package_recv(s, length - 8)
         |> msg_recv(s)
 
@@ -848,7 +846,7 @@ defmodule Tds.Protocol do
         >> = header
       } ->
         # IO.puts("header: #{inspect header}")
-        (buffer <> header)
+        [buffer | header]
         |> package_recv(s, length - 8)
 
       {:ok,
@@ -860,7 +858,7 @@ defmodule Tds.Protocol do
          _package::int8,
          _window::int8
        >> = header} ->
-        (buffer <> header)
+        [buffer | header]
         |> package_recv(s, length - 8)
 
         raise "Status #{inspect(status)} of tds package is not yer supported!"
@@ -878,11 +876,11 @@ defmodule Tds.Protocol do
       {:ok, data} when byte_size(data) < length ->
         length = length - byte_size(data)
 
-        (buffer <> data)
+        [buffer | data]
         |> package_recv(s, length)
 
       {:ok, data} ->
-        buffer <> data
+        [buffer | data]
 
       {:error, exception} ->
         {:disconnect, exception, s}
@@ -916,7 +914,7 @@ defmodule Tds.Protocol do
         {:error, ex, s}
 
       buffer ->
-        new_data(buffer, %{s | state: :login})
+        new_data(IO.iodata_to_binary(buffer), %{s | state: :login})
     end
   end
 

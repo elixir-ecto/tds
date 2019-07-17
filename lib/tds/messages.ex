@@ -83,19 +83,18 @@ defmodule Tds.Messages do
 
   ## Parsers
 
-  def parse(:login, @tds_pack_reply, _header, tail) do
-    case tail do
-      <<170::little-size(8), _::binary>> ->
-        [error: error] = decode_tokens(tail, [])
+  def parse(:login, @tds_pack_reply, tail) do
+    case decode_tokens(tail, []) do
+      [error: error] when error != nil ->
         msg_error(e: error)
 
-      _ ->
-        tokens = decode_tokens(tail, [])
+      tokens ->
         msg_login_ack(type: 4, redirect: Keyword.has_key?(tokens, :env_redirect), tokens: tokens)
     end
   end
 
-  def parse(:executing, @tds_pack_reply, _header, tail) do
+
+  def parse(:executing, @tds_pack_reply, tail) do
     tokens = []
     tokens = decode_tokens(tail, tokens)
 
@@ -103,7 +102,7 @@ defmodule Tds.Messages do
       [error: error] ->
         msg_error(e: error)
 
-      [done: %{}, trans: <<trans::binary>>] ->
+      [done: %{}, trans: trans] ->
         msg_trans(trans: trans)
 
       tokens ->
@@ -133,7 +132,7 @@ defmodule Tds.Messages do
     terminator = <<0xFF>>
     prelogin_data = version_data
     data = version <> terminator <> prelogin_data
-    encode_packets(0x12, data, [])
+    encode_packets(0x12, data)
     # encode_header(0x12, data) <> data
   end
 
@@ -277,7 +276,7 @@ defmodule Tds.Messages do
 
     login7_len = byte_size(login7) + 4
     data = <<login7_len::little-size(32)>> <> login7
-    encode_packets(0x10, data, [])
+    encode_packets(0x10, data)
     # header = encode_header(0x10, data)
 
     # header <> data
@@ -308,7 +307,7 @@ defmodule Tds.Messages do
     total_length = byte_size(headers) + 4
     all_headers = <<total_length::little-size(32)>> <> headers
     data = all_headers <> q_ucs
-    encode_packets(0x01, data, [])
+    encode_packets(0x01, data)
     # header = encode_header(0x01, data)
     # header <> data
   end
@@ -333,7 +332,7 @@ defmodule Tds.Messages do
 
     data = all_headers <> encode_rpc(proc, params)
     # layout Data
-    encode_packets(0x03, data, [])
+    encode_packets(0x03, data)
     # header = encode_header(0x03, data)
     # pak = header <> data
     # pak
@@ -371,7 +370,7 @@ defmodule Tds.Messages do
     all_headers = <<total_length::little-size(32)>> <> headers
     request_payload = encode_trans_request(request_type, savepoint)
     data = all_headers <> <<request_type::little-size(2)-unit(8)>> <> request_payload
-    encode_packets(0x0E, data, [])
+    encode_packets(0x0E, data)
   end
 
   @trans_iso_no_isolation_level 0x00
@@ -472,23 +471,24 @@ defmodule Tds.Messages do
     >>
   end
 
-  defp encode_packets(_type, <<>>, paks) do
-    Enum.reverse(paks)
+  defp encode_packets(type, binary, id \\ 1)
+  defp encode_packets(_type, <<>>, _) do
+    [<<>>]
   end
 
   defp encode_packets(
     type,
     <<data::binary-size(@tds_pack_data_size)-unit(8), tail::binary>>,
-    paks
+    id
   ) do
     status = if byte_size(tail) > 0, do: 0, else: 1
-    header = encode_header(type, data, id: length(paks) + 1, status: status)
-    encode_packets(type, tail, [header <> data | paks])
+    header = encode_header(type, data, id: rem(id, 255), status: status)
+    [header <> data | encode_packets(type, tail, id + 1)]
   end
 
-  defp encode_packets(type, <<data::binary>>, paks) do
-    header = encode_header(type, data, id: length(paks) + 1, status: 1)
-    encode_packets(type, <<>>, [header <> data | paks])
+  defp encode_packets(type, data, id) do
+    header = encode_header(type, data, id: id + 1, status: 1)
+    [header <> data]
   end
 
   defp encode_tdspassword(list) do

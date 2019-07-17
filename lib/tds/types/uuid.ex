@@ -27,7 +27,7 @@ defmodule Tds.Types.UUID do
     casted -> {:ok, casted}
   end
 
-  def cast(<< _::128 >> = binary), do: encode(binary)
+  def cast(<<bin::binary-size(16)>>), do: encode(bin)
 
   def cast(_), do: :error
 

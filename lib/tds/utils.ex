@@ -23,24 +23,22 @@ defmodule Tds.Utils do
   end
 
   def to_little_ucs2(str) do
-    with utf16 when is_bitstring(utf16) <-
-           :unicode.characters_to_binary(
-             str,
-             :unicode,
-             {:utf16, :little}
-           ) do
-      utf16
-    else
-      _ ->
-        error = ~s(failed to convert string "#{inspect(str)}" to ucs2 binary)
-        raise Tds.Error, error
+    convert = fn char ->
+      case :iconv.convert("UTF-8", "UCS-2LE", <<char::utf8>>) do
+        "" -> <<63::little-size(8)-unit(2)>>
+        c -> c
+      end
     end
+
+    for <<ch::utf8 <- str>>,
+      do: convert.(ch),
+      into: <<>>
   end
 
   def ucs2_to_utf(s) do
-    :binary.bin_to_list(s)
-    |> Enum.reject(&(&1 == 0))
-    |> to_string()
+    for <<ch::little-size(8)-unit(2) <- s>>,
+      do: :iconv.convert("UCS-2BE", "UTF-8", <<ch::utf16>>),
+      into: <<>>
   end
 
   def to_boolean(<<1>>) do

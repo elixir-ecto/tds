@@ -29,7 +29,7 @@ defmodule Tds.Mixfile do
   end
 
   def application do
-    [applications: [:logger, :db_connection, :decimal]]
+    [applications: [:logger, :db_connection, :decimal, :iconv]]
   end
 
   defp deps do
@@ -39,7 +39,8 @@ defmodule Tds.Mixfile do
       {:db_connection, "~> 1.1"},
       {:dialyxir, "~> 0.5", only: [:dev], runtime: false},
       {:excoveralls, "~> 0.7", only: :test},
-      {:ex_doc, "~> 0.19", only: :dev}
+      {:ex_doc, "~> 0.19", only: :dev},
+      {:iconv, "~> 1.0"}
     ]
   end
 

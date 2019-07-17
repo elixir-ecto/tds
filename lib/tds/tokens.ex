@@ -64,7 +64,9 @@ defmodule Tds.Tokens do
           "Unknown datatype parsed when decoding return value: #{dec}"
   end
 
-  defp decode_value(<<0x26, size::size(8), size::size(8), data::binary>>) do
+  defp decode_value(
+    <<0x26, size::size(8), size::size(8), data::binary>>
+    ) do
     <<value::little-size(size)-unit(8), data::binary>> = data
     {value, data}
   end

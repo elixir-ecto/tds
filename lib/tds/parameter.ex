@@ -4,24 +4,31 @@ defmodule Tds.Parameter do
   alias Tds.DateTime2
 
   @type t :: %__MODULE__{
-    name: String.t() | nil,
-    direction: :input | :output,
-    value: String.t() | nil,
-    type: atom() | nil
-  }
+          name: String.t() | nil,
+          direction: :input | :output,
+          value: String.t() | nil,
+          type: atom() | nil,
+          length: nil | integer
+        }
 
-  defstruct name: "", direction: :input, value: "", type: nil
+  defstruct name: "",
+            direction: :input,
+            value: "",
+            type: nil,
+            length: nil
 
   def option_flags(%__MODULE__{direction: direction, value: value}) do
-    fByRefValue = case direction do
-      :output -> 1
-      _ -> 0
-    end
+    fByRefValue =
+      case direction do
+        :output -> 1
+        _ -> 0
+      end
 
-    fDefaultValue = case value do
-      :default -> 1
-      _ -> 0
-    end
+    fDefaultValue =
+      case value do
+        :default -> 1
+        _ -> 0
+      end
 
     <<0::size(6), fDefaultValue::size(1), fByRefValue::size(1)>>
   end
@@ -65,22 +72,22 @@ defmodule Tds.Parameter do
   end
 
   def fix_data_type(%Tds.Parameter{type: type, value: _value} = param)
-  when not is_nil(type) do
+      when not is_nil(type) do
     param
   end
 
   def fix_data_type(%Tds.Parameter{value: value} = param)
-  when value == true or value == false do
+      when value == true or value == false do
     %{param | type: :boolean}
   end
 
   def fix_data_type(%Tds.Parameter{value: value} = param)
-  when is_binary(value) and value == "" do
+      when is_binary(value) and value == "" do
     %{param | type: :string}
   end
 
   def fix_data_type(%Tds.Parameter{value: value} = param)
-  when is_binary(value) do
+      when is_binary(value) do
     if String.valid?(value) do
       %{param | type: :string}
     else
@@ -88,7 +95,8 @@ defmodule Tds.Parameter do
     end
   end
 
-  def fix_data_type(%Tds.Parameter{value: value} = param) when is_integer(value) do
+  def fix_data_type(%Tds.Parameter{value: value} = param)
+      when is_integer(value) do
     %{param | type: :integer}
   end
 
@@ -137,7 +145,7 @@ defmodule Tds.Parameter do
     %{param | type: :datetimeoffset}
   end
 
-  def fix_data_type(%Tds.Parameter{type: nil, value: nil}=param) do
+  def fix_data_type(%Tds.Parameter{type: nil, value: nil} = param) do
     # should fix ecto has_one, on_change :nulify issue where type is not know when ecto
     # build query/statement for on_chage callback
     %{param | type: :binary}
@@ -150,6 +158,7 @@ defmodule Tds.Parameter do
       else
         raw_param
       end
+
     fix_data_type(param)
   end
 

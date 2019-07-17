@@ -4,11 +4,16 @@
 
 MSSQL / TDS Database driver for Elixir.
 
-Supports Ecto 2.0. It (mostly) implements the [db_connection](https://github.com/elixir-ecto/db_connection) behaviour and has support for transactions and prepared queries.
+Supports Ecto 2.0. It implements the [db_connection](https://github.com/elixir-ecto/db_connection) behaviour and has support for transactions and prepared queries.
 
 Please check out the issues for a more complete overview. This branch should not be considered stable or ready for production yet.
 
 ## Usage
+
+As of TDS version `>= 1.2`, it requires `iconv` native dependency. 
+For Linux and MacOS you may need to `brew`, `apt-get` or `yum` install `libiconv`. 
+For Windows OS it is suggested to use [MSYS2](http://www.msys2.org/),
+follow instructions on the page, it will install `libiconv` for you once you execute `pacman -Su` in MSYS2 shell.
 
 Add Tds as a dependency in your `mix.exs` file.
 
