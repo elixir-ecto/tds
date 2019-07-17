@@ -9,3 +9,4 @@ cover/
 .idea/
 .code/
 .tool-versions
+priv/libconv

@@ -1,5 +1,15 @@
 defmodule Tds.BinaryUtils do
   @moduledoc false
+  # @on_load :load_nifs
+
+  # def load_nifs() do
+  #   path = :filename.join(:code.priv_dir(:tds), 'binaryutils')
+  #   :ok = :erlang.load_nif(path, 0)
+  # end
+
+  def convert(_from_encoding, _to_encoding, _binary) do
+    raise "NIF binaryutils is not implemented"
+  end
 
   defmacro int64 do
     quote do: signed - 64
