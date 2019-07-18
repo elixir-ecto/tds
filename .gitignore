@@ -10,3 +10,5 @@ cover/
 .code/
 .tool-versions
 priv/libconv
+priv/binaryutils.so
+priv/binaryutils.so.*
