@@ -11,15 +11,24 @@ Please check out the issues for a more complete overview. This branch should not
 ## Usage
 
 As of TDS version `>= 1.2`, it requires `iconv` native dependency. 
-For Linux and MacOS you may need to `brew`, `apt-get` or `yum` install `libiconv`. 
-For Windows OS it is suggested to use [MSYS2](http://www.msys2.org/),
-follow instructions on the page, it will install `libiconv` for you once you execute `pacman -Su` in MSYS2 shell.
+
+**Linux and MacOS** 
+- Ensure that you have c/c++ compiler installed
+- You may need to `brew`, `apt-get` or `yum` install `libiconv-dev` since mix compile search for `iconv.h` header. 
+
+**Windows OS**:
+- Install [MSYS2](http://www.msys2.org/) 
+- Open MSYS2 console and exec `pacman -S base-devel gcc vim cmake libiconv libiconv-devel`
+- Add MinGW64/bin to your PATH environment variable
+- Add new environment variable `CPLUS_INCLUDE_PATH` to point to something like `c:\<path_to_msys64>\usr\include`
+
+
 
 Add Tds as a dependency in your `mix.exs` file.
 
 ```elixir
 def deps do
-  [{:tds, "~> 1.1"} ]
+  [{:tds, "~> 1.2"} ]
 end
 ```
 

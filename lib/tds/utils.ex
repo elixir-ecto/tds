@@ -24,7 +24,7 @@ defmodule Tds.Utils do
 
   def to_little_ucs2(str) do
     convert = fn char ->
-      case :iconv.convert("UTF-8", "UCS-2LE", <<char::utf8>>) do
+      case Tds.BinaryUtils.convert("UTF-8", "UCS-2LE", <<char::utf8>>) do
         "" -> <<63::little-size(8)-unit(2)>>
         c -> c
       end
@@ -37,7 +37,7 @@ defmodule Tds.Utils do
 
   def ucs2_to_utf(s) do
     for <<ch::little-size(8)-unit(2) <- s>>,
-      do: :iconv.convert("UCS-2BE", "UTF-8", <<ch::utf16>>),
+      do: Tds.BinaryUtils.convert("UCS-2BE", "UTF-8", <<ch::utf16>>),
       into: <<>>
   end
 

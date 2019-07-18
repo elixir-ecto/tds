@@ -1,5 +1,5 @@
 MIX = mix
-ICONV_VER = 1.9.1
+# ICONV_VER = 1.9.1
 ERLANG_PATH = $(shell erl -eval 'io:format("~s", [lists:concat([code:root_dir(), "/erts-", erlang:system_info(version), "/include"])])' -s init stop -noshell)
 CFLAGS = -g -O2 -Wall -I$(ERLANG_PATH)
 
@@ -8,7 +8,7 @@ CFLAGS = -g -O2 -Wall -I$(ERLANG_PATH)
 # else
 #   $(shell mkdir -p tmp)
 #   $(shell curl -L http://ftp.gnu.org/pub/gnu/libiconv/libiconv-$(ICONV_VER).tar.gz | tar xz -C tmp)
-# 	ICONV_PATH = tmp/libiconv-$(ICONV_VER)
+# 	ICONV_PATH = c_src/libiconv-$(ICONV_VER)
 # endif
 
 # CFLAGS += -I$(ICONV_PATH)/src
@@ -21,7 +21,7 @@ ifneq ($(OS),Windows_NT)
 	endif
 endif
 
-#.PHONY: all tds clean
+.PHONY: all tds clean
 
 all: tds
 
@@ -33,3 +33,7 @@ priv/binaryutils.so: c_src/binaryutils.c
 
 priv/binaryutils.dll: c_src/binaryutils.c
 	$(CC) $(CFLAGS) -shared $(LDFLAGS) -o $@ c_src/binaryutils.c
+
+clean:
+	$(MIX) clean
+	$(RM) -fr priv
