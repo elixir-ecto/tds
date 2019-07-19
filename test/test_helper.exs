@@ -70,7 +70,7 @@ BEGIN
 END;
 CREATE DATABASE [#{database}];
 """)
-{"Changed database context to 'test'.\n", 0} = Tds.TestHelper.sqlcmd(opts, """
+{"Changed database context to 'test'." <> _, 0} = Tds.TestHelper.sqlcmd(opts, """
 USE [test];
 
 CREATE TABLE altering ([a] int)
@@ -79,8 +79,7 @@ CREATE TABLE [composite1] ([a] int, [b] text);
 CREATE TABLE [composite2] ([a] int, [b] int, [c] int);
 CREATE TABLE [uniques] ([id] int NOT NULL, CONSTRAINT UIX_uniques_id UNIQUE([id]))
 """)
-
-{"Changed database context to 'test'.\n", 0} = Tds.TestHelper.sqlcmd opts, """
+{"Changed database context to 'test'." <> _, 0} = Tds.TestHelper.sqlcmd opts, """
 USE test
 GO
 CREATE SCHEMA test;
