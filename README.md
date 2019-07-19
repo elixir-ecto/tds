@@ -10,25 +10,16 @@ Please check out the issues for a more complete overview. This branch should not
 
 ## Usage
 
-As of TDS version `>= 1.2`, it requires `iconv` native dependency. 
-
-**Linux and MacOS** 
-- Ensure that you have c/c++ compiler installed
-- You may need to `brew`, `apt-get` or `yum` install `libiconv-dev` since mix compile search for `iconv.h` header. 
-
-**Windows OS**:
-- Install [MSYS2](http://www.msys2.org/) 
-- Open MSYS2 console and exec `pacman -S base-devel gcc vim cmake libiconv libiconv-devel`
-- Add MinGW64/bin to your PATH environment variable
-- Add new environment variable `CPLUS_INCLUDE_PATH` to point to something like `c:\<path_to_msys64>\usr\include`
-
+As of TDS version `>= 1.2`, it requires `rust` to be installed for nif required to 
+properly encode/decode `char`, `text` and `varchars`. In previous versions only 
+SQL_Latin1_General was suported. Please follow instructions at [rust website](https://www.rust-lang.org/tools/install)
 
 
 Add Tds as a dependency in your `mix.exs` file.
 
 ```elixir
 def deps do
-  [{:tds, "~> 1.2"} ]
+  [{:tds, "~> 1.2"}]
 end
 ```
 

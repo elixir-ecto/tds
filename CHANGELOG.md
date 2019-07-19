@@ -1,3 +1,8 @@
+# v1.2.0
+* Improvements
+- `char`, `nchar`, `text`, `ntext`, `varchar` and `nvarchar` encoding improvements 
+for most of the SQL collations. More will be supported.
+
 # v1.1.7
 * Bugfix
 - Fix for "Error with set_transaction_isolation_level: :read_uncommited" [issue #72](https://github.com/livehelpnow/tds_ecto/issues/72) 
