@@ -75,8 +75,7 @@ defmodule BinaryTest do
     ],
     [
       "Indic_General_100_CI_AS",
-      "कः खगौघाङचिच्छौजा झाञ्ज्ञोऽटौठीडडण्ढणः। तथोदधीन् पफ
-    र्बाभीर्मयोऽरिल्वाशिषां सहः।।"],
+      "कः खगौघाङचिच्छौजा झाञ्ज्ञोऽटौठीडडण्ढणः। तथोदधीन् पफ र्बाभीर्मयोऽरिल्वाशिषां सहः।।"],
     [
       "Serbian_Latin_100_CI_AS",
       "Gojazni đačić s biciklom drži hmelj i finu vatu u džepu nošnje"

@@ -20,6 +20,7 @@
   "mimerl": {:hex, :mimerl, "1.0.2", "993f9b0e084083405ed8252b99460c4f0563e41729ab42d9074fd5e52439be88", [:rebar3], [], "hexpm"},
   "nimble_parsec": {:hex, :nimble_parsec, "0.5.0", "90e2eca3d0266e5c53f8fbe0079694740b9c91b6747f2b7e3c5d21966bba8300", [:mix], [], "hexpm"},
   "p1_utils": {:hex, :p1_utils, "1.0.13", "176577cafb54a8c2fdc0a7fc62b9a21ab0f66588f4062792cd9e65f3e500bfdb", [:rebar3], [], "hexpm"},
+  "rustler": {:hex, :rustler, "0.20.0", "6b2cc8149700a7b1df2226dbe273ec1f9449318cad3bd3b5b68125a4cf1f438b", [:mix], [], "hexpm"},
   "ssl_verify_fun": {:hex, :ssl_verify_fun, "1.1.1", "28a4d65b7f59893bc2c7de786dec1e1555bd742d336043fe644ae956c3497fbe", [:make, :rebar], [], "hexpm"},
   "timex": {:hex, :timex, "0.13.4"},
   "unicode_util_compat": {:hex, :unicode_util_compat, "0.3.1", "a1f612a7b512638634a603c8f401892afbf99b8ce93a45041f8aaca99cadb85e", [:rebar3], [], "hexpm"},

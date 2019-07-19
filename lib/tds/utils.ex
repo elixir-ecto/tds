@@ -23,22 +23,11 @@ defmodule Tds.Utils do
   end
 
   def to_little_ucs2(str) do
-    convert = fn char ->
-      case Tds.BinaryUtils.convert("UTF-8", "UCS-2LE", <<char::utf8>>) do
-        "" -> <<63::little-size(8)-unit(2)>>
-        c -> c
-      end
-    end
-
-    for <<ch::utf8 <- str>>,
-      do: convert.(ch),
-      into: <<>>
+    Tds.Encoding.encode(str, "utf-16le")
   end
 
   def ucs2_to_utf(s) do
-    for <<ch::little-size(8)-unit(2) <- s>>,
-      do: Tds.BinaryUtils.convert("UCS-2BE", "UTF-8", <<ch::utf16>>),
-      into: <<>>
+    Tds.Encoding.decode(s, "utf-16le")
   end
 
   def to_boolean(<<1>>) do

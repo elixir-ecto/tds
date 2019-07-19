@@ -12,13 +12,19 @@ defmodule Tds.Packet.Decoder.Collation do
   COLMETADATA in MS-TDS.pdf.
   """
 
-  defstruct codepage: :CP1252,
+  defstruct codepage: :"WINDOWS-1252",
             lcid: nil,
             sort_id: nil,
             col_flags: nil,
             version: nil
 
-  @type t :: %__MODULE__{codepage: atom}
+  @type t :: %__MODULE__{
+    codepage: atom,
+    lcid: nil | non_neg_integer,
+    sort_id: non_neg_integer,
+    col_flags: non_neg_integer,
+    version: non_neg_integer,
+  }
   @typedoc """
   Value representing how much bytes is read from binary
   """
@@ -45,7 +51,7 @@ defmodule Tds.Packet.Decoder.Collation do
     codepage =
       decode_sortid(sort_id) ||
         decode_lcid(lcid) ||
-        :CP1252
+        :"WINDOWS-1252"
 
     {:ok, struct!(__MODULE__, codepage: codepage), 5}
   end
@@ -54,191 +60,191 @@ defmodule Tds.Packet.Decoder.Collation do
 
   defp decode_sortid(sortid) do
     case sortid do
-      0x1E -> :CP437
-      0x1F -> :CP437
-      0x20 -> :CP437
-      0x21 -> :CP437
-      0x22 -> :CP437
-      0x28 -> :CP850
-      0x29 -> :CP850
-      0x2A -> :CP850
-      0x2B -> :CP850
-      0x2C -> :CP850
-      0x31 -> :CP850
-      0x33 -> :CP1252
-      0x34 -> :CP1252
-      0x35 -> :CP1252
-      0x36 -> :CP1252
-      0x37 -> :CP850
-      0x38 -> :CP850
-      0x39 -> :CP850
-      0x3A -> :CP850
-      0x3B -> :CP850
-      0x3C -> :CP850
-      0x3D -> :CP850
-      0x50 -> :CP1250
-      0x51 -> :CP1250
-      0x52 -> :CP1250
-      0x53 -> :CP1250
-      0x54 -> :CP1250
-      0x55 -> :CP1250
-      0x56 -> :CP1250
-      0x57 -> :CP1250
-      0x58 -> :CP1250
-      0x59 -> :CP1250
-      0x5A -> :CP1250
-      0x5B -> :CP1250
-      0x5C -> :CP1250
-      0x5D -> :CP1250
-      0x5E -> :CP1250
-      0x5F -> :CP1250
-      0x60 -> :CP1250
-      0x68 -> :CP1251
-      0x69 -> :CP1251
-      0x6A -> :CP1251
-      0x6B -> :CP1251
-      0x6C -> :CP1251
-      0x70 -> :CP1253
-      0x71 -> :CP1253
-      0x72 -> :CP1253
-      0x78 -> :CP1253
-      0x79 -> :CP1253
-      0x7A -> :CP1253
-      0x7C -> :CP1253
-      0x80 -> :CP1254
-      0x81 -> :CP1254
-      0x82 -> :CP1254
-      0x88 -> :CP1255
-      0x89 -> :CP1255
-      0x8A -> :CP1255
-      0x90 -> :CP1256
-      0x91 -> :CP1256
-      0x92 -> :CP1256
-      0x98 -> :CP1257
-      0x99 -> :CP1257
-      0x9A -> :CP1257
-      0x9B -> :CP1257
-      0x9C -> :CP1257
-      0x9D -> :CP1257
-      0x9E -> :CP1257
-      0x9F -> :CP1257
-      0xA0 -> :CP1257
-      0xB7 -> :CP1252
-      0xB8 -> :CP1252
-      0xB9 -> :CP1252
-      0xBA -> :CP1252
+      0x1E -> "WINDOWS-437"
+      0x1F -> "WINDOWS-437"
+      0x20 -> "WINDOWS-437"
+      0x21 -> "WINDOWS-437"
+      0x22 -> "WINDOWS-437"
+      0x28 -> "WINDOWS-850"
+      0x29 -> "WINDOWS-850"
+      0x2A -> "WINDOWS-850"
+      0x2B -> "WINDOWS-850"
+      0x2C -> "WINDOWS-850"
+      0x31 -> "WINDOWS-850"
+      0x33 -> "WINDOWS-1252"
+      0x34 -> "WINDOWS-1252"
+      0x35 -> "WINDOWS-1252"
+      0x36 -> "WINDOWS-1252"
+      0x37 -> "WINDOWS-850"
+      0x38 -> "WINDOWS-850"
+      0x39 -> "WINDOWS-850"
+      0x3A -> "WINDOWS-850"
+      0x3B -> "WINDOWS-850"
+      0x3C -> "WINDOWS-850"
+      0x3D -> "WINDOWS-850"
+      0x50 -> "WINDOWS-1250"
+      0x51 -> "WINDOWS-1250"
+      0x52 -> "WINDOWS-1250"
+      0x53 -> "WINDOWS-1250"
+      0x54 -> "WINDOWS-1250"
+      0x55 -> "WINDOWS-1250"
+      0x56 -> "WINDOWS-1250"
+      0x57 -> "WINDOWS-1250"
+      0x58 -> "WINDOWS-1250"
+      0x59 -> "WINDOWS-1250"
+      0x5A -> "WINDOWS-1250"
+      0x5B -> "WINDOWS-1250"
+      0x5C -> "WINDOWS-1250"
+      0x5D -> "WINDOWS-1250"
+      0x5E -> "WINDOWS-1250"
+      0x5F -> "WINDOWS-1250"
+      0x60 -> "WINDOWS-1250"
+      0x68 -> "WINDOWS-1251"
+      0x69 -> "WINDOWS-1251"
+      0x6A -> "WINDOWS-1251"
+      0x6B -> "WINDOWS-1251"
+      0x6C -> "WINDOWS-1251"
+      0x70 -> "WINDOWS-1253"
+      0x71 -> "WINDOWS-1253"
+      0x72 -> "WINDOWS-1253"
+      0x78 -> "WINDOWS-1253"
+      0x79 -> "WINDOWS-1253"
+      0x7A -> "WINDOWS-1253"
+      0x7C -> "WINDOWS-1253"
+      0x80 -> "WINDOWS-1254"
+      0x81 -> "WINDOWS-1254"
+      0x82 -> "WINDOWS-1254"
+      0x88 -> "WINDOWS-1255"
+      0x89 -> "WINDOWS-1255"
+      0x8A -> "WINDOWS-1255"
+      0x90 -> "WINDOWS-1256"
+      0x91 -> "WINDOWS-1256"
+      0x92 -> "WINDOWS-1256"
+      0x98 -> "WINDOWS-1257"
+      0x99 -> "WINDOWS-1257"
+      0x9A -> "WINDOWS-1257"
+      0x9B -> "WINDOWS-1257"
+      0x9C -> "WINDOWS-1257"
+      0x9D -> "WINDOWS-1257"
+      0x9E -> "WINDOWS-1257"
+      0x9F -> "WINDOWS-1257"
+      0xA0 -> "WINDOWS-1257"
+      0xB7 -> "WINDOWS-1252"
+      0xB8 -> "WINDOWS-1252"
+      0xB9 -> "WINDOWS-1252"
+      0xBA -> "WINDOWS-1252"
       # Don't use sort_id it is not SQL collation
-      _ -> nil
+      _ -> :RAW
     end
   end
 
   def decode_lcid(lcid) do
     case lcid do
-      0x00436 -> :CP1252
-      0x00401 -> :CP1256
-      0x00801 -> :CP1256
-      0x00C01 -> :CP1256
-      0x01001 -> :CP1256
-      0x01401 -> :CP1256
-      0x01801 -> :CP1256
-      0x01C01 -> :CP1256
-      0x02001 -> :CP1256
-      0x02401 -> :CP1256
-      0x02801 -> :CP1256
-      0x02C01 -> :CP1256
-      0x03001 -> :CP1256
-      0x03401 -> :CP1256
-      0x03801 -> :CP1256
-      0x03C01 -> :CP1256
-      0x04001 -> :CP1256
-      0x0042D -> :CP1252
-      0x00423 -> :CP1251
-      0x00402 -> :CP1251
-      0x00403 -> :CP1252
-      0x30404 -> :CP950
-      0x00404 -> :CP950
-      0x00804 -> :CP936
-      0x20804 -> :CP936
-      0x01004 -> :CP936
-      0x0041A -> :CP1250
-      0x00405 -> :CP1250
-      0x00406 -> :CP1252
-      0x00413 -> :CP1252
-      0x00813 -> :CP1252
-      0x00409 -> :CP1252
-      0x00809 -> :CP1252
-      0x01009 -> :CP1252
-      0x01409 -> :CP1252
-      0x00C09 -> :CP1252
-      0x01809 -> :CP1252
-      0x01C09 -> :CP1252
-      0x02409 -> :CP1252
-      0x02009 -> :CP1252
-      0x00425 -> :CP1257
-      0x00438 -> :CP1252
-      0x00429 -> :CP1256
-      0x0040B -> :CP1252
-      0x0040C -> :CP1252
-      0x0080C -> :CP1252
-      0x0100C -> :CP1252
-      0x00C0C -> :CP1252
-      0x0140C -> :CP1252
-      0x10437 -> :CP1252
-      0x10407 -> :CP1252
-      0x00407 -> :CP1252
-      0x00807 -> :CP1252
-      0x00C07 -> :CP1252
-      0x01007 -> :CP1252
-      0x01407 -> :CP1252
-      0x00408 -> :CP1253
-      0x0040D -> :CP1255
-      0x00439 -> :CPUTF8
-      0x0040E -> :CP1250
-      0x0104E -> :CP1250
-      0x0040F -> :CP1252
-      0x00421 -> :CP1252
-      0x00410 -> :CP1252
-      0x00810 -> :CP1252
-      0x00411 -> :CP932
-      0x10411 -> :CP932
-      0x00412 -> :CP949
-      0x00426 -> :CP1257
-      0x00427 -> :CP1257
-      0x00827 -> :CP1257
-      0x0041C -> :CP1251
-      0x00414 -> :CP1252
-      0x00814 -> :CP1252
-      0x00415 -> :CP1250
-      0x00816 -> :CP1252
-      0x00416 -> :CP1252
-      0x00418 -> :CP1250
-      0x00419 -> :CP1251
-      0x0081A -> :CP1251
-      0x00C1A -> :CP1251
-      0x0041B -> :CP1250
-      0x00424 -> :CP1250
-      0x0080A -> :CP1252
-      0x0040A -> :CP1252
-      0x00C0A -> :CP1252
-      0x0100A -> :CP1252
-      0x0140A -> :CP1252
-      0x0180A -> :CP1252
-      0x01C0A -> :CP1252
-      0x0200A -> :CP1252
-      0x0240A -> :CP1252
-      0x0280A -> :CP1252
-      0x02C0A -> :CP1252
-      0x0300A -> :CP1252
-      0x0340A -> :CP1252
-      0x0380A -> :CP1252
-      0x03C0A -> :CP1252
-      0x0400A -> :CP1252
-      0x0041D -> :CP1252
-      0x0041E -> :CP874
-      0x0041F -> :CP1254
-      0x00422 -> :CP1251
-      0x00420 -> :CP1256
-      0x0042A -> :CP1258
+      0x00436 -> "WINDOWS-1252"
+      0x00401 -> "WINDOWS-1256"
+      0x00801 -> "WINDOWS-1256"
+      0x00C01 -> "WINDOWS-1256"
+      0x01001 -> "WINDOWS-1256"
+      0x01401 -> "WINDOWS-1256"
+      0x01801 -> "WINDOWS-1256"
+      0x01C01 -> "WINDOWS-1256"
+      0x02001 -> "WINDOWS-1256"
+      0x02401 -> "WINDOWS-1256"
+      0x02801 -> "WINDOWS-1256"
+      0x02C01 -> "WINDOWS-1256"
+      0x03001 -> "WINDOWS-1256"
+      0x03401 -> "WINDOWS-1256"
+      0x03801 -> "WINDOWS-1256"
+      0x03C01 -> "WINDOWS-1256"
+      0x04001 -> "WINDOWS-1256"
+      0x0042D -> "WINDOWS-1252"
+      0x00423 -> "WINDOWS-1251"
+      0x00402 -> "WINDOWS-1251"
+      0x00403 -> "WINDOWS-1252"
+      0x30404 -> "WINDOWS-950"
+      0x00404 -> "WINDOWS-950"
+      0x00804 -> "WINDOWS-936"
+      0x20804 -> "WINDOWS-936"
+      0x01004 -> "WINDOWS-936"
+      0x0041A -> "WINDOWS-1250"
+      0x00405 -> "WINDOWS-1250"
+      0x00406 -> "WINDOWS-1252"
+      0x00413 -> "WINDOWS-1252"
+      0x00813 -> "WINDOWS-1252"
+      0x00409 -> "WINDOWS-1252"
+      0x00809 -> "WINDOWS-1252"
+      0x01009 -> "WINDOWS-1252"
+      0x01409 -> "WINDOWS-1252"
+      0x00C09 -> "WINDOWS-1252"
+      0x01809 -> "WINDOWS-1252"
+      0x01C09 -> "WINDOWS-1252"
+      0x02409 -> "WINDOWS-1252"
+      0x02009 -> "WINDOWS-1252"
+      0x00425 -> "WINDOWS-1257"
+      0x00438 -> "WINDOWS-1252"
+      0x00429 -> "WINDOWS-1256"
+      0x0040B -> "WINDOWS-1252"
+      0x0040C -> "WINDOWS-1252"
+      0x0080C -> "WINDOWS-1252"
+      0x0100C -> "WINDOWS-1252"
+      0x00C0C -> "WINDOWS-1252"
+      0x0140C -> "WINDOWS-1252"
+      0x10437 -> "WINDOWS-1252"
+      0x10407 -> "WINDOWS-1252"
+      0x00407 -> "WINDOWS-1252"
+      0x00807 -> "WINDOWS-1252"
+      0x00C07 -> "WINDOWS-1252"
+      0x01007 -> "WINDOWS-1252"
+      0x01407 -> "WINDOWS-1252"
+      0x00408 -> "WINDOWS-1253"
+      0x0040D -> "WINDOWS-1255"
+      0x00439 -> "WINDOWS-UTF8"
+      0x0040E -> "WINDOWS-1250"
+      0x0104E -> "WINDOWS-1250"
+      0x0040F -> "WINDOWS-1252"
+      0x00421 -> "WINDOWS-1252"
+      0x00410 -> "WINDOWS-1252"
+      0x00810 -> "WINDOWS-1252"
+      0x00411 -> "WINDOWS-932"
+      0x10411 -> "WINDOWS-932"
+      0x00412 -> "WINDOWS-949"
+      0x00426 -> "WINDOWS-1257"
+      0x00427 -> "WINDOWS-1257"
+      0x00827 -> "WINDOWS-1257"
+      0x0041C -> "WINDOWS-1251"
+      0x00414 -> "WINDOWS-1252"
+      0x00814 -> "WINDOWS-1252"
+      0x00415 -> "WINDOWS-1250"
+      0x00816 -> "WINDOWS-1252"
+      0x00416 -> "WINDOWS-1252"
+      0x00418 -> "WINDOWS-1250"
+      0x00419 -> "WINDOWS-1251"
+      0x0081A -> "WINDOWS-1251"
+      0x00C1A -> "WINDOWS-1251"
+      0x0041B -> "WINDOWS-1250"
+      0x00424 -> "WINDOWS-1250"
+      0x0080A -> "WINDOWS-1252"
+      0x0040A -> "WINDOWS-1252"
+      0x00C0A -> "WINDOWS-1252"
+      0x0100A -> "WINDOWS-1252"
+      0x0140A -> "WINDOWS-1252"
+      0x0180A -> "WINDOWS-1252"
+      0x01C0A -> "WINDOWS-1252"
+      0x0200A -> "WINDOWS-1252"
+      0x0240A -> "WINDOWS-1252"
+      0x0280A -> "WINDOWS-1252"
+      0x02C0A -> "WINDOWS-1252"
+      0x0300A -> "WINDOWS-1252"
+      0x0340A -> "WINDOWS-1252"
+      0x0380A -> "WINDOWS-1252"
+      0x03C0A -> "WINDOWS-1252"
+      0x0400A -> "WINDOWS-1252"
+      0x0041D -> "WINDOWS-1252"
+      0x0041E -> "WINDOWS-874"
+      0x0041F -> "WINDOWS-1254"
+      0x00422 -> "WINDOWS-1251"
+      0x00420 -> "WINDOWS-1256"
+      0x0042A -> "WINDOWS-1258"
       _ -> nil
     end
   end

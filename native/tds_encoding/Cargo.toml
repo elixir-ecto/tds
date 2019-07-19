@@ -1,0 +1,15 @@
+[package]
+name = "tds_encoding"
+version = "0.1.0"
+authors = []
+
+[lib]
+name = "tds_encoding"
+path = "src/lib.rs"
+crate-type = ["dylib"]
+
+[dependencies]
+rustler = "0.20.0"
+rustler_codegen = "0.20.0"
+lazy_static = "1.0"
+encoding = "0.2.33"

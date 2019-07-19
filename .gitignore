@@ -9,5 +9,5 @@ cover/
 .idea/
 .code/
 .tool-versions
-priv/libconv
-priv/binaryutils.*
+priv/native
+native/tds_encoding/target
