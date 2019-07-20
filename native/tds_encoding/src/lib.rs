@@ -56,7 +56,7 @@ fn encode<'a>(env: Env<'a>, args: &[Term<'a>]) -> NifResult<Term<'a>> {
     match encoding_from_whatwg_label(&enc) {
         Some(encoding) => {
             let in_str : &str = args[0].decode()?;
-            let enc_bin = encoding.encode(in_str, EncoderTrap::Ignore).unwrap();
+            let enc_bin = encoding.encode(in_str, EncoderTrap::Replace).unwrap();
             let mut bin = OwnedBinary::new(enc_bin.len()).unwrap();
             bin.as_mut_slice().write(&enc_bin).unwrap();
             return Ok(bin.release(env).encode(env))
