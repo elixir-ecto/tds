@@ -9,6 +9,10 @@ defmodule Tds.Types do
   @secs_in_min 60
   @secs_in_hour 60 * @secs_in_min
 
+  # SQL Server Datetime2 defaults to a scale of 7, however, Elixir calendar
+  # currently only supports a scale of 6.
+  @max_usec_scale 6
+
   @tds_data_type_null 0x1F
   @tds_data_type_tinyint 0x30
   @tds_data_type_bit 0x32
@@ -1144,7 +1148,6 @@ defmodule Tds.Types do
     encode_param_descriptor(param)
   end
 
-
   def encode_param_descriptor(
         %Parameter{
           value: {{_, _, _}, {_, _, _}}
@@ -1585,13 +1588,14 @@ defmodule Tds.Types do
     date = :calendar.gregorian_days_to_date(@year_1900_days + days)
     hour = trunc(mins / 60)
     min = trunc(mins - hour * 60)
+
     {date, {hour, min, 0}}
     |> NaiveDateTime.from_erl!()
   end
 
   def encode_smalldatetime(nil), do: nil
 
-  def encode_smalldatetime(%{calendar: _}=naive_datetime) do
+  def encode_smalldatetime(%{calendar: _} = naive_datetime) do
     NaiveDateTime.to_erl(naive_datetime)
   end
 
@@ -1614,6 +1618,7 @@ defmodule Tds.Types do
     secs = div(secs300, 300)
     {_, {h, m, s}} = secs |> :calendar.seconds_to_daystime()
     sub_sec = secs300 / 300 - secs
+
     case trunc(sub_sec * @usecs_in_sec + 0.5) do
       0 -> NaiveDateTime.from_erl!({date, {h, m, s}})
       usec -> NaiveDateTime.from_erl!({date, {h, m, s}}, {usec, 6})
@@ -1708,8 +1713,11 @@ defmodule Tds.Types do
         <<fsec::little-unsigned-40>>
     end
   end
+
   def encode_time(time), do: encode_time(time, @max_time_scale)
+
   # DateTime2
+  @spec decode_datetime2(number, binary) :: NaiveDateTime.t()
   def decode_datetime2(scale, <<data::binary>>) do
     {time, date} =
       cond do
@@ -1729,11 +1737,13 @@ defmodule Tds.Types do
           raise "DateTime Scale Unknown"
       end
 
-    {hour, min, sec, msec} = decode_time(scale, time)
+    {hour, min, sec, usec} = decode_time(scale, time)
     date = decode_date(date)
 
     # erlang scale is at maximum 6
-    NaiveDateTime.from_erl!({date, {hour, min, sec}}, {msec,  min(scale, 6)})
+    microsecond = truncate_usec(usec, scale)
+
+    NaiveDateTime.from_erl!({date, {hour, min, sec}}, microsecond)
   end
 
   def encode_datetime2(nil), do: nil
@@ -1839,4 +1849,17 @@ defmodule Tds.Types do
     data = <<type, 0x07>>
     {type, data, scale: 7}
   end
+
+  defp truncate_usec(usec, scale) when is_integer(usec) do
+    usec |> to_string() |> truncate_usec(scale)
+  end
+
+  defp truncate_usec(
+         <<usec::binary-size(@max_usec_scale), _rest::binary>>,
+         scale
+       ),
+       do: {String.to_integer(usec), min(scale, @max_usec_scale)}
+
+  defp truncate_usec(usec, scale),
+    do: {String.to_integer(usec), min(scale, @max_usec_scale)}
 end

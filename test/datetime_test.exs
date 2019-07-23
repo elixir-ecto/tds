@@ -16,11 +16,19 @@ defmodule DatetimeTest do
   end
 
   @date {2015, 4, 8}
+
   @time {15, 16, 23}
   @time_fsec {15, 16, 23, 123_456}
+  # Datetime2 fields support a scale of 7 by default with SQL Server,
+  # but are truncated to 6 for Elixir
+  @time_datetime2 {15, 16, 23, 123_456_7}
+
   @datetime {@date, @time}
   @datetime_fsec {@date, @time_fsec}
+  @datetime2 {@date, @time_datetime2}
+
   @offset -240
+
   @datetimeoffset {@date, @time, @offset}
   @datetimeoffset_fsec {@date, @time_fsec, @offset}
 
@@ -165,15 +173,46 @@ defmodule DatetimeTest do
              ])
   end
 
-  test "datetime2", context do
-    assert nil == Types.encode_datetime2(nil)
-    enc = Types.encode_datetime2(@datetime)
-    assert ~N[2015-04-08 15:16:23.000000] == Types.decode_datetime2(7, enc)
-    enc = Types.encode_datetime2(@datetime_fsec)
-    assert ~N[2015-04-08 15:16:23.123456] == Types.decode_datetime2(7, enc)
-    enc = Types.encode_datetime2({@date, {131, 56, 23, 0}}, 0)
-    assert {@date, {131, 56, 23, 0}} == Types.decode_datetime2(0, enc)
+  describe "decode_datetime2" do
+    test "truncates microseconds with scale of 7 to the max of 6" do
+      encoded = Types.encode_datetime2(@datetime2)
 
+      assert Types.decode_datetime2(7, encoded) ==
+               ~N[2015-04-08 15:16:23.123456]
+    end
+
+    test "with 0 microseconds" do
+      enc = Types.encode_datetime2(@datetime)
+      assert Types.decode_datetime2(7, enc) == ~N[2015-04-08 15:16:23.000000]
+    end
+
+    test "with scale of 6" do
+      enc = Types.encode_datetime2(@datetime_fsec)
+      assert Types.decode_datetime2(7, enc) == ~N[2015-04-08 15:16:23.123456]
+    end
+
+    test "with scale of 0" do
+      enc = Types.encode_datetime2({@date, {13, 56, 23, 0}}, 0)
+      assert Types.decode_datetime2(0, enc) == ~N[2015-04-08 13:56:23]
+    end
+
+    # This test fails with Elixir 1.8.2, but added a test above for 0 scale and usec.
+    # ** (ArgumentError) cannot convert {{2015, 4, 8}, {131, 56, 23}} to naive datetime,
+    # reason: :invalid_time
+    @tag :skip
+    test "0 scale and 131st hour?" do
+      enc = Types.encode_datetime2({@date, {131, 56, 23, 0}}, 0)
+      assert {@date, {131, 56, 23, 0}} == Types.decode_datetime2(0, enc)
+    end
+  end
+
+  describe "encode_datetime2" do
+    test "nil" do
+      assert Types.encode_datetime2(nil) == nil
+    end
+  end
+
+  test "datetime2", context do
     assert [[nil]] == query("SELECT CAST(NULL AS datetime2)", [])
     assert [[nil]] == query("SELECT CAST(NULL AS datetime2(0))", [])
     assert [[nil]] == query("SELECT CAST(NULL AS datetime2(6))", [])
