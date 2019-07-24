@@ -431,7 +431,7 @@ defmodule Tds.Tokens do
        ) do
     token = %{
       t_sql_only: interface == 1,
-      tds_version: "0x#{Integer.to_string(tds_version, 16)}",
+      tds_version: tds_version,
       program: ucs2_to_utf(prog_name),
       version: "#{major_ver}.#{minor_ver}.#{build_hi}.#{build_low}"
     }
