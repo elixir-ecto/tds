@@ -1574,6 +1574,7 @@ defmodule Tds.Types do
   end
 
   def encode_date(nil), do: nil
+  def encode_date(%Date{} = date), do: date |> Date.to_erl() |> encode_date()
 
   def encode_date(date) do
     days = :calendar.date_to_gregorian_days(date) - 366
