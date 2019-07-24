@@ -268,8 +268,8 @@ defmodule Tds.Tokens do
             _::binary(old_value_size, 8),
             rest::binary
           >> = tail
-
-          {{:collation, Tds.Protocol.Collation.decode(collation)}, rest}
+          {:ok, collation, _} = Tds.Protocol.Collation.decode(collation)
+          {{:collation, collation}, rest}
 
         0x08 ->
           <<
