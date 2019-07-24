@@ -14,7 +14,6 @@ defmodule Tds.Protocol do
   @behaviour DBConnection
 
   @timeout 5000
-  @max_packet 4 * 1024
   @sock_opts [packet: :raw, mode: :binary, active: false, recbuf: 4096]
   @trans_levels [
     :read_uncommitted,
@@ -29,6 +28,7 @@ defmodule Tds.Protocol do
             itcp: nil,
             opts: nil,
             state: :ready,
+            collation: %Tds.Protocol.Collation{},
             # only has non-empty value when waiting for more data
             tail: "",
             # current tds packet header
@@ -358,90 +358,33 @@ defmodule Tds.Protocol do
   end
 
   def handle_info(msg, s) do
-    Logger.debug(fn -> "Unhandled info: #{inspect(msg)}" end)
+    Logger.error(fn -> "Unhandled info: #{inspect(msg)}" end)
 
     {:ok, s}
   end
 
-  # no data to process
-  defp new_data(<<>>, s) do
-    {:ok, s}
-  end
+  defp decode(packet_data, %{state: state} = s) do
+    msg = parse(state, packet_data)
 
-  # DONE_ATTN The DONE message is a server acknowledgement of a client ATTENTION
-  # message.
-  defp new_data(
-         <<0xFD, 0x20, _cur_cmd::binary(2), 0::size(8)-unit(8), _tail::binary>>,
-         %{state: :attn} = s
-       ) do
-    s = %{s | pak_header: "", pak_data: [], tail: ""}
-    message(:attn, :attn, s)
-  end
+    case message(state, msg, s) do
+      {:ok, s} ->
+        # message processed, reset header and msg buffer, then process
+        # tail
+        {:ok, %{s | pak_header: "", pak_data: []}}
 
-  # shift 8 bytes while in attention state, Protocol updates state
-  defp new_data(<<b::size(1)-unit(8), tail::binary>>, %{state: :attn} = s) do
-    Logger.debug(fn -> "Attn 0b#{Integer.to_string(b, 2)}" end)
-    new_data(tail, s)
-  end
+      {:ok, _result, s} ->
+        # send_query returns a result
+        {:ok, %{s | pak_header: "", pak_data: []}}
 
-  defp new_data(<<pak_header::binary(8), tail::binary>>, %{pak_header: ""}=s) do
-    new_data(tail, %{s | pak_header: pak_header})
-  end
-
-  # no packet header yet
-  defp new_data(data, %{pak_header: ""} = s) do
-    # have no packet header yet, wait for more data
-    {:ok, %{s | tail: data}}
-  end
-
-  defp new_data(
-         data,
-         %{state: state, pak_header: <<type::int8, status::int8, size::int16, _head_rem::int32>>, pak_data: pak_data} = s
-       ) do
-
-    # size includes packet header
-    size = size - 8
-
-    case data do
-      <<package::binary(size), tail::binary>> ->
-        # satisfied size specified in packet header
-        case status do
-          1 ->
-            # status 1 means last packet of message
-            # TODO Messages.parse does not use pak_header
-
-            msg = parse(state, type, IO.iodata_to_binary([pak_data | package]))
-
-            case message(state, msg, s) do
-              {:ok, s} ->
-                # message processed, reset header and msg buffer, then process
-                # tail
-                new_data(tail, %{s | pak_header: "", pak_data: []})
-
-              {:ok, _result, s} ->
-                # send_query returns a result
-                new_data(tail, %{s | pak_header: "", pak_data: []})
-
-              {:error, _, _} = err ->
-                err
-            end
-
-          _ ->
-            # not the last packet of message, more packets coming with new
-            # packet header
-            new_data(tail, %{s | pak_header: "", pak_data: [pak_data | package]})
-        end
-
-      data ->
-        # size specified in packet header still unsatisfied, wait for more data
-        {:ok, %{s | tail: data}}
+      {:error, _, _} = err ->
+        err
     end
   end
 
   defp flush(%{sock: sock} = s) do
     receive do
       {:tcp, ^sock, data} ->
-        _ = new_data(data, s)
+        _ = decode(data, s)
         {:ok, s}
 
       {:tcp_closed, ^sock} ->
@@ -537,16 +480,6 @@ defmodule Tds.Protocol do
         err
     end
   end
-
-  # def send_command(statement, s) do
-  #  Logger.debug "CALLED send_command/2"
-  #  Logger.debug "STATEMENT: #{inspect statement}"
-
-  #  msg = msg_sql(query: statement)
-  #  simple_send(msg, s)
-
-  #  {:ok, %{s | statement: nil, state: :ready}}
-  # end
 
   def send_param_query(
         %Query{handle: handle, statement: statement} = _,
@@ -788,14 +721,6 @@ defmodule Tds.Protocol do
     {:ok, %{s | statement: "", state: :ready, result: result}}
   end
 
-  # defp simple_send(msg, %{sock: {mod, sock}, env: env}) do
-  #  paks = encode_msg(msg, env)
-
-  #  Enum.each(paks, fn(pak) ->
-  #    mod.send(sock, pak)
-  #  end)
-  # end
-
   defp msg_send(msg, %{sock: {mod, sock}, env: env} = s) do
     :inet.setopts(sock, active: false)
 
@@ -805,102 +730,69 @@ defmodule Tds.Protocol do
       mod.send(sock, pak)
     end)
 
-    case msg_recv(<<>>, s) do
+    case msg_recv(s) do
       {:disconnect, _ex, _s} = res ->
         res
 
       buffer ->
-        new_data(IO.iodata_to_binary(buffer), %{s | state: :executing, pak_header: ""})
+        buffer
+        |> IO.iodata_to_binary()
+        |> decode(%{s | state: :executing, pak_header: ""})
     end
   end
 
-  defp msg_recv(buffer, %{sock: {mod, sock}} = s) do
-    # IO.puts("buffer: #{inspect buffer}")
+  defp msg_recv(s) do
+    case next_pkg(s) do
+      {:more, package_data} ->
+        [package_data | msg_recv(s)]
+
+      {:last, package_data} ->
+        [package_data]
+    end
+  catch
+    error -> error
+  end
+
+  @spec next_pkg(%{required(:sock) => {module, pid}, optional(atom) => term}) ::
+          {:more, binary}
+          | {:last, binary}
+          | no_return
+  defp next_pkg(%{sock: {mod, sock}} = s) do
     case mod.recv(sock, 8) do
-      # there is more tds packages after this one
-      {
-        :ok,
-        <<
-          _type::int8,
-          0x00,
-          length::int16,
-          _spid::int16,
-          _package::int8,
-          _window::int8
-        >> = header
-      } ->
-        [buffer | header]
-        |> package_recv(s, length - 8)
-        |> msg_recv(s)
+      {:ok, <<0x04, 0x01, size::int16, _spid::int16, _pkg::int8, _win::int8>>} ->
+        {:last, packetdata_recv(size - 8, s)}
 
-      # this heder belongs to last package
-      {
-        :ok,
-        <<
-          _type::int8,
-          0x01,
-          length::int16,
-          _spid::int16,
-          _package::int8,
-          _window::int8
-        >> = header
-      } ->
-        # IO.puts("header: #{inspect header}")
-        [buffer | header]
-        |> package_recv(s, length - 8)
+      {:ok, <<0x04, 0x00, size::int16, _spid::int16, _pkg::int8, _win::int8>>} ->
+        {:more, packetdata_recv(size - 8, s)}
 
-      {:ok,
-       <<
-         _type::int8,
-         status::int8,
-         length::int16,
-         _spid::int16,
-         _package::int8,
-         _window::int8
-       >> = header} ->
-        [buffer | header]
-        |> package_recv(s, length - 8)
-
-        raise "Status #{inspect(status)} of tds package is not yer supported!"
+      {:ok, other} ->
+        throw(
+          {:disconnect,
+           Tds.Error.exception(
+             "Message header, #{inspect(other, base: :hex)} is not supported."
+           )}
+        )
 
       {:error, :closed} ->
         raise DBConnection.ConnectionError, "connection is closed"
 
       {:error, exception} ->
-        {:disconnect, Tds.Error.exception(exception), s}
+        throw({:disconnect, exception, s})
     end
   end
 
-  defp package_recv(buffer, %{sock: {mod, sock}} = s, length) do
-    case mod.recv(sock, min(length, @max_packet)) do
-      {:ok, data} when byte_size(data) < length ->
-        length = length - byte_size(data)
+  defp packetdata_recv(size, %{sock: {mod, sock}} = s) do
+    case mod.recv(sock, size) do
+      {:ok, packetdata} ->
+        packetdata
 
-        [buffer | data]
-        |> package_recv(s, length)
-
-      {:ok, data} ->
-        [buffer | data]
+      {:error, :closed} ->
+        raise DBConnection.ConnectionError, "connection is closed"
 
       {:error, exception} ->
-        {:disconnect, exception, s}
+        throw({:disconnect, exception, s})
     end
   end
-
-  # defp msg_cast(msg, %{sock: {mod, sock}, env: env} = s) do
-  #   :inet.setopts(sock, active: false)
-
-  #   paks = encode_msg(msg, env)
-  #   Enum.each(paks, fn(pak) ->
-  #     mod.send(sock, pak)
-  #   end)
-  #   # NOTE: this method can not be used since it is not receiving packages
-  #     from SQL server!
-  #   # TODO: add :gen_tcp.recv/flush since it should flush next package if
-  #     there is such case where we don't care about
-  #   # what package contains.
-  #   {:ok, s}
-  # end
 
   defp login_send(msg, %{sock: {mod, sock}, env: env} = s) do
     paks = encode_msg(msg, env)
@@ -909,31 +801,16 @@ defmodule Tds.Protocol do
       mod.send(sock, pak)
     end)
 
-    case msg_recv(<<>>, s) do
+    case msg_recv(s) do
       {:disconnect, ex, s} ->
         {:error, ex, s}
 
       buffer ->
-        new_data(IO.iodata_to_binary(buffer), %{s | state: :login})
+        buffer
+        |> IO.iodata_to_binary()
+        |> decode(%{s | state: :login})
     end
   end
-
-  # defp send_to_result(msg, s) do
-  #  case msg_send(msg, s) do
-  #    :ok ->
-  #      {:ok, s}
-  #    {:error, reason} ->
-  #      {:error, %Tds.Error{message: "tcp send: #{reason}"} , s}
-  #  end
-  # end
-  #
-  # case send_attn(%{s | pak_header: "", pak_data: "", tail: "", state: :attn})
-  #  do
-  #  {:ok, s} ->
-  #    {:ok, s}
-  #  err ->
-  #    {:disconnect, %Tds.Error{message: "attn error: #{err}"}}
-  # end
 
   defp clean_opts(opts) do
     Keyword.put(opts, :password, :REDACTED)
