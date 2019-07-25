@@ -1,7 +1,7 @@
 defmodule Packet.TokenStreamTest do
   use ExUnit.Case, async: true
 
-  @login_response <<
+  @package_data <<
   # HEADER
   0x04, 0x01, 0x01, 0x61, 0x00, 0x00, 0x01, 0x00,
   # ENVCHANGE
@@ -42,7 +42,7 @@ defmodule Packet.TokenStreamTest do
   0xFD, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00
   >>
 
-  @login_response_ts [
+  @token_stream [
     envchange: {:database, "master"},
     info: %{class: 0, line_number: 0, msg_text: "Changed database context to 'master'.", number: 5701, proc_name: "", server_name: "", state: 2},
     envchange: {:collation, %Tds.Protocol.Collation{codepage: "WINDOWS-1252", col_flags: 0, lcid: 36941, sort_id: 52, version: 0}},
@@ -53,8 +53,55 @@ defmodule Packet.TokenStreamTest do
     done: %{cmd: <<0, 0>>, rows: nil, status: %{atnn?: false, count?: false, error?: false, final?: true, inxact?: false, more?: false, rpc_in_batch?: false, srverror?: false}}
   ]
 
-  test "should decode login response" do
-    <<_::binary-(8), token_stream::binary>> = @login_response
-    assert @login_response_ts == Tds.Tokens.decode_tokens(token_stream, nil)
+  test "should decode loginack response" do
+    <<_::binary-(8), package_data::binary>> = @package_data
+    assert @token_stream == Tds.Tokens.decode_tokens(package_data, nil)
+  end
+
+  @package_data <<
+  # HEADER
+  0x04, 0x01, 0x00, 0x33, 0x00, 0x00, 0x01, 0x00,
+  # COLMETADATA
+  0x81, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x20,
+  0x00, 0xA7, 0x03, 0x00, 0x09, 0x04, 0xD0, 0x00,
+  0x34, 0x03, 0x62, 0x00, 0x61, 0x00, 0x72, 0x00,
+  # ROW
+  0xD1, 0x03, 0x00, 0x66, 0x6F, 0x6F,
+  # DONE
+  0xFD, 0x10, 0x00, 0xC1, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+  >>
+
+  @token_stream [
+    colmetadata: [%{collation: %Tds.Protocol.Collation{codepage: "WINDOWS-1252", col_flags: 0, lcid: 36941, sort_id: 52, version: 0}, data_reader: :shortlen, data_type: :variable, data_type_code: 167, length: 3, name: "bar"}],
+    row: ["foo"],
+    done: %{cmd: <<193, 0>>, rows: nil, status: %{atnn?: false, count?: false, error?: false, final?: true, inxact?: false, more?: false, rpc_in_batch?: false, srverror?: false}}
+  ]
+
+  test "should decode SqlBatch Server Response" do
+    <<_::binary-(8), package_data::binary>> = @package_data
+    assert @token_stream == Tds.Tokens.decode_tokens(package_data, nil)
+  end
+
+  @package_data <<
+  # HEADER
+  0x04, 0x01, 0x00, 0x27, 0x00, 0x00, 0x01, 0x00,
+  # DONEINPROC
+  0xFF, 0x11, 0x00, 0xC1, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+  # RETURNSTATUS
+  0x79, 0x00, 0x00, 0x00, 0x00,
+  # DONEPROC
+  0xFE, 0x00, 0x00, 0xE0, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+  >>
+
+  @token_stream [
+    doneinproc: %{cmd: <<193, 0>>, rows: nil, status: %{atnn?: false, count?: false, error?: false, final?: true, inxact?: false, more?: false, rpc_in_batch?: false, srverror?: true}},
+    return_status: 0,
+    doneproc: %{cmd: <<224, 0>>, rows: nil, status: %{atnn?: false, count?: false, error?: false, final?: true, inxact?: false, more?: false, rpc_in_batch?: false, srverror?: false}}
+  ]
+
+  test "should decode RPC Server Response" do
+    <<_::binary-(8), package_data::binary>> = @package_data
+    assert @token_stream == Tds.Tokens.decode_tokens(package_data, nil)
   end
 end
+

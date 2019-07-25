@@ -8,6 +8,11 @@ Supports Ecto 2.0. It implements the [db_connection](https://github.com/elixir-e
 
 Please check out the issues for a more complete overview. This branch should not be considered stable or ready for production yet.
 
+<span style="background-color: #fff177; padding: 4px;"> 
+Please consider code in this branch unstable</span>
+
+For stable versions always use [hex.pm](https://hex.pm/packages/tds) as source for your mix.exs!!!
+
 ## Usage
 
 As of TDS version `>= 1.2`, it requires `rust` to be installed for nif required to 

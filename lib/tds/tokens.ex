@@ -93,7 +93,10 @@ defmodule Tds.Tokens do
   end
 
   # COLMETADATA
-  defp decode_colmetadata(<<column_count::little-(2 * 8), tail::binary>>, _) do
+  defp decode_colmetadata(
+         <<column_count::little-size(2)-unit(8), tail::binary>>,
+         _
+       ) do
     {colmetadata, tail} = decode_columns(tail, column_count)
     {{:colmetadata, colmetadata}, tail, colmetadata}
   end
@@ -268,7 +271,8 @@ defmodule Tds.Tokens do
             _::binary(old_value_size, 8),
             rest::binary
           >> = tail
-          {:ok, collation, _} = Tds.Protocol.Collation.decode(collation)
+
+          {:ok, collation} = Tds.Protocol.Collation.decode(collation)
           {{:collation, collation}, rest}
 
         0x08 ->
@@ -439,7 +443,7 @@ defmodule Tds.Tokens do
     {{:loginack, token}, tail, collmetadata}
   end
 
-  defp decode_column_order(<<tail::binary>>, n) when n < 1 do
+  defp decode_column_order(tail, n) when n < 1 do
     {[], tail}
   end
 
@@ -465,8 +469,29 @@ defmodule Tds.Tokens do
   end
 
   defp decode_columns(data, n) do
-    {column, tail} = decode_column(data)
-    {[column | decode_columns(tail, n - 1)], tail}
+    Stream.resource(
+      fn -> {0, data} end,
+      fn {i, tail} ->
+        cond do
+          i < n ->
+            {column, tail} = decode_column(tail)
+            {[column], {i + 1, tail}}
+          i == n ->
+            {[tail], {i + 1, tail}}
+          i > n ->
+            {:halt, {i}}
+        end
+      end,
+      fn _ -> nil end
+    )
+    |> Stream.chunk_every(n)
+    |> Enum.to_list()
+    |> case do
+      [columns, [tail]] -> {columns, tail}
+      [] -> {[], data}
+    end
+    # {column, tail} = decode_column(data)
+    # {[column | decode_columns(tail, n - 1)], tail}
   end
 
   defp decode_column(<<_usertype::int32, _flags::int16, tail::binary>>) do
@@ -482,10 +507,10 @@ defmodule Tds.Tokens do
 
   defp decode_column_name(<<
          name_length::int8,
-         name::unicode(name_length),
+         name::binary-size(name_length)-unit(16),
          tail::binary
        >>) do
-    name = name |> :unicode.characters_to_binary({:utf16, :little}, :utf8)
+    name = ucs2_to_utf(name)
     {name, tail}
   end
 
@@ -493,10 +518,33 @@ defmodule Tds.Tokens do
     {[], tail}
   end
 
-  defp decode_row_columns(<<tail::binary>>, [column_meta | colmetadata]) do
-    {column, tail} = decode_row_column(tail, column_meta)
-    {row, tail} = decode_row_columns(tail, colmetadata)
-    {[column | row], tail}
+  defp decode_row_columns(<<data::binary>>, colmetadata) do
+    n = Enum.count(colmetadata)
+    Stream.resource(
+      fn -> {0, data, colmetadata} end,
+      fn {i, tail, metadata} ->
+        cond do
+          i < n ->
+            [hmeta|tmeta] = metadata
+            {column, tail} = decode_row_column(tail, hmeta)
+            {[column], {i + 1, tail, tmeta}}
+          i == n ->
+            {[tail], {i + 1, tail, metadata}}
+          i > n ->
+            {:halt, {i}}
+        end
+      end,
+      fn _ -> nil end
+    )
+    |> Stream.chunk_every(n)
+    |> Enum.to_list()
+    |> case do
+      [columns, [tail]] -> {columns, tail}
+      [] -> {[], data}
+    end
+    # {column, tail} = decode_row_column(tail, column_meta)
+    # {row, tail} = decode_row_columns(tail, colmetadata)
+    # {[column | row], tail}
   end
 
   defp decode_row_columns(<<tail::binary>>, [], _bitmap) do

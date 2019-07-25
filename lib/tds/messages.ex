@@ -1,7 +1,7 @@
 defmodule Tds.Messages do
   import Record, only: [defrecord: 2]
   import Tds.Utils
-  import Tds.Tokens, only: [decode_tokens: 2]
+  import Tds.Tokens, only: [decode_tokens: 1]
 
   alias Tds.Parameter
   alias Tds.Types
@@ -83,20 +83,22 @@ defmodule Tds.Messages do
 
   ## Parsers
 
-  def parse(:login, @tds_pack_reply, tail) do
-    case decode_tokens(tail, []) do
+  def parse(:login, tail) do
+    case decode_tokens(tail) do
       [error: error] when error != nil ->
         msg_error(e: error)
 
       tokens ->
-        msg_login_ack(type: 4, redirect: Keyword.has_key?(tokens, :env_redirect), tokens: tokens)
+        msg_login_ack(
+          type: 4,
+          redirect: Keyword.has_key?(tokens, :env_redirect),
+          tokens: tokens
+        )
     end
   end
 
-
-  def parse(:executing, @tds_pack_reply, tail) do
-    tokens = []
-    tokens = decode_tokens(tail, tokens)
+  def parse(:executing, tail) do
+    tokens = decode_tokens(tail)
 
     case tokens do
       [error: error] ->
@@ -187,12 +189,12 @@ defmodule Tds.Messages do
 
     login_data =
       hostname_ucs <>
-      username_ucs <>
-      password_ucs_xor <>
-      app_name_ucs <>
-      servername_ucs <>
-      clt_int_name_ucs <>
-      database_ucs
+        username_ucs <>
+        password_ucs_xor <>
+        app_name_ucs <>
+        servername_ucs <>
+        clt_int_name_ucs <>
+        database_ucs
 
     curr_offset = offset_start + 58
     ibHostName = <<curr_offset::little-size(16)>>
@@ -283,7 +285,7 @@ defmodule Tds.Messages do
   end
 
   defp encode(msg_attn(), _s) do
-    [encode_header(@tds_pack_cancel, <<>>)]
+    [encode_header(@tds_pack_cancel, 0)]
   end
 
   defp encode(msg_sql(query: q), %{trans: trans}) do
@@ -341,12 +343,17 @@ defmodule Tds.Messages do
   defp encode(msg_transmgr(command: "TM_BEGIN_XACT"), %{trans: trans}) do
     encode_trans(5, trans)
   end
+
   defp encode(msg_transmgr(command: "TM_COMMIT_XACT"), %{trans: trans}) do
     encode_trans(7, trans)
   end
-  defp encode(msg_transmgr(command: "TM_ROLLBACK_XACT", name: name), %{trans: trans}) do
+
+  defp encode(msg_transmgr(command: "TM_ROLLBACK_XACT", name: name), %{
+         trans: trans
+       }) do
     encode_trans(8, trans, name)
   end
+
   defp encode(msg_transmgr(command: "TM_SAVE_XACT", name: name), %{trans: trans}) do
     encode_trans(9, trans, name)
   end
@@ -369,7 +376,10 @@ defmodule Tds.Messages do
     total_length = byte_size(headers) + 4
     all_headers = <<total_length::little-size(32)>> <> headers
     request_payload = encode_trans_request(request_type, savepoint)
-    data = all_headers <> <<request_type::little-size(2)-unit(8)>> <> request_payload
+
+    data =
+      all_headers <> <<request_type::little-size(2)-unit(8)>> <> request_payload
+
     encode_packets(0x0E, data)
   end
 
@@ -382,30 +392,34 @@ defmodule Tds.Messages do
 
   @trans_iso_level @trans_iso_no_isolation_level
 
-
   # begin transaction
   defp encode_trans_request(5, _) do
     <<@trans_iso_level::size(1)-unit(8), 0x0::size(1)-unit(8)>>
   end
+
   # commit transaction
   defp encode_trans_request(7, _) do
     <<0x00::size(2)-unit(8)>>
   end
+
   # rollback transaction
   defp encode_trans_request(8, savepoint) when savepoint > 0 do
     # rollback to save point
 
     <<
-    2::unsigned-8,  savepoint::little-size(2)-unit(8),
-    0x0::size(1)-unit(8)
+      2::unsigned-8,
+      savepoint::little-size(2)-unit(8),
+      0x0::size(1)-unit(8)
     >>
   end
+
   defp encode_trans_request(8, _) do
     <<0x00::size(2)-unit(8)>>
   end
+
   # save trans [name]
   defp encode_trans_request(9, savepoint) when is_number(savepoint) do
-    <<2::unsigned-8,  savepoint::little-size(2)-unit(8)>>
+    <<2::unsigned-8, savepoint::little-size(2)-unit(8)>>
   end
 
   defp encode_rpc(:sp_executesql, params) do
@@ -454,7 +468,7 @@ defmodule Tds.Messages do
     p_meta_data <> Types.encode_data(type_code, param.value, type_attr)
   end
 
-  defp encode_header(type, data, opts \\ []) do
+  def encode_header(type, data, opts \\ []) do
     status = opts[:status] || 1
 
     id = opts[:id] || 1
@@ -471,12 +485,13 @@ defmodule Tds.Messages do
     >>
   end
 
-  defp encode_packets(type, binary, id \\ 1)
-  defp encode_packets(_type, <<>>, _) do
+  @spec encode_packets(integer, binary, non_neg_integer) :: [binary, ...]
+  def encode_packets(type, binary, id \\ 1)
+  def encode_packets(_type, <<>>, _) do
     [<<>>]
   end
 
-  defp encode_packets(
+  def encode_packets(
     type,
     <<data::binary-size(@tds_pack_data_size)-unit(8), tail::binary>>,
     id
@@ -486,7 +501,7 @@ defmodule Tds.Messages do
     [header <> data | encode_packets(type, tail, id + 1)]
   end
 
-  defp encode_packets(type, data, id) do
+  def encode_packets(type, data, id) do
     header = encode_header(type, data, id: id + 1, status: 1)
     [header <> data]
   end

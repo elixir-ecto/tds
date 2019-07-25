@@ -262,14 +262,14 @@ defmodule Tds.Types do
         @tds_data_type_nchar
       ] ->
         <<length::little-unsigned-16, collation::binary-5, rest::binary>> = tail
-
+        {:ok, collation} = decode_collation(collation)
         col_info =
           def_col_info
-          |> Map.put(:collation, decode_collation(collation))
+          |> Map.put(:collation, collation)
           |> Map.put(
-               :data_reader,
-               if(length == 0xFFFF, do: :plp, else: :shortlen)
-             )
+            :data_reader,
+            if(length == 0xFFFF, do: :plp, else: :shortlen)
+          )
           |> Map.put(:length, length)
 
         {col_info, rest}
@@ -284,9 +284,9 @@ defmodule Tds.Types do
         col_info =
           def_col_info
           |> Map.put(
-               :data_reader,
-               if(length == 0xFFFF, do: :plp, else: :shortlen)
-             )
+            :data_reader,
+            if(length == 0xFFFF, do: :plp, else: :shortlen)
+          )
           |> Map.put(:length, length)
 
         {col_info, rest}
@@ -352,15 +352,13 @@ defmodule Tds.Types do
     end
   end
 
-  def decode_collation(<<lcid::size(20), colFlags::size(6), _::size(2),
-  version::size(4), sortId::size(8)>>) do
-    %{
-      lcid: lcid,
-      col_flags: colFlags,
-      version: version,
-      sort_id: sortId
-    }
-  end
+  @spec decode_collation(binpart :: <<_::40>>) ::
+          {:ok, Tds.Protocol.Collation.t()}
+          | {:error, :more}
+          | {:error, any}
+  defdelegate decode_collation(binpart),
+    to: Tds.Protocol.Collation,
+    as: :decode
 
   #
   #  Data Decoders
@@ -470,7 +468,7 @@ defmodule Tds.Types do
           data = data <> tail
           len = length * 8
           <<val::little-float-size(len), _::binary>> = data
-              val
+          val
 
         data_type_code == @tds_data_type_moneyn ->
           case length do
@@ -635,14 +633,20 @@ defmodule Tds.Types do
   end
 
   # UUID
-  def decode_uuid(<<_::128>>=bin), do: bin
+  def decode_uuid(<<_::128>> = bin), do: bin
 
-  def encode_uuid(<<_::64, ?-, _::32, ?-, _::32, ?-, _::32, ?-, _::96>> = string) do
-    raise ArgumentError, "trying to load string UUID as Tds.Types.UUID: #{inspect string}. " <>
-                         "Maybe you wanted to declare :uuid as your database field?"
+  def encode_uuid(
+        <<_::64, ?-, _::32, ?-, _::32, ?-, _::32, ?-, _::96>> = string
+      ) do
+    raise ArgumentError,
+          "trying to load string UUID as Tds.Types.UUID: #{inspect(string)}. " <>
+            "Maybe you wanted to declare :uuid as your database field?"
   end
-  def encode_uuid(<<_::128>>=bin), do: bin
-  def encode_uuid(any), do: raise ArgumentError, "Invalid uuid value #{inspect(any)}"
+
+  def encode_uuid(<<_::128>> = bin), do: bin
+
+  def encode_uuid(any),
+    do: raise(ArgumentError, "Invalid uuid value #{inspect(any)}")
 
   # Decimal
   def decode_decimal(precision, scale, <<sign::int8, value::binary>>) do
@@ -971,11 +975,12 @@ defmodule Tds.Types do
 
     value_size = byte_size(value)
 
-    len = 8 # keep max precision
-      # cond do
-      #   precision <= 9 -> 4
-      #   precision <= 19 -> 8
-      # end
+    # keep max precision
+    len = 8
+    # cond do
+    #   precision <= 9 -> 4
+    #   precision <= 19 -> 8
+    # end
 
     padding = len - value_size
     value_size = value_size + padding
@@ -1020,18 +1025,18 @@ defmodule Tds.Types do
 
         :string ->
           cond do
-            is_nil(value)                 -> "nvarchar(1)"
-            String.length(value) <= 0     -> "nvarchar(1)"
+            is_nil(value) -> "nvarchar(1)"
+            String.length(value) <= 0 -> "nvarchar(1)"
             String.length(value) <= 2_000 -> "nvarchar(2000)"
-            true                          -> "nvarchar(max)"
+            true -> "nvarchar(max)"
           end
 
         :varchar ->
           cond do
-            is_nil(value)                 -> "varchar(1)"
-            String.length(value) <= 0     -> "varchar(1)"
+            is_nil(value) -> "varchar(1)"
+            String.length(value) <= 0 -> "varchar(1)"
             String.length(value) <= 2_000 -> "varchar(2000)"
-            true                          -> "varchar(max)"
+            true -> "varchar(max)"
           end
 
         :integer ->
@@ -1064,19 +1069,22 @@ defmodule Tds.Types do
           # this should fix issues when column is varchar but parameter
           # is threated as nvarchar(..) since nothing defines parameter
           # as varchar.
-          latin1  = :unicode.characters_to_list(value || "", :latin1)
-          utf8    = :unicode.characters_to_list(value || "", :utf8)
-          db_type = if latin1 == utf8,
-                    do: "varchar",
-                    else: "nvarchar"
+          latin1 = :unicode.characters_to_list(value || "", :latin1)
+          utf8 = :unicode.characters_to_list(value || "", :utf8)
+
+          db_type =
+            if latin1 == utf8,
+              do: "varchar",
+              else: "nvarchar"
+
           # this is same .net driver uses in order to avoid too many
           # cached execution plans, it must be always same length otherwise it will
           # use too much memory in sql server to cache each plan per param size
           cond do
-            is_nil(value)                 -> "#{db_type}(1)"
-            String.length(value) <= 0     -> "#{db_type}(1)"
+            is_nil(value) -> "#{db_type}(1)"
+            String.length(value) <= 0 -> "#{db_type}(1)"
             String.length(value) <= 2_000 -> "#{db_type}(2000)"
-            true                          -> "#{db_type}(max)"
+            true -> "#{db_type}(max)"
           end
       end
 
@@ -1366,9 +1374,9 @@ defmodule Tds.Types do
     # if precision <= 7 + 1 do
     #   <<0x04, value::little-float-32>>
     # else
-      # up to 15 digits of precision
-      # https://docs.microsoft.com/en-us/sql/t-sql/data-types/float-and-real-transact-sql
-      <<0x08, value::little-float-64>>
+    # up to 15 digits of precision
+    # https://docs.microsoft.com/en-us/sql/t-sql/data-types/float-and-real-transact-sql
+    <<0x08, value::little-float-64>>
     # end
   end
 
@@ -1521,8 +1529,17 @@ defmodule Tds.Types do
   defp int_type_size(int) when int in 0..255, do: 4
   defp int_type_size(int) when int in -32_768..32_767, do: 4
   defp int_type_size(int) when int in -2_147_483_648..2_147_483_647, do: 4
-  defp int_type_size(int) when int in -9_223_372_036_854_775_808..9_223_372_036_854_775_807, do: 8
-  defp int_type_size(int), do: raise ArgumentError, "Erlang integer value #{int} is too big (more than 64bits) to fit tds integer/bigint. Please consider using Decimal.new/1 to maintain precision."
+
+  defp int_type_size(int)
+       when int in -9_223_372_036_854_775_808..9_223_372_036_854_775_807,
+       do: 8
+
+  defp int_type_size(int),
+    do:
+      raise(
+        ArgumentError,
+        "Erlang integer value #{int} is too big (more than 64bits) to fit tds integer/bigint. Please consider using Decimal.new/1 to maintain precision."
+      )
 
   @doc """
   Data Encoding DateTime Types
@@ -1728,9 +1745,9 @@ defmodule Tds.Types do
   def encode_datetimeoffset(nil), do: nil
 
   def encode_datetimeoffset(
-      {date, time, offset_min},
-      scale \\ @max_time_scale
-    ) do
+        {date, time, offset_min},
+        scale \\ @max_time_scale
+      ) do
     datetime = encode_datetime2({date, time}, scale)
     datetime <> <<offset_min::little-signed-16>>
   end
