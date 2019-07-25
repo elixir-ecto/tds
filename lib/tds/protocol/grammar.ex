@@ -136,5 +136,4 @@ defmodule Tds.Protocol.Grammar do
 
   defmacro bigbinary(n), do: quote(do: binary - size(unquote(n)) - unit(8))
 
-  defmacro flag(bin, size)
 end

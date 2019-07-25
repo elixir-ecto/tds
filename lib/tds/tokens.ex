@@ -18,7 +18,22 @@ defmodule Tds.Tokens do
           "Unknown datatype parsed when decoding return value: #{dec}"
   end
 
+  @type token ::
+          :colmetadata
+          | :done
+          | :doneinproc
+          | :doneproc
+          | :envchange
+          | :error
+          | :info
+          | :loginack
+          | :order
+          | :parameters
+          | :returnstatus
+          | :row
+
   ## Decode Token Stream
+  @spec decode_tokens(any, any) :: [{token, any}]
   def decode_tokens(binary, colmetadata \\ nil)
 
   def decode_tokens(tail, _) when tail == "" or tail == nil do
@@ -89,7 +104,7 @@ defmodule Tds.Tokens do
          <<value::little-size(32), tail::binary>>,
          collmetadata
        ) do
-    {{:return_status, value}, tail, collmetadata}
+    {{:returnstatus, value}, tail, collmetadata}
   end
 
   # COLMETADATA
@@ -476,8 +491,10 @@ defmodule Tds.Tokens do
           i < n ->
             {column, tail} = decode_column(tail)
             {[column], {i + 1, tail}}
+
           i == n ->
             {[tail], {i + 1, tail}}
+
           i > n ->
             {:halt, {i}}
         end
@@ -490,6 +507,7 @@ defmodule Tds.Tokens do
       [columns, [tail]] -> {columns, tail}
       [] -> {[], data}
     end
+
     # {column, tail} = decode_column(data)
     # {[column | decode_columns(tail, n - 1)], tail}
   end
@@ -520,16 +538,19 @@ defmodule Tds.Tokens do
 
   defp decode_row_columns(<<data::binary>>, colmetadata) do
     n = Enum.count(colmetadata)
+
     Stream.resource(
       fn -> {0, data, colmetadata} end,
       fn {i, tail, metadata} ->
         cond do
           i < n ->
-            [hmeta|tmeta] = metadata
+            [hmeta | tmeta] = metadata
             {column, tail} = decode_row_column(tail, hmeta)
             {[column], {i + 1, tail, tmeta}}
+
           i == n ->
             {[tail], {i + 1, tail, metadata}}
+
           i > n ->
             {:halt, {i}}
         end
@@ -542,6 +563,7 @@ defmodule Tds.Tokens do
       [columns, [tail]] -> {columns, tail}
       [] -> {[], data}
     end
+
     # {column, tail} = decode_row_column(tail, column_meta)
     # {row, tail} = decode_row_columns(tail, colmetadata)
     # {[column | row], tail}

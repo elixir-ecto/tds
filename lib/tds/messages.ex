@@ -62,7 +62,6 @@ defmodule Tds.Messages do
   ## Packet Types
   # @tds_pack_sqlbatch    1
   # @tds_pack_rpcRequest  3
-  @tds_pack_reply 4
   @tds_pack_cancel 6
   # @tds_pack_bulkloadbcp 7
   # @tds_pack_transmgrreq 14
@@ -285,7 +284,7 @@ defmodule Tds.Messages do
   end
 
   defp encode(msg_attn(), _s) do
-    [encode_header(@tds_pack_cancel, 0)]
+    [encode_header(@tds_pack_cancel, <<>>)]
   end
 
   defp encode(msg_sql(query: q), %{trans: trans}) do
