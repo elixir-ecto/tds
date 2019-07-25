@@ -41,8 +41,6 @@ defmodule Tds.Tokens do
   end
 
   def decode_tokens(<<token::unsigned-size(8), tail::binary>>, collmetadata) do
-    IO.inspect(token, label: "DECODING TOKEN STREAM", base: :hex)
-
     {token_data, tail, collmetadata} =
       case token do
         0x81 -> decode_colmetadata(tail, collmetadata)
