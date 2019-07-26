@@ -23,18 +23,40 @@ defmodule Tds.Protocol do
     :serializable
   ]
 
+  @type sock :: {:gen_tcp | :ssl, pid}
+  @type env :: %{
+          trans: <<_::8>>,
+          savepoint: non_neg_integer
+        }
+  @type transaction :: nil | :started | :successful | :failed
+  @type state ::
+          :ready
+          | :prelogin
+          | :login
+          | :executing
+  @type packet_data :: binary
+
+  @type proto :: %__MODULE__{
+          sock: nil | sock,
+          usock: nil | pid,
+          itcp: term,
+          opts: Keyword.t(),
+          # Tells if connection is ready or executing command
+          state: state,
+          collation: Tds.Protocol.Collation.t(),
+          result: nil,
+          query: nil | String.t(),
+          transaction: transaction,
+          env: env
+        }
+
   defstruct sock: nil,
             usock: nil,
             itcp: nil,
             opts: nil,
+            # Tells if connection is ready or executing command
             state: :ready,
             collation: %Tds.Protocol.Collation{},
-            # only has non-empty value when waiting for more data
-            tail: "",
-            # current tds packet header
-            pak_header: "",
-            # current tds message holding previous tds packets
-            pak_data: [],
             result: nil,
             query: nil,
             transaction: nil,
@@ -323,11 +345,14 @@ defmodule Tds.Protocol do
 
     case server do
       nil ->
-        error(%Tds.Error{message: "Instance #{opts[:instance]} not found"}, s)
+        error(%Tds.Error{message: "Instance #{opts[:instance]} not found"}, %{
+          s
+          | usock: nil
+        })
 
       serv ->
         {port, _} = Integer.parse(serv[:tcp])
-        {:ok, %{s | opts: opts, itcp: port}}
+        {:ok, %{s | opts: opts, itcp: port, usock: nil}}
     end
   end
 
@@ -370,11 +395,11 @@ defmodule Tds.Protocol do
       {:ok, s} ->
         # message processed, reset header and msg buffer, then process
         # tail
-        {:ok, %{s | pak_header: "", pak_data: []}}
+        {:ok, s}
 
       {:ok, _result, s} ->
         # send_query returns a result
-        {:ok, %{s | pak_header: "", pak_data: []}}
+        {:ok, s}
 
       {:error, _, _} = err ->
         err
@@ -711,7 +736,7 @@ defmodule Tds.Protocol do
   ## Error
   def message(_, msg_error(e: e), %{} = s) do
     error = %Tds.Error{mssql: e}
-    {:error, error, %{s | pak_header: "", tail: ""}}
+    {:error, error, s}
   end
 
   ## ATTN Ack
@@ -724,11 +749,9 @@ defmodule Tds.Protocol do
   defp msg_send(msg, %{sock: {mod, sock}, env: env} = s) do
     :inet.setopts(sock, active: false)
 
-    paks = encode_msg(msg, env)
-
-    Enum.each(paks, fn pak ->
-      mod.send(sock, pak)
-    end)
+    msg
+    |> encode_msg(env)
+    |> Enum.each(&mod.send(sock, &1))
 
     case msg_recv(s) do
       {:disconnect, _ex, _s} = res ->
@@ -737,7 +760,7 @@ defmodule Tds.Protocol do
       buffer ->
         buffer
         |> IO.iodata_to_binary()
-        |> decode(%{s | state: :executing, pak_header: ""})
+        |> decode(%{s | state: :executing})
     end
   end
 

@@ -1,5 +1,11 @@
 defmodule Tds.Query do
   @moduledoc false
+
+  @type t :: %__MODULE__{
+    statement: String.t,
+    handle: term
+  }
+
   defstruct [:statement, :handle]
 end
 

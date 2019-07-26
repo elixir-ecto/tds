@@ -17,21 +17,10 @@ defmodule Tds.Messages do
   defrecord :msg_trans, [:trans]
   defrecord :msg_transmgr, [:command, :name]
   defrecord :msg_sql_result, [:columns, :rows, :done]
-  defrecord :msg_sql_empty, []
   defrecord :msg_rpc, [:proc, :query, :params]
   defrecord :msg_prepared, [:params]
   defrecord :msg_error, [:e]
   defrecord :msg_attn, []
-
-  ## TDS Versions
-  # @tds_ver_70     0x70000000
-  # @tds_ver_71     0x71000000
-  # @tds_ver_71rev1 0x71000001
-  # @tds_ver_72     0x72090002
-  # @tds_ver_73A    0x730A0003
-  # @tds_ver_73     @tds_ver_73A
-  # @tds_ver_73B    0x730B0003
-  # @tds_ver_74     0x74000004
 
   ## Microsoft Stored Procedures
   # @tds_sp_cursor 1
@@ -50,10 +39,6 @@ defmodule Tds.Messages do
   # @tds_sp_prepexecrpc 14
   @tds_sp_unprepare 15
 
-  # Parameter Flags
-  # @fByRefValue 1
-  # @fDefaultValue 2
-
   ## Packet Size
   @tds_pack_data_size 4088
   @tds_pack_header_size 8
@@ -70,20 +55,15 @@ defmodule Tds.Messages do
   # @tds_pack_sspimessage 17
   # @tds_pack_prelogin    18
 
-  ## Prelogin Fields
-  # http://msdn.microsoft.com/en-us/library/dd357559.aspx
-  # @tds_prelogin_version     0
-  # @tds_prelogin_encryption  1
-  # @tds_prelogin_instopt     2
-  # @tds_prelogin_threadid    3
-  # @tds_prelogin_mars        4
-  # @tds_prelogin_traceid     5
-  # @tds_prelogin_terminator  0xFF
-
   ## Parsers
 
-  def parse(:login, tail) do
-    case decode_tokens(tail) do
+  def parse(:login, packet_data) do
+    stream =
+      packet_data
+      |> decode_tokens()
+      |> IO.inspect()
+
+    case stream do
       [error: error] when error != nil ->
         msg_error(e: error)
 
@@ -96,10 +76,13 @@ defmodule Tds.Messages do
     end
   end
 
-  def parse(:executing, tail) do
-    tokens = decode_tokens(tail)
+  def parse(:executing, packet_data) do
+    stream =
+      packet_data
+      |> decode_tokens()
+      |> IO.inspect()
 
-    case tokens do
+    case stream do
       [error: error] ->
         msg_error(e: error)
 
@@ -122,6 +105,7 @@ defmodule Tds.Messages do
   ## Encoders
 
   def encode_msg(msg, env) do
+    elem(msg, 0) |> IO.inspect(label: "MESSAGE")
     encode(msg, env)
   end
 
@@ -486,18 +470,19 @@ defmodule Tds.Messages do
 
   @spec encode_packets(integer, binary, non_neg_integer) :: [binary, ...]
   def encode_packets(type, binary, id \\ 1)
+
   def encode_packets(_type, <<>>, _) do
-    [<<>>]
+    []
   end
 
   def encode_packets(
-    type,
-    <<data::binary-size(@tds_pack_data_size)-unit(8), tail::binary>>,
-    id
-  ) do
+        type,
+        <<data::binary-size(@tds_pack_data_size)-unit(8), tail::binary>>,
+        id
+      ) do
     status = if byte_size(tail) > 0, do: 0, else: 1
     header = encode_header(type, data, id: rem(id, 255), status: status)
-    [header <> data | encode_packets(type, tail, id + 1)]
+    [[header, data] | encode_packets(type, tail, id + 1)]
   end
 
   def encode_packets(type, data, id) do
@@ -510,6 +495,6 @@ defmodule Tds.Messages do
       <<c>> = <<a::size(4), b::size(4)>>
       Bitwise.bxor(c, 0xA5)
     end
-    |> Enum.map_join(& <<&1>>)
+    |> Enum.map_join(&<<&1>>)
   end
 end

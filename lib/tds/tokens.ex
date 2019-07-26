@@ -86,16 +86,10 @@ defmodule Tds.Tokens do
     >> = bin
 
     name = ucs2_to_utf(name)
-
-    {value, data} =
-      case data do
-        <<0x26, size::size(8), size::size(8), data::binary>> ->
-          <<value::little-size(size)-unit(8), data::binary>> = data
-          {value, data}
-          # todo: support other return types
-      end
-
-    {{:parameters, {name, value}}, data, collmetadata}
+    {type_info, tail} = Tds.Types.decode_info(data)
+    {value, tail} = Tds.Types.decode_data(type_info, tail)
+    param = %Tds.Parameter{name: name, value: value, direction: :output}
+    {{:returnvalue, param}, tail, collmetadata}
   end
 
   defp decode_returnstatus(
@@ -198,7 +192,7 @@ defmodule Tds.Tokens do
     bitmap_bytes = round(8 * Float.ceil(column_count / 8))
     {bitmap, tail} = bitmap_list(tail, bitmap_bytes)
     bitmap = bitmap |> Enum.reverse()
-    {row, tail} = decode_row_columns(tail, collmetadata, bitmap)
+    {row, tail} = decode_nbcrow_columns(tail, collmetadata, bitmap)
 
     {{:row, row}, tail, collmetadata}
   end
@@ -456,13 +450,14 @@ defmodule Tds.Tokens do
     {{:loginack, token}, tail, collmetadata}
   end
 
-  defp decode_column_order(tail, n) when n < 1 do
-    {[], tail}
+  defp decode_column_order(tail, n, acc \\ [])
+
+  defp decode_column_order(tail, n, acc) when n < 1 do
+    {Enum.reverse(acc), tail}
   end
 
-  defp decode_column_order(<<col_id::little-unsigned-16, tail::binary>>, n) do
-    {col_ids, tail} = decode_column_order(tail, n - 1)
-    {[col_id | col_ids], tail}
+  defp decode_column_order(<<col_id::little-unsigned-16, tail::binary>>, n, acc) do
+    decode_column_order(tail, n - 1, [col_id | acc])
   end
 
   ## Row and Column Decoders
@@ -477,37 +472,15 @@ defmodule Tds.Tokens do
     {[b1, b2, b3, b4, b5, b6, b7, b8 | bits], tail}
   end
 
-  defp decode_columns(tail, n) when n < 1 do
-    {[], tail}
+  defp decode_columns(data, n, acc \\ [])
+
+  defp decode_columns(tail, n, acc) when n < 1 do
+    {Enum.reverse(acc), tail}
   end
 
-  defp decode_columns(data, n) do
-    Stream.resource(
-      fn -> {0, data} end,
-      fn {i, tail} ->
-        cond do
-          i < n ->
-            {column, tail} = decode_column(tail)
-            {[column], {i + 1, tail}}
-
-          i == n ->
-            {[tail], {i + 1, tail}}
-
-          i > n ->
-            {:halt, {i}}
-        end
-      end,
-      fn _ -> nil end
-    )
-    |> Stream.chunk_every(n)
-    |> Enum.to_list()
-    |> case do
-      [columns, [tail]] -> {columns, tail}
-      [] -> {[], data}
-    end
-
-    # {column, tail} = decode_column(data)
-    # {[column | decode_columns(tail, n - 1)], tail}
+  defp decode_columns(data, n, acc) do
+    {column, tail} = decode_column(data)
+    decode_columns(tail, n - 1, [column | acc])
   end
 
   defp decode_column(<<_usertype::int32, _flags::int16, tail::binary>>) do
@@ -521,68 +494,41 @@ defmodule Tds.Tokens do
     {info, tail}
   end
 
-  defp decode_column_name(<<
-         name_length::int8,
-         name::binary-size(name_length)-unit(16),
-         tail::binary
-       >>) do
+  defp decode_column_name(
+         <<length::int8, name::binary-size(length)-unit(16), tail::binary>>
+       ) do
     name = ucs2_to_utf(name)
     {name, tail}
   end
 
-  defp decode_row_columns(<<tail::binary>>, []) do
-    {[], tail}
+  defp decode_row_columns(binary, colmetadata, acc \\ [])
+
+  defp decode_row_columns(<<tail::binary>>, [], acc) do
+    {Enum.reverse(acc), tail}
   end
 
-  defp decode_row_columns(<<data::binary>>, colmetadata) do
-    n = Enum.count(colmetadata)
-
-    Stream.resource(
-      fn -> {0, data, colmetadata} end,
-      fn {i, tail, metadata} ->
-        cond do
-          i < n ->
-            [hmeta | tmeta] = metadata
-            {column, tail} = decode_row_column(tail, hmeta)
-            {[column], {i + 1, tail, tmeta}}
-
-          i == n ->
-            {[tail], {i + 1, tail, metadata}}
-
-          i > n ->
-            {:halt, {i}}
-        end
-      end,
-      fn _ -> nil end
-    )
-    |> Stream.chunk_every(n)
-    |> Enum.to_list()
-    |> case do
-      [columns, [tail]] -> {columns, tail}
-      [] -> {[], data}
-    end
-
-    # {column, tail} = decode_row_column(tail, column_meta)
-    # {row, tail} = decode_row_columns(tail, colmetadata)
-    # {[column | row], tail}
+  defp decode_row_columns(<<data::binary>>, [column_meta | colmetadata], acc) do
+    {column, tail} = decode_row_column(data, column_meta)
+    decode_row_columns(tail, colmetadata, [column | acc])
   end
 
-  defp decode_row_columns(<<tail::binary>>, [], _bitmap) do
-    {[], tail}
+  defp decode_nbcrow_columns(binary, colmetadata, bitmap, acc \\ [])
+
+  defp decode_nbcrow_columns(<<tail::binary>>, [], _bitmap, acc) do
+    {Enum.reverse(acc), tail}
   end
 
-  defp decode_row_columns(<<tail::binary>>, [column_meta | colmetadata], [
-         bit | bitmap
-       ]) do
+  defp decode_nbcrow_columns(<<tail::binary>>, colmetadata, bitmap, acc) do
+    [column_meta | colmetadata] = colmetadata
+    [bit | bitmap] = bitmap
+
     {column, tail} =
       case bit do
         0 -> decode_row_column(tail, column_meta)
         _ -> {nil, tail}
       end
 
-    {row, tail} = decode_row_columns(tail, colmetadata, bitmap)
-
-    {[column | row], tail}
+    decode_nbcrow_columns(tail, colmetadata, bitmap, [column | acc])
   end
 
   defp decode_row_column(<<tail::binary>>, column_meta) do

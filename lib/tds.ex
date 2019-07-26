@@ -46,12 +46,7 @@ defmodule Tds do
     end
   end
 
-  def execute(pid, query, params, opts \\ []) do
-    case DBConnection.execute(pid, query, params, opts) do
-      {:ok, result} -> {:ok, result}
-      {:error, err} -> {:error, err}
-    end
-  end
+  defdelegate execute(pid, query, params, opts \\ []), to: DBConnection
 
   def execute!(pid, query, params, opts \\ []) do
     case DBConnection.execute(pid, query, params, opts) do
@@ -60,12 +55,7 @@ defmodule Tds do
     end
   end
 
-  def close(pid, query, opts \\ []) do
-    case DBConnection.close(pid, query, opts) do
-      {:ok, result} -> {:ok, result}
-      {:error, err} -> {:error, err}
-    end
-  end
+  defdelegate close(pid, query, opts \\ []), to: DBConnection
 
   def close!(pid, query, opts \\ []) do
     case DBConnection.close(pid, query, opts) do
@@ -74,9 +64,7 @@ defmodule Tds do
     end
   end
 
-  def transaction(pid, fun, opts \\ []) do
-    DBConnection.transaction(pid, fun, opts)
-  end
+  defdelegate transaction(pid, fun, opts \\ []), to: DBConnection
 
   @spec rollback(DBConnection.t, reason :: any) :: no_return
   defdelegate rollback(conn, any), to: DBConnection
