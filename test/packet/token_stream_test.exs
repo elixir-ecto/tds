@@ -50,7 +50,7 @@ defmodule Packet.TokenStreamTest do
     envchange: {:packetsize, 4096},
     info: %{class: 0, line_number: 0, msg_text: "Changed language setting to us_english.", number: 5703, proc_name: "", server_name: "", state: 1},
     loginack: %{program: "Microsoft SQL Server", t_sql_only: true, tds_version: 1913192450, version: "14.0.90.1"},
-    done: %{cmd: <<0, 0>>, rows: nil, status: %{atnn?: false, count?: false, error?: false, final?: true, inxact?: false, more?: false, rpc_in_batch?: false, srverror?: false}}
+    done: %{cmd: 0, rows: 0, status: %{atnn?: false, count?: false, error?: false, final?: true, inxact?: false, more?: false, rpc_in_batch?: false, srverror?: false}}
   ]
 
   test "should decode loginack response" do
@@ -72,9 +72,9 @@ defmodule Packet.TokenStreamTest do
   >>
 
   @token_stream [
-    colmetadata: [%{collation: %Tds.Protocol.Collation{codepage: "WINDOWS-1252", col_flags: 0, lcid: 36941, sort_id: 52, version: 0}, data_reader: :shortlen, data_type: :variable, data_type_code: 167, length: 3, name: "bar"}],
+    colmetadata: [%{collation: %Tds.Protocol.Collation{codepage: "WINDOWS-1252", col_flags: 0, lcid: 36941, sort_id: 52, version: 0}, data_reader: :shortlen, data_type: :variable, data_type_code: 167, length: 3, name: "bar", sql_type: :bigvarchar}],
     row: ["foo"],
-    done: %{cmd: <<193, 0>>, rows: nil, status: %{atnn?: false, count?: false, error?: false, final?: true, inxact?: false, more?: false, rpc_in_batch?: false, srverror?: false}}
+    done: %{cmd: 193, rows: 1, status: %{atnn?: false, count?: true, error?: false, final?: true, inxact?: false, more?: false, rpc_in_batch?: false, srverror?: false}}
   ]
 
   test "should decode SqlBatch Server Response" do
@@ -94,9 +94,9 @@ defmodule Packet.TokenStreamTest do
   >>
 
   @token_stream [
-    doneinproc: %{cmd: <<193, 0>>, rows: nil, status: %{atnn?: false, count?: false, error?: false, final?: true, inxact?: false, more?: false, rpc_in_batch?: false, srverror?: true}},
+    doneinproc: %{cmd: 193, rows: 1, status: %{atnn?: false, error?: false, final?: true, inxact?: false, rpc_in_batch?: false, count?: true, more?: true, srverror?: false}},
     returnstatus: 0,
-    doneproc: %{cmd: <<224, 0>>, rows: nil, status: %{atnn?: false, count?: false, error?: false, final?: true, inxact?: false, more?: false, rpc_in_batch?: false, srverror?: false}}
+    doneproc: %{cmd: 224, rows: 0, status: %{atnn?: false, count?: false, error?: false, final?: true, inxact?: false, more?: false, rpc_in_batch?: false, srverror?: false}}
   ]
 
   test "should decode RPC Server Response" do

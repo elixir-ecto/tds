@@ -33,6 +33,7 @@ defmodule Tds.Protocol do
           :ready
           | :prelogin
           | :login
+          | :prepare
           | :executing
   @type packet_data :: binary
 
@@ -157,23 +158,23 @@ defmodule Tds.Protocol do
         reraise exception, stacktrace
     after
       unless is_nil(handle) do
-        handle_close(query, opts, s)
+        handle_close(query, opts, %{s | state: :executing})
       end
     end
   end
 
   @impl DBConnection
-  def handle_prepare(%{statement: statement} = query, opts, %{sock: _sock} = s) do
+  def handle_prepare(%{statement: statement} = query, opts, s) do
     case Keyword.get(opts, :execution_mode, :prepare_execute) do
       :prepare_execute ->
         params =
           opts[:parameters]
           |> Parameter.prepared_params()
 
-        send_prepare(statement, params, s)
+        send_prepare(statement, params, %{s | state: :prepare})
 
       :executesql ->
-        {:ok, query, %{s | state: :ready}}
+        {:ok, query, %{s | state: :executing}}
 
       execution_mode ->
         message =
@@ -185,9 +186,8 @@ defmodule Tds.Protocol do
   end
 
   @impl DBConnection
-  def handle_close(query, opts, %{sock: _sock} = s) do
+  def handle_close(query, opts, s) do
     params = opts[:parameters]
-
     send_close(query, params, s)
   end
 
@@ -389,7 +389,7 @@ defmodule Tds.Protocol do
   end
 
   defp decode(packet_data, %{state: state} = s) do
-    msg = parse(state, packet_data)
+    {msg, s} = parse(state, packet_data, s)
 
     case message(state, msg, s) do
       {:ok, s} ->
@@ -446,7 +446,7 @@ defmodule Tds.Protocol do
 
     case login_send(msg, s) do
       {:ok, s} ->
-        {:ok, %{s | state: :executing}}
+        {:ok, %{s | state: :ready}}
 
       err ->
         err
@@ -456,9 +456,9 @@ defmodule Tds.Protocol do
   def send_query(statement, s) do
     msg = msg_sql(query: statement)
 
-    case msg_send(msg, s) do
+    case msg_send(msg, %{s | state: :executing}) do
       {:ok, %{result: result} = s} ->
-        {:ok, result, %{s | state: :ready}}
+        {:ok, result, s}
 
       {:error, err, %{transaction: :started} = s} ->
         {:error, err, %{s | transaction: :failed}}
@@ -482,9 +482,9 @@ defmodule Tds.Protocol do
 
     msg = msg_rpc(proc: :sp_prepare, query: statement, params: params)
 
-    case msg_send(msg, s) do
+    case msg_send(msg, %{s | state: :prepare}) do
       {:ok, %{query: query} = s} ->
-        {:ok, %{query | statement: statement}, %{s | state: :ready}}
+        {:ok, %{query | statement: statement}, %{s | state: :executing}}
 
       {:error, err, %{transaction: :started} = s} ->
         {:error, err, %{s | transaction: :failed}}
@@ -634,36 +634,13 @@ defmodule Tds.Protocol do
     end
   end
 
-  # def send_proc(proc, params, s) do
-  #  msg = msg_rpc(proc: proc, params: params)
-  #  case send_to_result(msg, s) do
-  #    {:ok, s} ->
-  #      {:ok, %{s | statement: nil, state: :executing}}
-  #    err ->
-  #      err
-  #  end
-  # end
-
-  # def send_attn(s) do
-  #  msg = msg_attn()
-  #  simple_send(msg, s)
-
-  #  {:ok, %{s | statement: nil, state: :attn}}
-  # end
-
-  ## SERVER Packet Responses
-
-  # def message(:prelogin, _state) do
-  # end
-
   def message(
         :login,
-        msg_login_ack(redirect: true, tokens: tokens),
+        msg_loginack(redirect: %{hostname: host, port: port}),
         %{opts: opts} = s
       ) do
     # we got an ENVCHANGE:redirection token, we need to disconnect and start over with new server
     disconnect("redirected", s)
-    %{hostname: host, port: port} = tokens[:env_redirect]
 
     new_opts =
       opts
@@ -673,7 +650,7 @@ defmodule Tds.Protocol do
     connect(new_opts)
   end
 
-  def message(:login, msg_login_ack(), %{opts: opts} = s) do
+  def message(:login, msg_loginack(), %{opts: opts} = s) do
     state = %{s | opts: clean_opts(opts)}
 
     opts
@@ -682,34 +659,18 @@ defmodule Tds.Protocol do
     |> send_query(state)
   end
 
-  ## executing
-
   def message(
         :executing,
-        msg_sql_result(columns: columns, rows: rows, done: done),
+        msg_result(set: set, status: _status, params: _params),
         %{} = s
       ) do
-    columns =
-      if columns != nil do
-        columns
-        |> Enum.reduce([], fn col, acc -> [col[:name] | acc] end)
-        |> Enum.reverse()
-      else
-        columns
+    result =
+      case set do
+        [] -> %Tds.Result{rows: nil}
+        [h | _t] -> h
       end
 
-    num_rows = done.rows
-
-    # rows are correctly orrdered when they were parsed, so below is not needed
-    # anymore
-    # rows =
-    # if rows != nil, do:  Enum.reverse(rows), else: rows
-
-    rows = if num_rows == 0 && rows == nil, do: [], else: rows
-
-    result = %Tds.Result{columns: columns, rows: rows, num_rows: num_rows}
-
-    {:ok, %{s | state: :executing, result: result}}
+    {:ok, mark_ready(%{s | result: result})}
   end
 
   def message(:executing, msg_trans(trans: trans), %{env: env} = s) do
@@ -724,19 +685,22 @@ defmodule Tds.Protocol do
      }}
   end
 
-  def message(:executing, msg_prepared(params: params), %{} = s) do
-    {"@handle", handle} = params
+  def message(:prepare, msg_prepared(params: params), %{} = s) do
+    handle =
+      params
+      |> Enum.find(%{}, &(&1.name == "@handle" and &1.direction == :output))
+      |> Map.get(:value, nil)
 
     result = %Tds.Result{columns: [], rows: [], num_rows: 0}
     query = %Tds.Query{handle: handle}
 
-    {:ok, %{s | state: :ready, result: result, query: query}}
+    {:ok, mark_ready(%{s | result: result, query: query})}
   end
 
   ## Error
-  def message(_, msg_error(e: e), %{} = s) do
+  def message(_, msg_error(error: e), %{} = s) do
     error = %Tds.Error{mssql: e}
-    {:error, error, s}
+    {:error, error, mark_ready(s)}
   end
 
   ## ATTN Ack
@@ -744,6 +708,29 @@ defmodule Tds.Protocol do
     result = %Tds.Result{columns: [], rows: [], num_rows: 0}
 
     {:ok, %{s | statement: "", state: :ready, result: result}}
+  end
+
+  defp mark_ready(%{state: _} = s) do
+    %{s | state: :ready}
+  end
+
+  # Send Command To Sql Server
+  defp login_send(msg, %{sock: {mod, sock}, env: env} = s) do
+    paks = encode_msg(msg, env)
+
+    Enum.each(paks, fn pak ->
+      mod.send(sock, pak)
+    end)
+
+    case msg_recv(s) do
+      {:disconnect, ex, s} ->
+        {:error, ex, s}
+
+      buffer ->
+        buffer
+        |> IO.iodata_to_binary()
+        |> decode(%{s | state: :login})
+    end
   end
 
   defp msg_send(msg, %{sock: {mod, sock}, env: env} = s) do
@@ -760,7 +747,7 @@ defmodule Tds.Protocol do
       buffer ->
         buffer
         |> IO.iodata_to_binary()
-        |> decode(%{s | state: :executing})
+        |> decode(s)
     end
   end
 
@@ -814,24 +801,6 @@ defmodule Tds.Protocol do
 
       {:error, exception} ->
         throw({:disconnect, exception, s})
-    end
-  end
-
-  defp login_send(msg, %{sock: {mod, sock}, env: env} = s) do
-    paks = encode_msg(msg, env)
-
-    Enum.each(paks, fn pak ->
-      mod.send(sock, pak)
-    end)
-
-    case msg_recv(s) do
-      {:disconnect, ex, s} ->
-        {:error, ex, s}
-
-      buffer ->
-        buffer
-        |> IO.iodata_to_binary()
-        |> decode(%{s | state: :login})
     end
   end
 

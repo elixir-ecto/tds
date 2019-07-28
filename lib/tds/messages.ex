@@ -9,18 +9,22 @@ defmodule Tds.Messages do
   require Bitwise
   require Logger
 
+  # requests
   defrecord :msg_prelogin, [:params]
   defrecord :msg_login, [:params]
-  defrecord :msg_login_ack, [:type, :redirect, :tokens]
   defrecord :msg_ready, [:status]
   defrecord :msg_sql, [:query]
-  defrecord :msg_trans, [:trans]
   defrecord :msg_transmgr, [:command, :name]
-  defrecord :msg_sql_result, [:columns, :rows, :done]
   defrecord :msg_rpc, [:proc, :query, :params]
-  defrecord :msg_prepared, [:params]
-  defrecord :msg_error, [:e]
   defrecord :msg_attn, []
+
+  # responses
+  defrecord :msg_loginack, [:redirect]
+  defrecord :msg_prepared, [:params]
+  defrecord :msg_sql_result, [:columns, :rows, :row_count]
+  defrecord :msg_result, [:set, :params, :status]
+  defrecord :msg_trans, [:trans]
+  defrecord :msg_error, [:error]
 
   ## Microsoft Stored Procedures
   # @tds_sp_cursor 1
@@ -57,55 +61,121 @@ defmodule Tds.Messages do
 
   ## Parsers
 
-  def parse(:login, packet_data) do
-    stream =
-      packet_data
-      |> decode_tokens()
-      |> IO.inspect()
+  def parse(:login, packet_data, s) do
+    packet_data
+    |> decode_tokens()
+    |> Enum.reduce({msg_loginack(), s}, fn
+      {:envchange, {:routing, r}}, {msg_loginack() = msg, s} ->
+        {msg_loginack(msg, redirect: r), s}
 
-    case stream do
-      [error: error] when error != nil ->
-        msg_error(e: error)
+      {:envchange, other}, {msg, s} ->
+        {msg, on_envchange(other, s)}
 
-      tokens ->
-        msg_login_ack(
-          type: 4,
-          redirect: Keyword.has_key?(tokens, :env_redirect),
-          tokens: tokens
-        )
-    end
+      {:loginack, %{tds_version: version}}, {msg, s} ->
+        Process.put(:tds_version, version)
+        {msg, s}
+
+      {:error, error}, _ ->
+        {msg_error(error: error), s}
+
+      _, msg ->
+        # FeatureExtAck should be processed here in future
+        msg
+    end)
   end
 
-  def parse(:executing, packet_data) do
-    stream =
-      packet_data
-      |> decode_tokens()
-      |> IO.inspect()
+  def parse(:prepare, packet_data, s) do
+    packet_data
+    |> decode_tokens()
+    |> Enum.reduce({msg_prepared(), s}, fn
+      {:envchange, env}, {msg, s} ->
+        {msg, on_envchange(env, s)}
 
-    case stream do
-      [error: error] ->
-        msg_error(e: error)
+      {:error, error}, {_, s} ->
+        {msg_error(error: error), s}
 
-      [done: %{}, trans: trans] ->
-        msg_trans(trans: trans)
+      {:returnvalue, param}, {msg_prepared(params: params) = m, s} ->
+        m = msg_prepared(m, params: [param | List.wrap(params)])
+        {m, s}
 
-      tokens ->
-        if Keyword.has_key?(tokens, :parameters) do
-          msg_prepared(params: tokens[:parameters])
-        else
-          msg_sql_result(
-            columns: tokens[:columns],
-            rows: tokens[:rows],
-            done: tokens[:done]
-          )
+      _, msg ->
+        msg
+    end)
+  end
+
+  def parse(:executing, packet_data, s) do
+    packet_data
+    |> decode_tokens()
+    |> Enum.reduce({msg_result(set: [], params: [], status: 0), nil, s}, fn
+      {:envchange, env}, {m, c, s} ->
+        {m, c, on_envchange(env, s)}
+
+      {:colmetadata, colmetadata}, {msg_result() = m, _, s} ->
+        curr = %Tds.Result{
+          columns: transform(colmetadata, :name),
+          rows: [],
+          num_rows: 0
+        }
+
+        {m, curr, s}
+
+      {:row, row}, {msg_result() = m, c, s} ->
+        c = %{c | rows: [row | c.rows]}
+        {m, c, s}
+
+      {token, %{status: status, rows: num_rows}},
+      {msg_result(set: set) = m, %Tds.Result{} = c, s}
+      when token in [:done, :doneinproc, :doneproc] ->
+        case status do
+          %{final?: true, count?: true} ->
+            c = %{c | num_rows: num_rows, rows: c.rows}
+            m = msg_result(m, set: [c | set])
+            {m, nil, s}
+
+          _ ->
+            {m, c, s}
         end
+
+      {:parameters, param}, {msg_result(params: params) = m, c, s} ->
+        m = msg_result(m, params: [param | params])
+        {m, c, s}
+
+      {:returnstatus, status}, {msg_result() = m, c, s} ->
+        m = msg_result(m, status: status)
+        {m, c, s}
+
+      {:error, error}, {_, _, s} ->
+        {msg_error(error: error), nil, s}
+
+      _, any ->
+        any
+    end)
+    |> case do
+      {msg_result(set: set) = msg, _, s} ->
+        set = Enum.reverse(set)
+        {msg_result(msg, set: set), s}
+
+      {msg_error() = msg, _, s} ->
+        {msg, s}
     end
   end
+
+  defp on_envchange(_, s) do
+    s
+  end
+
+  defp transform(list, key, acc \\ [])
+  defp transform([], _key, acc), do: acc |> Enum.reverse()
+
+  defp transform([h | t], key, acc) when is_map(h),
+    do: transform(t, key, [Map.get(h, key) | acc])
+
+  defp transform([h | t], key, acc) when is_list(h),
+    do: transform(t, key, [Keyword.get(h, key) | acc])
 
   ## Encoders
 
   def encode_msg(msg, env) do
-    elem(msg, 0) |> IO.inspect(label: "MESSAGE")
     encode(msg, env)
   end
 

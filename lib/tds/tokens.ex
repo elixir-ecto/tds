@@ -31,6 +31,7 @@ defmodule Tds.Tokens do
           | :parameters
           | :returnstatus
           | :row
+  # | :eof # end of message marker
 
   ## Decode Token Stream
   @spec decode_tokens(any, any) :: [{token, any}]
@@ -189,9 +190,8 @@ defmodule Tds.Tokens do
   ## NBC ROW
   defp decode_nbcrow(<<tail::binary>>, collmetadata) do
     column_count = Enum.count(collmetadata)
-    bitmap_bytes = round(8 * Float.ceil(column_count / 8))
+    bitmap_bytes = round(Float.ceil(column_count / 8))
     {bitmap, tail} = bitmap_list(tail, bitmap_bytes)
-    bitmap = bitmap |> Enum.reverse()
     {row, tail} = decode_nbcrow_columns(tail, collmetadata, bitmap)
 
     {{:row, row}, tail, collmetadata}
@@ -323,10 +323,6 @@ defmodule Tds.Tokens do
             rest::binary
           >> = tail
 
-          Logger.warn(fn ->
-            "Defect transaction env change received #{inspect(new_value)}"
-          end)
-
           {{:transaction_defect, new_value}, rest}
 
         0x0D ->
@@ -361,7 +357,7 @@ defmodule Tds.Tokens do
             rest::binary
           >> = tail
 
-          {{:user_info, ucs2_to_utf(value)}, rest}
+          {{:userinfo, ucs2_to_utf(value)}, rest}
 
         0x14 ->
           <<
@@ -389,8 +385,9 @@ defmodule Tds.Tokens do
 
   ## DONE
   defp decode_done(
-         <<status::int16, cur_cmd::binary(2), row_count::little-size(8)-unit(8),
-           tail::binary>>,
+         <<status::little-unsigned-size(2)-unit(8),
+           cur_cmd::little-unsigned-size(2)-unit(8),
+           row_count::little-size(8)-unit(8), tail::binary>>,
          collmetadata
        ) do
     status = %{
@@ -407,7 +404,7 @@ defmodule Tds.Tokens do
     done = %{
       status: status,
       cmd: cur_cmd,
-      rows: if(status.count?, do: row_count)
+      rows: row_count
     }
 
     {{:done, done}, tail, collmetadata}
@@ -466,8 +463,11 @@ defmodule Tds.Tokens do
     {[], tail}
   end
 
-  defp bitmap_list(<<byte::binary-8, tail::binary>>, n) do
-    <<b8::1, b7::1, b6::1, b5::1, b4::1, b3::1, b2::1, b1::1>> = byte
+  defp bitmap_list(
+         <<b8::1, b7::1, b6::1, b5::1, b4::1, b3::1, b2::1, b1::1,
+           tail::binary>>,
+         n
+       ) do
     {bits, tail} = bitmap_list(tail, n - 1)
     {[b1, b2, b3, b4, b5, b6, b7, b8 | bits], tail}
   end

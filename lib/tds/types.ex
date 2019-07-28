@@ -725,7 +725,7 @@ defmodule Tds.Types do
   end
 
   def decode_nchar(_data_info, <<data::binary>>) do
-    :unicode.characters_to_binary(data, {:utf16, :little}, :utf8)
+    ucs2_to_utf(data)
   end
 
   def decode_xml(_data_info, <<_data::binary>>) do
