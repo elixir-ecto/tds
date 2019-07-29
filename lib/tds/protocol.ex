@@ -759,14 +759,17 @@ defmodule Tds.Protocol do
 
     stm = Map.get(s, :query)
 
-    # Logger.debug(fn ->
-    #   "#TDS #{state} " <>
-    #     "send=#{Tds.Perf.to_string(t_send)} " <>
-    #     "receive=#{Tds.Perf.to_string(t_recv - t_decode)} " <>
-    #     "decode=#{Tds.Perf.to_string(t_decode)}" <>
-    #     "\n" <>
-    #     "#{inspect(stm)}"
-    # end)
+    if Keyword.get(s.opts, :trace, false) == true do
+      Logger.debug(fn ->
+        "[trace] [Tds.Protocod.msg_send/2] " <>
+          "state=#{inspect(state)} " <>
+          "send=#{Tds.Perf.to_string(t_send)} " <>
+          "receive=#{Tds.Perf.to_string(t_recv - t_decode)} " <>
+          "decode=#{Tds.Perf.to_string(t_decode)}" <>
+          "\n" <>
+          "#{inspect(stm)}"
+      end)
+    end
 
     result
   end

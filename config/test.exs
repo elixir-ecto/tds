@@ -8,5 +8,6 @@ config :tds,
     username: System.get_env("SQL_USERNAME") || "sa",
     password: System.get_env("SQL_PASSWORD") || "some!Password",
     database: "test",
+    trace: false,
     set_allow_snapshot_isolation: :on
   ]
