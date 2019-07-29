@@ -65,7 +65,7 @@ defmodule Tds.Messages do
     packet_data
     |> decode_tokens()
     |> Enum.reduce({msg_loginack(), s}, fn
-      {:envchange, {:routing, r}}, {msg_loginack() = msg, s} ->
+      {:envchange, {:routing, r, _}}, {msg_loginack() = msg, s} ->
         {msg_loginack(msg, redirect: r), s}
 
       {:envchange, other}, {msg, s} ->
@@ -85,6 +85,7 @@ defmodule Tds.Messages do
   end
 
   def parse(:prepare, packet_data, s) do
+    # IO.inspect(decode_tokens(packet_data), label: "PREPARE TOKENS" )
     packet_data
     |> decode_tokens()
     |> Enum.reduce({msg_prepared(), s}, fn
@@ -103,7 +104,23 @@ defmodule Tds.Messages do
     end)
   end
 
+  def parse(:transaction_manager, packet_data, s) do
+    packet_data
+    |> decode_tokens()
+    |> Enum.reduce({msg_trans(), s}, fn
+      {:envchange, env}, {msg, s} ->
+        {msg, on_envchange(env, s)}
+
+      {:error, error}, {_, s} ->
+        {msg_error(error: error), s}
+
+      _, msg ->
+        msg
+    end)
+  end
+
   def parse(:executing, packet_data, s) do
+    # IO.inspect(decode_tokens(packet_data), label: "EXECUTING" )
     packet_data
     |> decode_tokens()
     |> Enum.reduce({msg_result(set: [], params: [], status: 0), nil, s}, fn
@@ -124,10 +141,11 @@ defmodule Tds.Messages do
         {m, c, s}
 
       {token, %{status: status, rows: num_rows}},
-      {msg_result(set: set) = m, %Tds.Result{} = c, s}
+      {msg_result(set: set) = m, c, s}
       when token in [:done, :doneinproc, :doneproc] ->
         case status do
           %{final?: true, count?: true} ->
+            c = c || %Tds.Result{}
             c = %{c | num_rows: num_rows, rows: c.rows}
             m = msg_result(m, set: [c | set])
             {m, nil, s}
@@ -160,8 +178,26 @@ defmodule Tds.Messages do
     end
   end
 
-  defp on_envchange(_, s) do
-    s
+  defp on_envchange(envchnage, %{env: env} = s) do
+    case envchnage do
+      {:packetsize, new_value, _} ->
+        %{s | env: Map.put(env, :packetsize, new_value)}
+
+      {:collation, new_value, _} ->
+        %{s | env: Map.put(env, :collation, new_value)}
+
+      {:transaction_begin, new_value, _} ->
+        %{s | env: Map.put(env, :trans, new_value)}
+
+      {:transaction_commit, new_value, _} ->
+        %{s | env: Map.put(env, :trans, new_value)}
+
+      {:transaction_rollback, new_value, _} ->
+        %{s | env: Map.put(env, :trans, new_value)}
+
+      _ ->
+        s
+    end
   end
 
   defp transform(list, key, acc \\ [])

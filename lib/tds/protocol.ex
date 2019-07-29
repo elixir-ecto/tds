@@ -26,7 +26,9 @@ defmodule Tds.Protocol do
   @type sock :: {:gen_tcp | :ssl, pid}
   @type env :: %{
           trans: <<_::8>>,
-          savepoint: non_neg_integer
+          savepoint: non_neg_integer,
+          collation: Tds.Protocol.Collation.t(),
+          packetsize: integer
         }
   @type transaction :: nil | :started | :successful | :failed
   @type state ::
@@ -44,7 +46,6 @@ defmodule Tds.Protocol do
           opts: Keyword.t(),
           # Tells if connection is ready or executing command
           state: state,
-          collation: Tds.Protocol.Collation.t(),
           result: nil,
           query: nil | String.t(),
           transaction: transaction,
@@ -57,11 +58,15 @@ defmodule Tds.Protocol do
             opts: nil,
             # Tells if connection is ready or executing command
             state: :ready,
-            collation: %Tds.Protocol.Collation{},
             result: nil,
             query: nil,
             transaction: nil,
-            env: %{trans: <<0x00>>, savepoint: 0}
+            env: %{
+              trans: <<0x00>>,
+              savepoint: 0,
+              collation: %Tds.Protocol.Collation{},
+              packetsize: 4096
+            }
 
   @impl DBConnection
   def connect(opts) do
@@ -497,9 +502,9 @@ defmodule Tds.Protocol do
   def send_transaction(command, name, s) do
     msg = msg_transmgr(command: command, name: name)
 
-    case msg_send(msg, s) do
+    case msg_send(msg, %{s | state: :transaction_manager}) do
       {:ok, %{result: result} = s} ->
-        {:ok, result, %{s | state: :ready}}
+        {:ok, result, s}
 
       err ->
         err
@@ -673,16 +678,10 @@ defmodule Tds.Protocol do
     {:ok, mark_ready(%{s | result: result})}
   end
 
-  def message(:executing, msg_trans(trans: trans), %{env: env} = s) do
+  def message(:transaction_manager, msg_trans(), s) do
     result = %Tds.Result{columns: [], rows: [], num_rows: 0}
 
-    {:ok,
-     %{
-       s
-       | state: :ready,
-         result: result,
-         env: %{trans: trans, savepoint: env.savepoint}
-     }}
+    {:ok, %{s | state: :ready, result: result}}
   end
 
   def message(:prepare, msg_prepared(params: params), %{} = s) do
@@ -733,31 +732,54 @@ defmodule Tds.Protocol do
     end
   end
 
-  defp msg_send(msg, %{sock: {mod, sock}, env: env} = s) do
+  defp msg_send(msg, %{sock: {mod, sock}, env: env, state: state} = s) do
     :inet.setopts(sock, active: false)
 
-    msg
-    |> encode_msg(env)
-    |> Enum.each(&mod.send(sock, &1))
+    {t_send, _} =
+      :timer.tc(fn ->
+        msg
+        |> encode_msg(env)
+        |> Enum.each(&mod.send(sock, &1))
+      end)
 
-    case msg_recv(s) do
-      {:disconnect, _ex, _s} = res ->
-        res
+    {t_recv, {t_decode, result}} =
+      :timer.tc(fn ->
+        case msg_recv(s) do
+          {:disconnect, _ex, _s} = res ->
+            {0, res}
 
-      buffer ->
-        buffer
-        |> IO.iodata_to_binary()
-        |> decode(s)
-    end
+          buffer ->
+            :timer.tc(fn ->
+              buffer
+              |> IO.iodata_to_binary()
+              |> decode(s)
+            end)
+        end
+      end)
+
+    stm = Map.get(s, :query)
+
+    # Logger.debug(fn ->
+    #   "#TDS #{state} " <>
+    #     "send=#{Tds.Perf.to_string(t_send)} " <>
+    #     "receive=#{Tds.Perf.to_string(t_recv - t_decode)} " <>
+    #     "decode=#{Tds.Perf.to_string(t_decode)}" <>
+    #     "\n" <>
+    #     "#{inspect(stm)}"
+    # end)
+
+    result
   end
 
-  defp msg_recv(s) do
+  defp msg_recv(s, acc \\ [])
+
+  defp msg_recv(s, acc) do
     case next_pkg(s) do
       {:more, package_data} ->
-        [package_data | msg_recv(s)]
+        msg_recv(s, [package_data | acc])
 
       {:last, package_data} ->
-        [package_data]
+        [package_data | acc] |> Enum.reverse()
     end
   catch
     error -> error

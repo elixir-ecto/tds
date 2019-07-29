@@ -12,10 +12,10 @@ defmodule Tds.Result do
 
   @typedoc "The result of a database query."
   @type t :: %__MODULE__{
-          columns: [String.t()],
+          columns: nil | [String.t()],
           rows: [tuple],
           num_rows: integer
         }
 
-  defstruct columns: [], rows: [], num_rows: 0
+  defstruct columns: nil, rows: [], num_rows: 0
 end

@@ -43,11 +43,11 @@ defmodule Packet.TokenStreamTest do
   >>
 
   @token_stream [
-    envchange: {:database, "master"},
+    envchange: {:database, "master", "master"},
     info: %{class: 0, line_number: 0, msg_text: "Changed database context to 'master'.", number: 5701, proc_name: "", server_name: "", state: 2},
-    envchange: {:collation, %Tds.Protocol.Collation{codepage: "WINDOWS-1252", col_flags: 0, lcid: 36941, sort_id: 52, version: 0}},
-    envchange: {:language, "us_english"},
-    envchange: {:packetsize, 4096},
+    envchange: {:collation, %Tds.Protocol.Collation{codepage: "WINDOWS-1252", col_flags: 0, lcid: 36941, sort_id: 52, version: 0}, nil},
+    envchange: {:language, "us_english", ""},
+    envchange: {:packetsize, 4096, 4096},
     info: %{class: 0, line_number: 0, msg_text: "Changed language setting to us_english.", number: 5703, proc_name: "", server_name: "", state: 1},
     loginack: %{program: "Microsoft SQL Server", t_sql_only: true, tds_version: 1913192450, version: "14.0.90.1"},
     done: %{cmd: 0, rows: 0, status: %{atnn?: false, count?: false, error?: false, final?: true, inxact?: false, more?: false, rpc_in_batch?: false, srverror?: false}}

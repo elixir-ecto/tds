@@ -212,47 +212,50 @@ defmodule Tds.Tokens do
             new_value_size::unsigned-8,
             new_value::binary(new_value_size, 16),
             old_value_size::unsigned-8,
-            _old_value::binary(old_value_size, 16),
+            old_value::binary(old_value_size, 16),
             rest::binary
           >> = tail
 
-          database = ucs2_to_utf(new_value)
-          {{:database, database}, rest}
+          new_database = ucs2_to_utf(new_value)
+          old_database = ucs2_to_utf(old_value)
+          {{:database, new_database, old_database}, rest}
 
         0x02 ->
           <<
             new_value_size::unsigned-8,
             new_value::binary(new_value_size, 16),
             old_value_size::unsigned-8,
-            _old_value::binary(old_value_size, 16),
+            old_value::binary(old_value_size, 16),
             rest::binary
           >> = tail
 
-          language = ucs2_to_utf(new_value)
-          {{:language, language}, rest}
+          new_language = ucs2_to_utf(new_value)
+          old_language = ucs2_to_utf(old_value)
+          {{:language, new_language, old_language}, rest}
 
         0x03 ->
           <<
             new_value_size::unsigned-8,
             new_value::binary(new_value_size, 16),
             old_value_size::unsigned-8,
-            _old_value::binary(old_value_size, 16),
+            old_value::binary(old_value_size, 16),
             rest::binary
           >> = tail
 
-          charset = ucs2_to_utf(new_value)
-          {{:charset, charset}, rest}
+          new_charset = ucs2_to_utf(new_value)
+          old_charset = ucs2_to_utf(old_value)
+          {{:charset, new_charset, old_charset}, rest}
 
         0x04 ->
           <<
             new_value_size::unsigned-8,
             new_value::binary(new_value_size, 16),
             old_value_size::unsigned-8,
-            _old_value::binary(old_value_size, 16),
+            old_value::binary(old_value_size, 16),
             rest::binary
           >> = tail
 
-          packetsize =
+          new_packetsize =
             new_value
             |> ucs2_to_utf()
             |> Integer.parse()
@@ -262,7 +265,17 @@ defmodule Tds.Tokens do
               {value, _maybe_unit} -> value
             end
 
-          {{:packetsize, packetsize}, rest}
+          old_packetsize =
+            old_value
+            |> ucs2_to_utf()
+            |> Integer.parse()
+            |> case do
+              :error -> 4096
+              {value, ""} -> value
+              {value, _maybe_unit} -> value
+            end
+
+          {{:packetsize, new_packetsize, old_packetsize}, rest}
 
         # 0x05
         # @tds_envtype_unicode_data_storing_local_id ->
@@ -275,12 +288,12 @@ defmodule Tds.Tokens do
             new_value_size::unsigned-8,
             collation::binary(new_value_size, 8),
             old_value_size::unsigned-8,
-            _::binary(old_value_size, 8),
+            _old_value::binary(old_value_size, 8),
             rest::binary
           >> = tail
 
           {:ok, collation} = Tds.Protocol.Collation.decode(collation)
-          {{:collation, collation}, rest}
+          {{:collation, collation, nil}, rest}
 
         0x08 ->
           <<
@@ -290,27 +303,30 @@ defmodule Tds.Tokens do
             rest::binary
           >> = tail
 
-          {{:transaction_begin, new_value}, rest}
+          new_trans = :binary.copy(new_value)
+          {{:transaction_begin, new_trans, <<0x00>>}, rest}
 
         0x09 ->
           <<
             0x00,
             value_size::unsigned-8,
-            _old_value::binary-little-size(value_size)-unit(8),
+            old_value::binary-little-size(value_size)-unit(8),
             rest::binary
           >> = tail
 
-          {{:transaction_commit, <<0x00>>}, rest}
+          old_trans = :binary.copy(old_value)
+          {{:transaction_commit, <<0x00>>, old_trans}, rest}
 
         0x0A ->
           <<
             0x00,
             value_size::unsigned-8,
-            _old_value::binary-little-size(value_size)-unit(8),
+            old_value::binary-little-size(value_size)-unit(8),
             rest::binary
           >> = tail
 
-          {{:transaction_rollback, <<0x00>>}, rest}
+          trans = :binary.copy(old_value)
+          {{:transaction_rollback, <<0x00>>, trans}, rest}
 
         # 0x0B
         # @tds_envtype_enlist_dtc_transaction ->
@@ -323,7 +339,8 @@ defmodule Tds.Tokens do
             rest::binary
           >> = tail
 
-          {{:transaction_defect, new_value}, rest}
+          tran = :binary.copy(new_value)
+          {{:transaction_defect, tran, <<0x00>>}, rest}
 
         0x0D ->
           <<
@@ -333,21 +350,22 @@ defmodule Tds.Tokens do
             rest::binary
           >> = tail
 
-          {{:mirroring_partner, :ignore_me}, rest}
+          {{:mirroring_partner, :ignore_me, :ignore_me}, rest}
 
         0x11 ->
           <<
             0x00,
             value_size::unsigned-8,
-            _old_value::binary-little-size(value_size)-unit(8),
+            old_value::binary-little-size(value_size)-unit(8),
             rest::binary
           >> = tail
 
-          {{:transaction_ended, <<0x00>>}, rest}
+          old = :binary.copy(old_value)
+          {{:transaction_ended, <<0x00>>, old}, rest}
 
         0x12 ->
           <<0x00, 0x00, rest::binary>> = tail
-          {{:resetconnection_ack, 0x00}, rest}
+          {{:resetconnection_ack, 0x00, 0x00}, rest}
 
         0x13 ->
           <<
@@ -357,7 +375,7 @@ defmodule Tds.Tokens do
             rest::binary
           >> = tail
 
-          {{:userinfo, ucs2_to_utf(value)}, rest}
+          {{:userinfo, ucs2_to_utf(value), nil}, rest}
 
         0x14 ->
           <<
@@ -377,7 +395,7 @@ defmodule Tds.Tokens do
             port: port
           }
 
-          {{:routing, routing}, rest}
+          {{:routing, routing, nil}, rest}
       end
 
     {{:envchange, token}, tail, colmetadata}
