@@ -7,7 +7,7 @@ MSSQL / TDS Database driver for Elixir.
 ### NOTE: 
 Since TDS version 2.0, tds_ecto package is deprecated, this version supports `ecto_sql` since version 3.1.0. 
 
-Please check out the [issues](https://github.com/livehelpnow/tds/issues) for a more complete overview or [CHNAGELOG.md](CHANGELOG.md). 
+Please check out the [issues](https://github.com/livehelpnow/tds/issues) for a more complete overview or [CHANGELOG.md](CHANGELOG.md). 
 
 ## Usage
 
