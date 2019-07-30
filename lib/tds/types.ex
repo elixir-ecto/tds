@@ -543,7 +543,7 @@ defmodule Tds.Types do
           @tds_data_type_char,
           @tds_data_type_varchar
         ] ->
-          decode_char(data_info[:collation], :binary.copy(data))
+          decode_char(data_info, data)
 
         data_type_code in [
           @tds_data_type_binary,
@@ -569,7 +569,7 @@ defmodule Tds.Types do
           @tds_data_type_bigvarchar,
           @tds_data_type_bigchar
         ] ->
-          decode_char(data_info[:collation], :binary.copy(data))
+          decode_char(data_info, data)
 
         data_type_code in [
           @tds_data_type_bigvarbinary,
@@ -581,7 +581,7 @@ defmodule Tds.Types do
           @tds_data_type_nvarchar,
           @tds_data_type_nchar
         ] ->
-          decode_nchar(data_info, :binary.copy(data))
+          decode_nchar(data_info, data)
 
         data_type_code == @tds_data_type_udt ->
           decode_udt(data_info, :binary.copy(data))
@@ -606,8 +606,8 @@ defmodule Tds.Types do
       ) do
     value =
       case data_type_code do
-        @tds_data_type_text -> decode_char(data_info, :binary.copy(data))
-        @tds_data_type_ntext -> decode_nchar(data_info, :binary.copy(data))
+        @tds_data_type_text -> decode_char(data_info, data)
+        @tds_data_type_ntext -> decode_nchar(data_info, data)
         @tds_data_type_image -> :binary.copy(data)
         _ -> nil
       end
@@ -639,7 +639,7 @@ defmodule Tds.Types do
           @tds_data_type_bigchar,
           @tds_data_type_text
         ] ->
-          decode_char(data_info[:collation], data)
+          decode_char(data_info, data)
 
         data_type_code in [
           @tds_data_type_bigvarbinary,
@@ -720,8 +720,8 @@ defmodule Tds.Types do
     end
   end
 
-  def decode_char(_data_info, <<data::binary>>) do
-    data
+  def decode_char(data_info, <<data::binary>>) do
+    Tds.Encoding.decode(data, data_info.collation.codepage)
   end
 
   def decode_nchar(_data_info, <<data::binary>>) do
@@ -729,7 +729,7 @@ defmodule Tds.Types do
   end
 
   def decode_xml(_data_info, <<data::binary>>) do
-    :unicode.characters_to_binary(data, {:utf16, :little}, :utf8)
+    ucs2_to_utf(data)
   end
 
   def decode_udt(%{}, <<data::binary>>) do

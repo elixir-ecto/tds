@@ -45,6 +45,16 @@ defmodule Tds.TestHelper do
     end
   end
 
+  defmacro drop_table(table) do
+    quote bind_quoted: [table: table] do
+      statement =
+        "if exists(select * from sys.tables where [name] = '#{table}')" <>
+          " drop table #{table}"
+
+      Tds.query!(var!(context)[:pid], statement, [])
+    end
+  end
+
   def sqlcmd(params, sql, args \\ []) do
     args = [
       "-U",
@@ -63,32 +73,37 @@ end
 
 opts = Application.get_env(:tds, :opts)
 database = opts[:database]
-{"", 0} = Tds.TestHelper.sqlcmd(opts, """
-IF EXISTS(SELECT * FROM sys.databases where name = '#{database}')
-BEGIN
-  DROP DATABASE [#{database}];
-END;
-CREATE DATABASE [#{database}];
-""")
-{"Changed database context to 'test'." <> _, 0} = Tds.TestHelper.sqlcmd(opts, """
-USE [test];
 
-CREATE TABLE altering ([a] int)
+{"", 0} =
+  Tds.TestHelper.sqlcmd(opts, """
+  IF EXISTS(SELECT * FROM sys.databases where name = '#{database}')
+  BEGIN
+    DROP DATABASE [#{database}];
+  END;
+  CREATE DATABASE [#{database}];
+  """)
 
-CREATE TABLE [composite1] ([a] int, [b] text);
-CREATE TABLE [composite2] ([a] int, [b] int, [c] int);
-CREATE TABLE [uniques] ([id] int NOT NULL, CONSTRAINT UIX_uniques_id UNIQUE([id]))
-""")
-{"Changed database context to 'test'." <> _, 0} = Tds.TestHelper.sqlcmd opts, """
-USE test
-GO
-CREATE SCHEMA test;
-"""
+{"Changed database context to 'test'." <> _, 0} =
+  Tds.TestHelper.sqlcmd(opts, """
+  USE [test];
+
+  CREATE TABLE altering ([a] int)
+
+  CREATE TABLE [composite1] ([a] int, [b] text);
+  CREATE TABLE [composite2] ([a] int, [b] int, [c] int);
+  CREATE TABLE [uniques] ([id] int NOT NULL, CONSTRAINT UIX_uniques_id UNIQUE([id]))
+  """)
+
+{"Changed database context to 'test'." <> _, 0} =
+  Tds.TestHelper.sqlcmd(opts, """
+  USE test
+  GO
+  CREATE SCHEMA test;
+  """)
 
 # :dbg.tracer()
 # :dbg.p(:all,:c)
 # :dbg.tpl(Tds, :query, :x)
-
 
 ExUnit.start()
 ExUnit.configure(exclude: [:manual])
