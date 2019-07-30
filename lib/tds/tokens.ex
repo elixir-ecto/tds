@@ -176,7 +176,19 @@ defmodule Tds.Tokens do
       line_number: line_number
     }
 
-    Logger.info(info.msg_text)
+    Logger.debug(fn ->
+      [
+        "[MSSQL INFO]",
+        inspect(
+          Map.take(info, [:number, :state, :class, :line_number])
+          |> Map.to_list()
+        ),
+        info.msg_text
+      ]
+      |> Enum.intersperse(" ")
+      |> IO.iodata_to_binary()
+    end)
+
     # tokens = Keyword.update(tokens, :info, [i], &[i | &1])
     {{:info, info}, tail, collmetadata}
   end
