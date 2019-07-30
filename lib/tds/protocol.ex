@@ -14,7 +14,7 @@ defmodule Tds.Protocol do
   @behaviour DBConnection
 
   @timeout 5000
-  @sock_opts [packet: :raw, mode: :binary, active: false, recbuf: 4096]
+  @sock_opts [packet: :raw, mode: :binary, active: false]
   @trans_levels [
     :read_uncommitted,
     :read_committed,
@@ -774,58 +774,87 @@ defmodule Tds.Protocol do
     result
   end
 
-  defp msg_recv(s, acc \\ [])
+  defp msg_recv(%{sock: {mod, pid}} = s) do
+    case mod.recv(pid, 0) do
+      {:ok, pkg} ->
+        pkg
+        |> next_tds_pkg([])
+        |> msg_recv(s)
 
-  defp msg_recv(s, acc) do
-    case next_pkg(s) do
-      {:more, package_data} ->
-        msg_recv(s, [package_data | acc])
 
-      {:last, package_data} ->
-        [package_data | acc] |> Enum.reverse()
+      {:error, error} ->
+        {:disconnect,
+         %Tds.Error{
+           message: "Connection failed to receive packet due #{inspect(error)}"
+         }, s}
     end
   catch
-    error -> error
+    {:error, error} -> {:disconnect, error, s}
   end
 
-  @spec next_pkg(%{required(:sock) => {module, pid}, optional(atom) => term}) ::
-          {:more, binary}
-          | {:last, binary}
-          | no_return
-  defp next_pkg(%{sock: {mod, sock}} = s) do
-    case mod.recv(sock, 8) do
-      {:ok, <<0x04, 0x01, size::int16, _spid::int16, _pkg::int8, _win::int8>>} ->
-        {:last, packetdata_recv(size - 8, s)}
+  defp msg_recv({:done, buffer, _}, _s) do
+    Enum.reverse(buffer)
+  end
 
-      {:ok, <<0x04, 0x00, size::int16, _spid::int16, _pkg::int8, _win::int8>>} ->
-        {:more, packetdata_recv(size - 8, s)}
+  defp msg_recv({:more, buffer, more, last?}, %{sock: {mod, pid}} = s) do
+    take = if last?, do: more, else: 0
 
-      {:ok, other} ->
-        throw(
-          {:disconnect,
-           Tds.Error.exception(
-             "Message header, #{inspect(other, base: :hex)} is not supported."
-           )}
-        )
+    case mod.recv(pid, take) do
+      {:ok, pkg} ->
+        next_tds_pkg(pkg, buffer, more, last?)
+        |> msg_recv(s)
 
-      {:error, :closed} ->
-        raise DBConnection.ConnectionError, "connection is closed"
-
-      {:error, exception} ->
-        throw({:disconnect, exception, s})
+      {:error, error} ->
+        throw({:error, error})
     end
   end
 
-  defp packetdata_recv(size, %{sock: {mod, sock}} = s) do
-    case mod.recv(sock, size) do
-      {:ok, packetdata} ->
-        packetdata
+  defp msg_recv({:more, buffer, unknown_pkg}, %{sock: {mod, pid}} = s) do
+    case mod.recv(pid, 0) do
+      {:ok, pkg} ->
+        unknown_pkg
+        |> Kernel.<>(pkg)
+        |> next_tds_pkg(buffer)
+        |> msg_recv(s)
 
-      {:error, :closed} ->
-        raise DBConnection.ConnectionError, "connection is closed"
+      {:error, error} -> throw {:error, error}
+    end
+  end
 
-      {:error, exception} ->
-        throw({:disconnect, exception, s})
+  defp next_tds_pkg(pkg, buffer) do
+    case pkg do
+      <<0x04, 0x01, size::int16, _::int32, chunk::binary>> ->
+        more = size - 8
+        next_tds_pkg(chunk, buffer, more, true)
+
+      <<0x04, 0x00, size::int16, _::int32, chunk::binary>> ->
+        more = size - 8
+        next_tds_pkg(chunk, buffer, more, false)
+
+      unknown_pkg ->
+        {:more, buffer, unknown_pkg}
+    end
+  end
+
+  defp next_tds_pkg(pkg, buffer, more, true) do
+    case pkg do
+      <<chunk::binary(more, 8), tail::binary>> ->
+        {:done, [chunk | buffer], tail}
+
+      <<chunk::binary>> ->
+        more = more - byte_size(chunk)
+        {:more, [chunk | buffer], more, true}
+    end
+  end
+
+  defp next_tds_pkg(pkg, buffer, more, false) do
+    case pkg do
+      <<chunk::binary(more, 8), tail::binary>> ->
+        next_tds_pkg(tail, [chunk | buffer])
+
+      <<chunk::binary>> ->
+        more = more - byte_size(chunk)
+        {:more, [chunk | buffer], more, false}
     end
   end
 

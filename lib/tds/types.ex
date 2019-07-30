@@ -489,7 +489,7 @@ defmodule Tds.Types do
           decode_datetimeoffset(data_info[:scale], data)
 
         data_type_code == @tds_data_type_uniqueidentifier ->
-          decode_uuid(data)
+          decode_uuid(:binary.copy(data))
 
         data_type_code == @tds_data_type_intn ->
           case length do
@@ -543,13 +543,13 @@ defmodule Tds.Types do
           @tds_data_type_char,
           @tds_data_type_varchar
         ] ->
-          decode_char(data_info[:collation], data)
+          decode_char(data_info[:collation], :binary.copy(data))
 
         data_type_code in [
           @tds_data_type_binary,
           @tds_data_type_varbinary
         ] ->
-          data
+          :binary.copy(data)
       end
 
     {value, tail}
@@ -569,22 +569,22 @@ defmodule Tds.Types do
           @tds_data_type_bigvarchar,
           @tds_data_type_bigchar
         ] ->
-          decode_char(data_info[:collation], data)
+          decode_char(data_info[:collation], :binary.copy(data))
 
         data_type_code in [
           @tds_data_type_bigvarbinary,
           @tds_data_type_bigbinary
         ] ->
-          data
+          :binary.copy(data)
 
         data_type_code in [
           @tds_data_type_nvarchar,
           @tds_data_type_nchar
         ] ->
-          decode_nchar(data_info, data)
+          decode_nchar(data_info, :binary.copy(data))
 
         data_type_code == @tds_data_type_udt ->
-          decode_udt(data_info, data)
+          decode_udt(data_info, :binary.copy(data))
       end
 
     {value, tail}
@@ -606,9 +606,9 @@ defmodule Tds.Types do
       ) do
     value =
       case data_type_code do
-        @tds_data_type_text -> decode_char(data_info, data)
-        @tds_data_type_ntext -> decode_nchar(data_info, data)
-        @tds_data_type_image -> data
+        @tds_data_type_text -> decode_char(data_info, :binary.copy(data))
+        @tds_data_type_ntext -> decode_nchar(data_info, :binary.copy(data))
+        @tds_data_type_image -> :binary.copy(data)
         _ -> nil
       end
 
@@ -674,7 +674,7 @@ defmodule Tds.Types do
         >>,
         buf
       ) do
-    decode_plp_chunk(tail, buf <> chunk)
+    decode_plp_chunk(tail, buf <> :binary.copy(chunk))
   end
 
   def decode_smallmoney(<<money::little-signed-32>>) do
@@ -733,9 +733,12 @@ defmodule Tds.Types do
     nil
   end
 
-  def decode_udt(%{}, <<_data::binary>>) do
-    # TODO: Decode UDT Data
-    nil
+  def decode_udt(%{}, <<data::binary>>) do
+    # UDT, if used, should be decoded by app that uses it,
+    # tho we could've registered UDT types on connection
+    # Example could be ecto, where custom type is created
+    # special case are built in udt types such as HierarchyId
+    data
   end
 
   @doc """
