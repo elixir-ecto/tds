@@ -129,15 +129,43 @@ defmodule Tds.Protocol do
   end
 
   @impl DBConnection
-  def checkout(%{sock: {_mod, sock}} = s) do
-    :ok = :inet.setopts(sock, active: false)
+  def checkout(%{transaction: :started} = s) do
+    err = %Tds.Error{message: "Unexpected transaction status `:started`"}
+    {:disconnect, err, s}
+  end
+
+  def checkout(%{sock: {mod, sock}} = s) do
+    sock_mod = inspect(mod)
+
+    case :inet.setopts(sock, active: false) do
+      :ok ->
+        {:ok, s}
+
+      {:error, reason} ->
+        msg = "Failed to #{sock_mod}.setops(active: false) due `#{reason}`"
+        {:disconnect, %Tds.Error{message: msg}, s}
+    end
 
     {:ok, s}
   end
 
   @impl DBConnection
-  def checkin(%{sock: {_mod, sock}} = s) do
-    :ok = :inet.setopts(sock, active: :once)
+  def checkin(%{transaction: :started} = s) do
+    err = %Tds.Error{message: "Unexpected transaction status `:started`"}
+    {:disconnect, err, s}
+  end
+
+  def checkin(%{sock: {mod, sock}} = s) do
+    sock_mod = inspect(mod)
+
+    case :inet.setopts(sock, active: :once) do
+      :ok ->
+        {:ok, s}
+
+      {:error, reason} ->
+        msg = "Failed to #{sock_mod}.setops(active: false) due `#{reason}`"
+        {:disconnect, %Tds.Error{message: msg}, s}
+    end
 
     {:ok, s}
   end
@@ -781,7 +809,6 @@ defmodule Tds.Protocol do
         |> next_tds_pkg([])
         |> msg_recv(s)
 
-
       {:error, error} ->
         {:disconnect,
          %Tds.Error{
@@ -817,7 +844,8 @@ defmodule Tds.Protocol do
         |> next_tds_pkg(buffer)
         |> msg_recv(s)
 
-      {:error, error} -> throw {:error, error}
+      {:error, error} ->
+        throw({:error, error})
     end
   end
 
@@ -1044,5 +1072,21 @@ defmodule Tds.Protocol do
             "should be either :on, :off, nil"
         )
     end
+  end
+
+  defp query_error(s, msg) do
+    {:error, ArgumentError.exception(msg), s}
+  end
+
+  defp lock_error(s, fun) do
+    msg = "connection is locked copying to or from the database and " <>
+      "can not #{fun} transaction"
+    {:disconnect, RuntimeError.exception(msg), s}
+  end
+
+  defp lock_error(s, fun, query) do
+    msg = "connection is locked copying to or from the database and " <>
+      "can not #{fun} #{inspect query}"
+    {:error, RuntimeError.exception(msg), s}
   end
 end

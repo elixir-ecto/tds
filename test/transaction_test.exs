@@ -27,26 +27,20 @@ defmodule Tds.TransactionTest do
 
   @tag mode: :transaction
   test "connection works after failure during commit transaction", context do
-    assert transaction(fn conn ->
-             assert {:error, %Tds.Error{mssql: %{class: 14, number: 2627}}} =
-                      Tds.query(
-                        conn,
-                        "insert into uniques values (1), (1);",
-                        []
-                      )
+    fun = fn conn ->
+      assert {:error, %Tds.Error{mssql: %{class: 14, number: 2627}}} =
+               Tds.query(conn, "insert into uniques values (1), (1);", [])
 
-             assert {:ok, %Tds.Result{columns: [""], num_rows: 1, rows: ['*']}} =
-                      Tds.query(conn, "SELECT 42", [])
+      assert {:ok, %Tds.Result{columns: [""], num_rows: 1, rows: ['*']}} =
+               Tds.query(conn, "SELECT 42", [])
 
-             assert {:ok, %Tds.Result{columns: nil, num_rows: 2, rows: []}} =
-                      Tds.query(
-                        conn,
-                        "insert into uniques values (1), (2);",
-                        []
-                      )
+      assert {:ok, %Tds.Result{columns: nil, num_rows: 2, rows: []}} =
+               Tds.query(conn, "insert into uniques values (1), (2);", [])
 
-             :hi
-           end) == {:ok, :hi}
+      :hi
+    end
+
+    assert transaction(fun) == {:ok, :hi}
 
     assert [[42]] = query("SELECT 42", [])
     assert [[0]] = query("SELECT COUNT(*) FROM uniques", [])

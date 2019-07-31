@@ -181,6 +181,7 @@ defmodule Tds.Messages do
   end
 
   defp on_envchange(envchnage, %{env: env} = s) do
+    # IO.inspect(envchnage)
     case envchnage do
       {:packetsize, new_value, _} ->
         %{s | env: Map.put(env, :packetsize, new_value)}
@@ -189,13 +190,13 @@ defmodule Tds.Messages do
         %{s | env: Map.put(env, :collation, new_value)}
 
       {:transaction_begin, new_value, _} ->
-        %{s | env: Map.put(env, :trans, new_value)}
+        %{s | env: %{env | trans: new_value}}
 
       {:transaction_commit, new_value, _} ->
-        %{s | env: Map.put(env, :trans, new_value)}
+        %{s | env: %{env | trans: new_value, savepoint: 0}, transaction: nil}
 
       {:transaction_rollback, new_value, _} ->
-        %{s | env: Map.put(env, :trans, new_value)}
+        %{s | env: %{env | trans: new_value, savepoint: 0}, transaction: nil}
 
       _ ->
         s

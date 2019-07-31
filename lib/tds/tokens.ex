@@ -178,11 +178,10 @@ defmodule Tds.Tokens do
 
     Logger.debug(fn ->
       [
-        "[MSSQL INFO]",
-        inspect(
-          Map.take(info, [:number, :state, :class, :line_number])
-          |> Map.to_list()
-        ),
+        "(Tds.Info)",
+        "Line",
+        to_string(info.line_number),
+        "(Class #{info.class})",
         info.msg_text
       ]
       |> Enum.intersperse(" ")
