@@ -5,7 +5,7 @@ defmodule Tds.Mixfile do
   def project do
     [
       app: :tds,
-      version: "1.1.7",
+      version: "1.2.0",
       elixir: "~> 1.0",
       deps: deps(),
       compilers: [:rustler] ++ Mix.compilers(),
