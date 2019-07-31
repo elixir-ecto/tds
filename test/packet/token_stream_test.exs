@@ -94,7 +94,7 @@ defmodule Packet.TokenStreamTest do
   >>
 
   @token_stream [
-    doneinproc: %{cmd: 193, rows: 1, status: %{atnn?: false, error?: false, final?: true, inxact?: false, rpc_in_batch?: false, count?: true, more?: true, srverror?: false}},
+    doneinproc: %{cmd: 193, rows: 1, status: %{atnn?: false, error?: false, final?: false, inxact?: false, rpc_in_batch?: false, count?: true, more?: true, srverror?: false}},
     returnstatus: 0,
     doneproc: %{cmd: 224, rows: 0, status: %{atnn?: false, count?: false, error?: false, final?: true, inxact?: false, more?: false, rpc_in_batch?: false, srverror?: false}}
   ]
