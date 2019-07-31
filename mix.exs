@@ -59,7 +59,7 @@ defmodule Tds.Mixfile do
   defp package do
     [
       name: "tds",
-      files: ["lib", "mix.exs", "README*"],
+      files: ["lib", "mix.exs", "README*", "native"],
       maintainers: ["Eric Witchin", "Milan Jaric"],
       licenses: ["Apache 2.0"],
       links: %{"Github" => "https://github.com/livehelpnow/tds"}
