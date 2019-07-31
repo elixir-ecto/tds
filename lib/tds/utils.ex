@@ -22,6 +22,12 @@ defmodule Tds.Utils do
     Enum.join(x, " ")
   end
 
+  def to_little_ucs2(str) when is_list(str) do
+    str
+    |> IO.iodata_to_binary()
+    |> to_little_ucs2()
+  end
+
   def to_little_ucs2(str) do
     Tds.Encoding.encode(str, "utf-16le")
   end
