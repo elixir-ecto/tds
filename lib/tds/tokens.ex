@@ -421,14 +421,14 @@ defmodule Tds.Tokens do
          collmetadata
        ) do
     status = %{
-      final?: band(status, 0x00) == 0x00,
-      more?: band(status, 0x01) == 0x01,
-      error?: band(status, 0x02) == 0x02,
-      inxact?: band(status, 0x04) == 0x04,
-      count?: band(status, 0x10) == 0x10,
-      atnn?: band(status, 0x20) == 0x20,
-      rpc_in_batch?: band(status, 0x80) == 0x80,
-      srverror?: band(status, 0x100) == 0x100
+      final?: band(status, 0x0001) == 0x0,
+      more?: band(status, 0x0001) == 0x1,
+      error?: band(status, 0x0002) == 0x2,
+      inxact?: band(status, 0x0004) == 0x4,
+      count?: band(status, 0x0010) == 0x10,
+      atnn?: band(status, 0x0020) == 0x20,
+      rpc_in_batch?: band(status, 0x0080) == 0x80,
+      srverror?: band(status, 0x0100) == 0x100
     }
 
     done = %{
