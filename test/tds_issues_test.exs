@@ -126,8 +126,9 @@ defmodule TdsIssuesTest do
     AS
     BEGIN
       -- SET NOCOUNT ON added to prevent extra result sets from
-      -- interfering with SELECT statements.
-      SET NOCOUNT ON;
+      -- interfering with SELECT statements. This is NOT REQURED anymore
+      -- rows are counted by message parser until done token appears
+      -- SET NOCOUNT ON;
 
         -- Insert statements for procedure here
       select id, name from dummy_tbl where id = @filterId
