@@ -105,6 +105,8 @@ defmodule Tds.Messages do
   end
 
   def parse(:transaction_manager, packet_data, s) do
+    # IO.inspect(packet_data, base: :hex, label: "TRANSACTION MANAGER")
+    # IO.inspect(decode_tokens(packet_data), label: "TRANSACTION MANAGER")
     packet_data
     |> decode_tokens()
     |> Enum.reduce({msg_trans(), s}, fn
@@ -120,6 +122,7 @@ defmodule Tds.Messages do
   end
 
   def parse(:executing, packet_data, s) do
+    # IO.inspect(packet_data, base: :hex, label: "EXECUTING")
     # IO.inspect(decode_tokens(packet_data), label: "EXECUTING" )
     packet_data
     |> decode_tokens()
@@ -137,21 +140,20 @@ defmodule Tds.Messages do
         {m, curr, s}
 
       {:row, row}, {msg_result() = m, c, s} ->
-        c = %{c | rows: [row | c.rows]}
+        c = %{c | rows: [row | c.rows], num_rows: c.num_rows + 1}
         {m, c, s}
 
       {token, %{status: status, rows: num_rows}},
       {msg_result(set: set) = m, c, s}
       when token in [:done, :doneinproc, :doneproc] ->
-        case status do
-          %{final?: true, count?: true} ->
-            c = c || %Tds.Result{}
-            c = %{c | num_rows: num_rows, rows: c.rows}
-            m = msg_result(m, set: [c | set])
+        cond do
+          status.count? and is_nil(c) ->
+            c = %Tds.Result{num_rows: num_rows}
+            {msg_result(m, set: [c | set]), nil, s}
+          not is_nil(c) ->
+            {msg_result(m, set: [c | set]), nil, s}
+          :else ->
             {m, nil, s}
-
-          _ ->
-            {m, c, s}
         end
 
       {:parameters, param}, {msg_result(params: params) = m, c, s} ->
