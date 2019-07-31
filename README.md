@@ -110,6 +110,18 @@ Set this option to enable snapshot isolation on the database level. Requires con
 
 Currently unsupported: [User-Defined Types](https://docs.microsoft.com/en-us/sql/relational-databases/clr-integration-database-objects-user-defined-types/working-with-user-defined-types-in-sql-server), XML
 
+### UUIDs
+
+[MSSQL stores UUIDs in mixed-endian
+format](https://dba.stackexchange.com/a/121878), and these mixed-endian UUIDs
+are returned in [Tds.Result](https://hexdocs.pm/tds/Tds.Result.html).
+
+To convert a mixed-endian UUID binary to a big-endian string, use 
+[Tds.Types.UUID.load/1](https://hexdocs.pm/tds/Tds.Types.UUID.html#load/1)
+
+To convert a big-endian UUID string to a mixed-endian binary, use
+[Tds.Types.UUID.dump/1](https://hexdocs.pm/tds/Tds.Types.UUID.html#dump/1)
+
 ## Contributing
 
 Clone and compile Tds with:
