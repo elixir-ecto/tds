@@ -35,7 +35,7 @@ defmodule Tds.Mixfile do
   end
 
   def application do
-    [applications: [:logger, :db_connection, :decimal]]
+    [applications: [:logger, :db_connection, :decimal, :rustler]]
   end
 
   defp deps do
