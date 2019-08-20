@@ -5,7 +5,7 @@
 MSSQL / TDS Database driver for Elixir.
 
 ### NOTE: 
-Since TDS version 2.0, tds_ecto package is deprecated, this version supports `ecto_sql` since version 3.1.0. 
+Since TDS version 2.0, `tds_ecto` package is deprecated, this version supports `ecto_sql` since version 3.1.0. 
 
 Please check out the [issues](https://github.com/livehelpnow/tds/issues) for a more complete overview or [CHANGELOG.md](CHANGELOG.md). 
 
@@ -56,8 +56,8 @@ config :your_app, tds_conn,
 Then using `Application.get_env(:your_app, :tds_conn)` use this as first parameter in `Tds.start_link/1` function.
 
 There is additional parameter that can be used in configuration and 
-can improve query execution in sql server. If you find out that 
-your queries suffer form "denst estimation" as described [here](https://www.brentozar.com/archive/2018/03/sp_prepare-isnt-good-sp_executesql-performance/)
+can improve query execution in SQL Server. If you find out that 
+your queries suffer from "density estimation" as described [here](https://www.brentozar.com/archive/2018/03/sp_prepare-isnt-good-sp_executesql-performance/)
 
 you can try switching  how tds executes queries as below:
 
@@ -72,11 +72,11 @@ config :your_app, tds_conn,
   port: 1433,
   execution_mode: :executesql
 ```
-This will skip calling `sp_prepare` and query will be executed using `sp_executesql` instead. Please note that only single  execution mode can be set at the time and SQL will probably use single execution plan (since it is NOT estimated by checking data density!).
+This will skip calling `sp_prepare` and query will be executed using `sp_executesql` instead. Please note that only one execution mode can be set at a time, and SQL Server will probably use single execution plan (since it is NOT estimated by checking data density!).
 
-## Connecting to SQL Instances
+## Connecting to SQL Server Instances
 
-Tds supports SQL instances by passing `instance: "instancename"` to the connection options.
+Tds supports SQL Server instances by passing `instance: "instancename"` to the connection options.
 Since v1.0.16, additional connection parameters are:
   - `:set_language` - check stored procedure output `exec sp_helplanguage` name column value should be used here
   - `:set_datefirst` - number in range `1..7`
@@ -138,7 +138,7 @@ use it for the first time.
 
 ### SQL Server Setup
 
-The tests require an sql server database to be available on localhost.
+The tests require an SQL Server database to be available on localhost.
 
 If you have Docker installed, you can use the official [SQL Server Docker image](https://hub.docker.com/r/microsoft/mssql-server-linux).
 To start the container, run:
@@ -153,7 +153,7 @@ installation instructions here:
 * [Windows](https://docs.microsoft.com/en-us/sql/database-engine/install-windows/install-sql-server-from-the-installation-wizard-setup)
 * [Linux](https://docs.microsoft.com/en-us/sql/linux/sql-server-linux-setup)
 
-Make sure your SQL server accepts the credentials defined in `config/test.exs`.
+Make sure your SQL Server accepts the credentials defined in `config/test.exs`.
 
 You also will need to have the *sqlcmd* command line tools installed. Setup
 instructions can be found [here](https://docs.microsoft.com/en-us/sql/linux/sql-server-linux-setup-tools).
