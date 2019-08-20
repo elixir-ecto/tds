@@ -1,19 +1,19 @@
 # v2.1.0
 
-### Braking changes
-In order to improve compatibility with `ecto_sql` following braking changes are introduced in this release:
+### Breaking changes
+In order to improve compatibility with `ecto_sql`, following breaking changes are introduced in this release:
 
 * Sql data types `Time`, `Date`, `SmallDateTime`, `DateTime` and `DateTime2` are encoded from and decoded to
 elixir types `Time`, `Date`, `NavieDateTime`. It is still possible to use erlang datetime tuple as query parameter, 
 but any query output will be decoded always into one of above types.
 * Sql data type `DateTimeOffset` is decoded to `DateTime`
-* Since `tds_ecto` package is deprecated and adapter is moving to `ecto_sql`, use `Tds.Type.UUID` for 
+* Since `tds_ecto` package is deprecated and adapter is moving to `ecto_sql`, use `Tds.Types.UUID` for 
 column types `binary_id` (`uuid`). 
 * For same reason as above `Tds.VarChar` is now `Tds.Types.VarChar`
 
 # v2.0.0
 ### Improvements:
-* Implements DBConnection v2.0 to support `ecto_sql`. Please note that starting from this version [tds_ecto](https://hex.pm/packages/tds_ecto) is not anymore improved and will not use tds version 2.0.0+, instead use [ecto_sql](https://hex.pm/packages/ecto_sql) where tds_ecto will become part of it starting from version 3.1.0.
+* Implements DBConnection v2.0 to support `ecto_sql`. Please note that starting from this version [tds_ecto](https://hex.pm/packages/tds_ecto) is not improved anymore and will not use tds version 2.0.0+, instead use [ecto_sql](https://hex.pm/packages/ecto_sql) where tds_ecto will become part of it starting from version 3.1.0.
 
 # v1.1.5
 ### Improvements
