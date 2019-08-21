@@ -24,5 +24,14 @@ before_install:
 script:
   - source $HOME/.cargo/env
   - export PATH=$PATH:/opt/mssql-tools/bin
-  - mix deps.get
-  - mix test
+  - "MIX_ENV=test mix do deps.get, test && mix compile && mix coveralls.travis"
+  
+deploy:
+   provider: script
+   script: >-
+     mix deps.get &&
+     mix hex.publish --yes &&
+     mix clean &&
+     mix deps.clean --all
+   on:
+    tags: true
