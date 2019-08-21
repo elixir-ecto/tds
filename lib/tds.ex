@@ -24,7 +24,7 @@ defmodule Tds do
 
     case DBConnection.prepare_execute(pid, query, params, opts) do
       {:ok, _query, result} -> result
-      {:error, err} -> raise err.mssql.msg_text
+      {:error, err} -> raise err
     end
   end
 

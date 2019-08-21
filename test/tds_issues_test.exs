@@ -151,4 +151,25 @@ defmodule TdsIssuesTest do
       []
     )
   end
+
+  test "pardon prepare" do
+    opts =
+      Application.fetch_env!(:tds, :opts)
+      |> Keyword.put(:execution_mode, :executesql)
+
+    {:ok, pid} = Tds.start_link(opts)
+
+    statement = """
+    declare @p1 int
+    set @p1=1
+    exec sp_prepare @h=@p1 output,@params=N'@idPadron nvarchar(2000)',@stmt=N'SELECT id_padron=@idPadron'
+    select @p1
+    """
+    params = [
+      %Tds.Parameter{name: "idPadron", value: "pardon"},
+      %Tds.Parameter{name: "h", direction: :output, value: "pardon"}
+    ]
+    assert 3 == Tds.query!(pid, statement, params)
+
+  end
 end
