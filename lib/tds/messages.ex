@@ -75,6 +75,12 @@ defmodule Tds.Messages do
         Process.put(:tds_version, version)
         {msg, s}
 
+      {:error, error}, {msg_error(), _s} = msg_s ->
+        Tds.Error.message(%Tds.Error{mssql: error})
+        |> Logger.error()
+
+        msg_s
+
       {:error, error}, _ ->
         {msg_error(error: error), s}
 
@@ -91,6 +97,12 @@ defmodule Tds.Messages do
     |> Enum.reduce({msg_prepared(), s}, fn
       {:envchange, env}, {msg, s} ->
         {msg, on_envchange(env, s)}
+
+      {:error, error}, {msg_error(), _s} = msg_s ->
+        Tds.Error.message(%Tds.Error{mssql: error})
+        |> Logger.error()
+
+        msg_s
 
       {:error, error}, {_, s} ->
         {msg_error(error: error), s}
@@ -112,6 +124,12 @@ defmodule Tds.Messages do
     |> Enum.reduce({msg_trans(), s}, fn
       {:envchange, env}, {msg, s} ->
         {msg, on_envchange(env, s)}
+
+      {:error, error}, {msg_error(), _s} = msg_s ->
+        Tds.Error.message(%Tds.Error{mssql: error})
+        |> Logger.error()
+
+        msg_s
 
       {:error, error}, {_, s} ->
         {msg_error(error: error), s}
@@ -150,8 +168,10 @@ defmodule Tds.Messages do
           status.count? and is_nil(c) ->
             c = %Tds.Result{num_rows: num_rows}
             {msg_result(m, set: [c | set]), nil, s}
+
           not is_nil(c) ->
             {msg_result(m, set: [c | set]), nil, s}
+
           :else ->
             {m, nil, s}
         end

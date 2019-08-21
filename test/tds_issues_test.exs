@@ -2,6 +2,7 @@ defmodule TdsIssuesTest do
   import Tds.TestHelper
   require Logger
   use ExUnit.Case, async: true
+  import ExUnit.CaptureLog
 
   @tag timeout: 50000
 
@@ -152,7 +153,54 @@ defmodule TdsIssuesTest do
     )
   end
 
-  test "wrong column collation", context do
+  test "should return first error from token stream then auto log the rest of errors", context do
+    query("DROP TABLE test_collation1", [])
+
+    query(
+      """
+      CREATE TABLE test_collation1 (id int NOT NULL identity(1,1) PRIMARY KEY, txt ntext NOT NULL )
+      """,
+      []
+    )
+
+    query(
+      """
+      INSERT INTO test_collation1 values
+        ('missing collation decoder'),
+        ('2missing collation decoder')
+      """,
+      []
+    )
+
+    fun = fn ->
+      assert %Tds.Error{
+        message: _,
+        mssql: %{
+          class: 16,
+          line_number: 1,
+          msg_text: "Invalid column name 'b'.",
+          number: 207,
+          proc_name: _,
+          server_name: _,
+          state: 1
+        }
+      } =
+        query(
+          """
+          SELECT TOP (1000) [id] ,[txt], [b]
+          FROM [test].[dbo].[test_collation1]
+          """,
+          []
+        )
+    end
+
+    # this should be error returned to as result of query execution
+    assert not(capture_log(fun) =~ "Invalid column name 'b'")
+    # this should be logged in console
+    assert capture_log(fun) =~ "Statement(s) could not be prepared"
+  end
+
+  test "should interprete correctly colmetadata type_info for text columns", context do
     query("DROP TABLE test_collation", [])
 
     query(
@@ -171,14 +219,15 @@ defmodule TdsIssuesTest do
       []
     )
 
-    assert 2 ==
-             query(
-               """
-               SELECT TOP (1000) [id] ,[txt]
-               FROM [test].[dbo].[test_collation]
-               """,
-               []
-             )
-             |> length()
+
+      assert 2 =
+        query(
+          """
+          SELECT TOP (1000) [id] ,[txt]
+          FROM [test].[dbo].[test_collation]
+          """,
+          []
+        )
+        |> length()
   end
 end
