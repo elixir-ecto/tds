@@ -9,7 +9,7 @@ env:
   - MIX_ENV=test
   
 before_install:
-  - curl https://sh.rustup.rs -sSf | sh
+  - curl https://sh.rustup.rs -sSf | sh -s -- -y
   - docker run --rm -name mssql -e 'ACCEPT_EULA=Y' -e 'SA_PASSWORD=some!Password' -p 1433:1433 -v $(pwd):/opt/src -d mcr.microsoft.com/mssql/server:2017-latest
   - docker exec -it mssql /opt/mssql-tools/bin/sqlcmd -S localhost -U sa -P some!Password -d master -i /opt/src/setup.sql
 
