@@ -13,6 +13,8 @@ services:
 
 env:
   - MIX_ENV=test
+  - ACCEPT_EULA=y
+  - DEBIAN_FRONTEND=noninteractive
   
 before_install:
   - sudo curl https://packages.microsoft.com/keys/microsoft.asc | sudo apt-key add -
@@ -25,5 +27,6 @@ before_install:
 
 script:
   - source $HOME/.cargo/env
+  - export PATH=$PATH:/opt/mssql-tools/bin
   - mix do deps.get,compile
   - mix test
