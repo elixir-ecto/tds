@@ -29,8 +29,8 @@ script:
 deploy:
    provider: script
    script: >-
-     mix deps.get &&
-     mix hex.publish --yes &&
+     MIX_ENV=dev mix deps.get &&
+     MIX_ENV=dev mix hex.publish --yes &&
      mix clean &&
      mix deps.clean --all
    on:
