@@ -17,7 +17,7 @@ before_install:
   - sudo curl https://packages.microsoft.com/config/ubuntu/16.04/prod.list | sudo tee /etc/apt/sources.list.d/msprod.list
   - sudo add-apt-repository "$(wget -qO- https://packages.microsoft.com/config/ubuntu/16.04/mssql-server-2017.list)"
   - sudo apt-get update 
-  - sudo apt-get install -y mssql-tools unixodbc-dev mssql-server
+  - sudo apt-get install -y openssl mssql-tools unixodbc-dev mssql-server
   - sudo /opt/mssql/bin/mssql-conf -n setup accept-eula
   # - sudo systemctl restart mssql-server
   - curl https://sh.rustup.rs -sSf | sh -s -- -y
