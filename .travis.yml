@@ -12,10 +12,8 @@ services:
   - docker
 
 env:
-  - MIX_ENV=test
-  - ACCEPT_EULA=y
-  - DEBIAN_FRONTEND=noninteractive
-  
+  - MIX_ENV=test ACCEPT_EULA=y
+
 before_install:
   - sudo curl https://packages.microsoft.com/keys/microsoft.asc | sudo apt-key add -
   - sudo curl https://packages.microsoft.com/config/ubuntu/16.04/prod.list | sudo tee /etc/apt/sources.list.d/msprod.list
