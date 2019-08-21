@@ -388,7 +388,7 @@ defmodule Tds.Types do
         <<length::signed-32, numparts::signed-8, rest::binary>> = tail
 
         rest =
-          Enum.reduce([1..numparts], rest, fn _,
+          Enum.reduce(1..numparts, rest, fn _,
                                               <<
                                                 size::unsigned-16,
                                                 _str::size(size)-unit(16),
