@@ -1074,19 +1074,19 @@ defmodule Tds.Protocol do
     end
   end
 
-  defp query_error(s, msg) do
-    {:error, ArgumentError.exception(msg), s}
-  end
+  # defp query_error(s, msg) do
+  #   {:error, ArgumentError.exception(msg), s}
+  # end
 
-  defp lock_error(s, fun) do
-    msg = "connection is locked copying to or from the database and " <>
-      "can not #{fun} transaction"
-    {:disconnect, RuntimeError.exception(msg), s}
-  end
+  # defp lock_error(s, fun) do
+  #   msg = "connection is locked copying to or from the database and " <>
+  #     "can not #{fun} transaction"
+  #   {:disconnect, RuntimeError.exception(msg), s}
+  # end
 
-  defp lock_error(s, fun, query) do
-    msg = "connection is locked copying to or from the database and " <>
-      "can not #{fun} #{inspect query}"
-    {:error, RuntimeError.exception(msg), s}
-  end
+  # defp lock_error(s, fun, query) do
+  #   msg = "connection is locked copying to or from the database and " <>
+  #     "can not #{fun} #{inspect query}"
+  #   {:error, RuntimeError.exception(msg), s}
+  # end
 end
