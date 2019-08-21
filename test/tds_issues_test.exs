@@ -151,4 +151,34 @@ defmodule TdsIssuesTest do
       []
     )
   end
+
+  test "wrong column collation", context do
+    query("DROP TABLE test_collation", [])
+
+    query(
+      """
+      CREATE TABLE test_collation (id int NOT NULL identity(1,1) PRIMARY KEY, txt ntext NOT NULL )
+      """,
+      []
+    )
+
+    query(
+      """
+      INSERT INTO test_collation values
+        ('missing collation decoder'),
+        ('2missing collation decoder')
+      """,
+      []
+    )
+
+    assert 2 ==
+             query(
+               """
+               SELECT TOP (1000) [id] ,[txt]
+               FROM [test].[dbo].[test_collation]
+               """,
+               []
+             )
+             |> length()
+  end
 end

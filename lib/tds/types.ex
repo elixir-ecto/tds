@@ -281,8 +281,6 @@ defmodule Tds.Types do
         @tds_data_type_floatn,
         @tds_data_type_moneyn,
         @tds_data_type_datetimen,
-        @tds_data_type_char,
-        @tds_data_type_varchar,
         @tds_data_type_binary,
         @tds_data_type_varbinary
       ] ->
@@ -292,6 +290,20 @@ defmodule Tds.Types do
           def_type_info
           |> Map.put(:length, length)
           |> Map.put(:data_reader, :bytelen)
+
+        {type_info, rest}
+
+      data_type_code in [
+        @tds_data_type_char,
+        @tds_data_type_varchar
+      ] ->
+        <<length::little-unsigned-8, collation::binary-5, rest::binary>> = tail
+        {:ok, collation} = decode_collation(collation)
+        type_info =
+          def_type_info
+          |> Map.put(:length, length)
+          |> Map.put(:data_reader, :bytelen)
+          |> Map.put(:collation, collation)
 
         {type_info, rest}
 
@@ -328,7 +340,6 @@ defmodule Tds.Types do
             if(length == 0xFFFF, do: :plp, else: :shortlen)
           )
           |> Map.put(:length, length)
-
         {type_info, rest}
 
       data_type_code in [
@@ -350,12 +361,12 @@ defmodule Tds.Types do
 
       data_type_code in [@tds_data_type_text, @tds_data_type_ntext] ->
         <<
-          length::signed-32,
+          length::little-unsigned-32,
           collation::binary-5,
           numparts::signed-8,
           rest::binary
         >> = tail
-
+        {:ok, collation} = decode_collation(collation)
         type_info =
           def_type_info
           |> Map.put(:collation, collation)
@@ -363,16 +374,12 @@ defmodule Tds.Types do
           |> Map.put(:length, length)
 
         rest =
-          Enum.reduce([1..numparts], rest, fn _,
-                                              <<
-                                                tsize::little-unsigned-16,
-                                                _table_name::binary-size(tsize)-unit(
-                                                  16
-                                                ),
-                                                next_rest::binary
-                                              >> ->
-            next_rest
-          end)
+          Enum.reduce(
+            1..numparts,
+            rest,
+            fn _, <<tsize::little-unsigned-16, _table_name::binary-size(tsize)-unit(16), next_rest::binary>> ->
+              next_rest
+            end)
 
         {type_info, rest}
 
