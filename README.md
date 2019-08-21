@@ -1,6 +1,7 @@
 # Tds
 
-[![Hex.pm](https://img.shields.io/hexpm/v/tds.svg)](https://hex.pm/packages/tds) [![Build status](https://ci.appveyor.com/api/projects/status/aibnqbukppa3kcpt?svg=true)](https://ci.appveyor.com/project/mjaric/tds)
+[![Hex.pm](https://img.shields.io/hexpm/v/tds.svg)](https://hex.pm/packages/tds) 
+[![Build status](https://ci.appveyor.com/api/projects/status/aibnqbukppa3kcpt?svg=true)](https://ci.appveyor.com/project/mjaric/tds)
 
 MSSQL / TDS Database driver for Elixir.
 
