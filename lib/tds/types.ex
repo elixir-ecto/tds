@@ -723,7 +723,7 @@ defmodule Tds.Types do
 
   def encode_data_type(%Parameter{value: value} = param)
       when is_integer(value) and value < 0 do
-    encode_data_type(%{param | value: Decimal.new(value), type: :decimal})
+    encode_data_type(%{param | value: Decimal.from_float(value), type: :decimal})
   end
 
   def encode_data_type(%Parameter{value: {{_, _, _}}} = param) do
@@ -1190,7 +1190,7 @@ defmodule Tds.Types do
   # Negative Integers
   def encode_param_descriptor(%Parameter{value: value} = param)
       when is_integer(value) and value < 0 do
-    param = %{param | type: :decimal, value: Decimal.new(value)}
+    param = %{param | type: :decimal, value: Decimal.from_float(value)}
     encode_param_descriptor(param)
   end
 
@@ -1256,7 +1256,7 @@ defmodule Tds.Types do
   def encode_decimal_descriptor(
         %Parameter{type: :decimal, value: value} = param
       ) do
-    encode_decimal_descriptor(%{param | value: Decimal.new(value)})
+    encode_decimal_descriptor(%{param | value: Decimal.from_float(value)})
   end
 
   @doc """
