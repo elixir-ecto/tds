@@ -1687,6 +1687,7 @@ defmodule Tds.Types do
   # 5 bytes if 5 <= n < = 7.
   def encode_time(nil), do: nil
   def encode_time({h, m, s}), do: encode_time({h, m, s, 0})
+  def encode_time(time), do: encode_time(time, @max_time_scale)
 
   def encode_time({h, m, s}, scale), do: encode_time({h, m, s, 0}, scale)
 
@@ -1708,7 +1709,7 @@ defmodule Tds.Types do
         <<fsec::little-unsigned-40>>
     end
   end
-  def encode_time(time), do: encode_time(time, @max_time_scale)
+
   # DateTime2
   def decode_datetime2(scale, <<data::binary>>) do
     {time, date} =
