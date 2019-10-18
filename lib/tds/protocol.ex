@@ -1130,14 +1130,6 @@ defmodule Tds.Protocol do
   end
 
   @impl Access
-  def get(data, key, default) do
-    case fetch(data, key) do
-      {:ok, value} -> value
-      :error       -> default
-    end
-  end
-
-  @impl Access
   def pop(data, key) do
     case fetch(data, key) do
       {:ok, value} -> {value, data}
