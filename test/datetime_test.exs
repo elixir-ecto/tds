@@ -47,7 +47,7 @@ defmodule DatetimeTest do
     assert [[nil]] == query("SELECT CAST(NULL AS datetime)", [])
 
     assert [[~N[2014-06-20 10:21:42]]] ==
-             query("SELECT CAST('20140620 10:21:42 AM' AS datetime)", [])
+             query("SELECT CAST('2014-06-20T10:21:42' AS datetime)", [])
 
     assert [[nil]] ==
              query("SELECT @n1", [
@@ -70,13 +70,26 @@ defmodule DatetimeTest do
                %Parameter{name: "@2", value: 0, type: :integer}
              ])
 
+    assert :ok =
+             query("INSERT INTO date_test VALUES (@1, @2)", [
+               %Parameter{name: "@1", value: ~N[2015-04-08 15:16:23.123333], type: :datetime},
+               %Parameter{name: "@2", value: 0, type: :integer}
+             ])
+
+    assert [[nil], [~N[2015-04-08 15:16:23.123333]]] = query("SELECT created_at FROM date_test")
+
     query("DROP TABLE date_test", [])
   end
 
   test "smalldatetime", context do
+    orig = ~N[2015-04-08 15:16:23]
+    orig_usec = ~N[2015-04-08 15:16:23.123333]
+
     assert nil == Types.encode_smalldatetime(nil)
-    enc = Types.encode_smalldatetime(@datetime)
-    assert ~N[2015-04-08 15:16:00] == Types.decode_smalldatetime(enc)
+    assert orig == orig
+      |> Types.encode_smalldatetime()
+      |> Types.decode_smalldatetime()
+
     assert [[nil]] == query("SELECT CAST(NULL AS smalldatetime)", [])
 
     assert [[~N[2014-06-20 10:40:00]]] ==

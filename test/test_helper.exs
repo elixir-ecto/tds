@@ -3,7 +3,7 @@ defmodule Tds.TestHelper do
 
   require Logger
 
-  defmacro query(statement, params, opts \\ []) do
+  defmacro query(statement, params \\ [], opts \\ []) do
     quote do
       case Tds.query(
              var!(context)[:pid],
