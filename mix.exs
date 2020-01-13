@@ -29,7 +29,12 @@ defmodule Tds.Mixfile do
   end
 
   def application do
-    [applications: [:logger, :db_connection, :decimal]]
+    [
+      applications: [:logger, :db_connection, :decimal],
+      env: [
+        json_library: Jason
+      ]
+    ]
   end
 
   defp deps do
@@ -37,6 +42,7 @@ defmodule Tds.Mixfile do
       {:credo, "~> 0.8", only: [:dev, :test], runtime: false},
       {:binpp, ">= 0.0.0", only: [:dev, :test]},
       {:decimal, "~> 1.6"},
+      {:jason, "~> 1.0", optional: true},
       {:db_connection, "~> 2.0"},
       {:dialyxir, "~> 0.5", only: [:dev], runtime: false},
       {:excoveralls, "~> 0.7", only: :test},

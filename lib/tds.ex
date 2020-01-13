@@ -78,7 +78,7 @@ defmodule Tds do
     DBConnection.transaction(pid, fun, opts)
   end
 
-  @spec rollback(DBConnection.t, reason :: any) :: no_return
+  @spec rollback(DBConnection.t(), reason :: any) :: no_return
   defdelegate rollback(conn, any), to: DBConnection
 
   def child_spec(opts) do
@@ -89,5 +89,19 @@ defmodule Tds do
     opts
     |> Keyword.put_new(:idle_timeout, @timeout)
     |> Keyword.put_new(:execution_mode, @execution_mode)
+  end
+
+  @doc """
+  Returns the configured JSON library.
+
+  To customize the JSON library, include the following in your `config/config.exs`:
+
+      config :myxql, json_library: SomeJSONModule
+
+  Defaults to `Jason`.
+  """
+  @spec json_library() :: module()
+  def json_library() do
+    Application.fetch_env!(:tds, :json_library)
   end
 end
