@@ -1,15 +1,24 @@
-# Tds
+# Tds - MSSQL Driver for Elixir
 
-[![Hex.pm](https://img.shields.io/hexpm/v/tds.svg)](https://hex.pm/packages/tds) [![Build status](https://ci.appveyor.com/api/projects/status/aibnqbukppa3kcpt?svg=true)](https://ci.appveyor.com/project/mjaric/tds)
+[![Hex.pm](https://img.shields.io/hexpm/v/tds.svg)](https://hex.pm/packages/tds) 
+[![Coverage Status](https://coveralls.io/repos/github/livehelpnow/tds/badge.svg?branch=support-1.1)](https://coveralls.io/github/livehelpnow/tds?branch=support-1.1)
+[![Build status](https://travis-ci.org/livehelpnow/tds.svg?branch=support-1.1)](https://travis-ci.org/livehelpnow/tds)
 
 MSSQL / TDS Database driver for Elixir.
 
 ### NOTE: 
 Since TDS version 2.0, `tds_ecto` package is deprecated, this version supports `ecto_sql` since version 3.1.0. 
 
-Please check out the [issues](https://github.com/livehelpnow/tds/issues) for a more complete overview or [CHANGELOG.md](CHANGELOG.md). 
+Please check out the issues for a more complete overview. This branch should not be considered stable or ready for production yet.
+
+For stable versions always use [hex.pm](https://hex.pm/packages/tds) as source for your mix.exs!!!
 
 ## Usage
+
+As of TDS version `>= 1.2`, it requires `rust` to be installed for nif required to 
+properly encode/decode `char`, `text` and `varchars`. In previous versions only 
+SQL_Latin1_General was suported. Please follow instructions at [rust website](https://www.rust-lang.org/tools/install)
+
 
 Add Tds as a dependency in your `mix.exs` file.
 
@@ -85,7 +94,7 @@ Since v1.0.16, additional connection parameters are:
   - `:set_lock_timeout` - number in milliseconds > 0
   - `:set_remote_proc_transactions` - atom, one of `:on | :off`
   - `:set_implicit_transactions` - atom, one of `:on | :off`
-  - `:set_transaction_isolation_level` - atom, one of `:read_uncommited | :read_commited | :repeatable_read | :snapshot | :serializable`
+  - `:set_transaction_isolation_level` - atom, one of `:read_uncommitted | :read_committed | :repeatable_read | :snapshot | :serializable`
   - `:set_allow_snapshot_isolation` - atom, one of `:on | :off`
   - `:set_read_committed_snapshot` - atom, one of `:on | :off`
 

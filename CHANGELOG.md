@@ -11,9 +11,20 @@ but any query output will be decoded always into one of above types.
 column types `binary_id` (`uuid`). 
 * For same reason as above `Tds.VarChar` is now `Tds.Types.VarChar`
 
+# v1.2.0
+### Improvements
+- `char`, `nchar`, `text`, `ntext`, `varchar` and `nvarchar` encoding improvements 
+for most of the SQL collations. More will be supported.
+
+# v1.1.7
+### Bugfix
+- Fix for "Error with set_transaction_isolation_level: :read_uncommited" [issue #72](https://github.com/livehelpnow/tds_ecto/issues/72) 
+
+
 # v2.0.0
 ### Improvements:
 * Implements DBConnection v2.0 to support `ecto_sql`. Please note that starting from this version [tds_ecto](https://hex.pm/packages/tds_ecto) is not improved anymore and will not use tds version 2.0.0+, instead use [ecto_sql](https://hex.pm/packages/ecto_sql) where tds_ecto will become part of it starting from version 3.1.0.
+
 
 # v1.1.5
 ### Improvements

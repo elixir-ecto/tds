@@ -4,10 +4,14 @@ defmodule Tds.Types do
   use Bitwise
 
   alias Tds.Parameter
+  alias Tds.DateTime
+  alias Tds.DateTime2
 
   @year_1900_days :calendar.date_to_gregorian_days({1900, 1, 1})
+  # @days_in_month 30
   @secs_in_min 60
   @secs_in_hour 60 * @secs_in_min
+  # @secs_in_day 24 * @secs_in_hour
 
   @tds_data_type_null 0x1F
   @tds_data_type_tinyint 0x30
@@ -111,6 +115,53 @@ defmodule Tds.Types do
   #  Data Type Decoders
   #
 
+  def to_atom(token) do
+    case token do
+      @tds_data_type_null -> :null
+      @tds_data_type_tinyint -> :tinyint
+      @tds_data_type_bit -> :bit
+      @tds_data_type_smallint -> :smallint
+      @tds_data_type_int -> :int
+      @tds_data_type_smalldatetime -> :smalldatetime
+      @tds_data_type_real -> :real
+      @tds_data_type_money -> :money
+      @tds_data_type_datetime -> :datetime
+      @tds_data_type_float -> :float
+      @tds_data_type_smallmoney -> :smallmoney
+      @tds_data_type_bigint -> :bigint
+      @tds_data_type_uniqueidentifier -> :uniqueidentifier
+      @tds_data_type_intn -> :intn
+      @tds_data_type_decimal -> :decimal
+      @tds_data_type_numeric -> :numeric
+      @tds_data_type_bitn -> :bitn
+      @tds_data_type_decimaln -> :decimaln
+      @tds_data_type_numericn -> :numericn
+      @tds_data_type_floatn -> :floatn
+      @tds_data_type_moneyn -> :moneyn
+      @tds_data_type_datetimen -> :datetimen
+      @tds_data_type_daten -> :daten
+      @tds_data_type_timen -> :timen
+      @tds_data_type_datetime2n -> :datetime2n
+      @tds_data_type_datetimeoffsetn -> :datetimeoffsetn
+      @tds_data_type_char -> :char
+      @tds_data_type_varchar -> :varchar
+      @tds_data_type_binary -> :binary
+      @tds_data_type_varbinary -> :varbinary
+      @tds_data_type_bigvarbinary -> :bigvarbinary
+      @tds_data_type_bigvarchar -> :bigvarchar
+      @tds_data_type_bigbinary -> :bigbinary
+      @tds_data_type_bigchar -> :bigchar
+      @tds_data_type_nvarchar -> :nvarchar
+      @tds_data_type_nchar -> :nchar
+      @tds_data_type_xml -> :xml
+      @tds_data_type_udt -> :udt
+      @tds_data_type_text -> :text
+      @tds_data_type_image -> :image
+      @tds_data_type_ntext -> :ntext
+      @tds_data_type_variant -> :variant
+    end
+  end
+
   def decode_info(<<data_type_code::unsigned-8, tail::binary>>)
       when data_type_code in @fixed_data_types do
     length =
@@ -144,23 +195,32 @@ defmodule Tds.Types do
           8
       end
 
-    {%{data_type: :fixed, data_type_code: data_type_code, length: length}, tail}
+    {%{
+       data_type: :fixed,
+       data_type_code: data_type_code,
+       length: length,
+       data_type_name: to_atom(data_type_code)
+     }, tail}
   end
 
   def decode_info(<<data_type_code::unsigned-8, tail::binary>>)
       when data_type_code in @variable_data_types do
-    def_col_info = %{data_type: :variable, data_type_code: data_type_code}
+    def_type_info = %{
+      data_type: :variable,
+      data_type_code: data_type_code,
+      sql_type: to_atom(data_type_code)
+    }
 
     cond do
       data_type_code == @tds_data_type_daten ->
         length = 3
 
-        col_info =
-          def_col_info
+        type_info =
+          def_type_info
           |> Map.put(:length, length)
           |> Map.put(:data_reader, :bytelen)
 
-        {col_info, tail}
+        {type_info, tail}
 
       data_type_code in [
         @tds_data_type_timen,
@@ -184,13 +244,13 @@ defmodule Tds.Types do
             _ -> length
           end
 
-        col_info =
-          def_col_info
+        type_info =
+          def_type_info
           |> Map.put(:scale, scale)
           |> Map.put(:length, length)
           |> Map.put(:data_reader, :bytelen)
 
-        {col_info, rest}
+        {type_info, rest}
 
       data_type_code in [
         @tds_data_type_numericn,
@@ -203,14 +263,14 @@ defmodule Tds.Types do
           rest::binary
         >> = tail
 
-        col_info =
-          def_col_info
+        type_info =
+          def_type_info
           |> Map.put(:precision, precision)
           |> Map.put(:scale, scale)
           |> Map.put(:length, length)
           |> Map.put(:data_reader, :bytelen)
 
-        {col_info, rest}
+        {type_info, rest}
 
       data_type_code in [
         @tds_data_type_uniqueidentifier,
@@ -221,19 +281,31 @@ defmodule Tds.Types do
         @tds_data_type_floatn,
         @tds_data_type_moneyn,
         @tds_data_type_datetimen,
-        @tds_data_type_char,
-        @tds_data_type_varchar,
         @tds_data_type_binary,
         @tds_data_type_varbinary
       ] ->
         <<length::little-unsigned-8, rest::binary>> = tail
 
-        col_info =
-          def_col_info
+        type_info =
+          def_type_info
           |> Map.put(:length, length)
           |> Map.put(:data_reader, :bytelen)
 
-        {col_info, rest}
+        {type_info, rest}
+
+      data_type_code in [
+        @tds_data_type_char,
+        @tds_data_type_varchar
+      ] ->
+        <<length::little-unsigned-8, collation::binary-5, rest::binary>> = tail
+        {:ok, collation} = decode_collation(collation)
+        type_info =
+          def_type_info
+          |> Map.put(:length, length)
+          |> Map.put(:data_reader, :bytelen)
+          |> Map.put(:collation, collation)
+
+        {type_info, rest}
 
       data_type_code == @tds_data_type_xml ->
         <<schema::unsigned-8, rest::binary>> = tail
@@ -245,11 +317,11 @@ defmodule Tds.Types do
           # USVarChar xml schema collection
         end
 
-        col_info =
-          def_col_info
+        type_info =
+          def_type_info
           |> Map.put(:data_reader, :plp)
 
-        {col_info, rest}
+        {type_info, rest}
 
       data_type_code in [
         @tds_data_type_bigvarchar,
@@ -258,17 +330,17 @@ defmodule Tds.Types do
         @tds_data_type_nchar
       ] ->
         <<length::little-unsigned-16, collation::binary-5, rest::binary>> = tail
+        {:ok, collation} = decode_collation(collation)
 
-        col_info =
-          def_col_info
-          |> Map.put(:collation, decode_collation(collation))
+        type_info =
+          def_type_info
+          |> Map.put(:collation, collation)
           |> Map.put(
-               :data_reader,
-               if(length == 0xFFFF, do: :plp, else: :shortlen)
-             )
+            :data_reader,
+            if(length == 0xFFFF, do: :plp, else: :shortlen)
+          )
           |> Map.put(:length, length)
-
-        {col_info, rest}
+        {type_info, rest}
 
       data_type_code in [
         @tds_data_type_bigvarbinary,
@@ -277,50 +349,46 @@ defmodule Tds.Types do
       ] ->
         <<length::little-unsigned-16, rest::binary>> = tail
 
-        col_info =
-          def_col_info
+        type_info =
+          def_type_info
           |> Map.put(
-               :data_reader,
-               if(length == 0xFFFF, do: :plp, else: :shortlen)
-             )
+            :data_reader,
+            if(length == 0xFFFF, do: :plp, else: :shortlen)
+          )
           |> Map.put(:length, length)
 
-        {col_info, rest}
+        {type_info, rest}
 
       data_type_code in [@tds_data_type_text, @tds_data_type_ntext] ->
         <<
-          length::signed-32,
+          length::little-unsigned-32,
           collation::binary-5,
           numparts::signed-8,
           rest::binary
         >> = tail
-
-        col_info =
-          def_col_info
+        {:ok, collation} = decode_collation(collation)
+        type_info =
+          def_type_info
           |> Map.put(:collation, collation)
           |> Map.put(:data_reader, :longlen)
           |> Map.put(:length, length)
 
         rest =
-          Enum.reduce([1..numparts], rest, fn _,
-                                              <<
-                                                tsize::little-unsigned-16,
-                                                _table_name::binary-size(tsize)-unit(
-                                                  16
-                                                ),
-                                                next_rest::binary
-                                              >> ->
-            next_rest
-          end)
+          Enum.reduce(
+            1..numparts,
+            rest,
+            fn _, <<tsize::little-unsigned-16, _table_name::binary-size(tsize)-unit(16), next_rest::binary>> ->
+              next_rest
+            end)
 
-        {col_info, rest}
+        {type_info, rest}
 
       data_type_code == @tds_data_type_image ->
         # TODO NumBarts Reader
         <<length::signed-32, numparts::signed-8, rest::binary>> = tail
 
         rest =
-          Enum.reduce([1..numparts], rest, fn _,
+          Enum.reduce(1..numparts, rest, fn _,
                                               <<
                                                 size::unsigned-16,
                                                 _str::size(size)-unit(16),
@@ -329,34 +397,32 @@ defmodule Tds.Types do
             next_rest
           end)
 
-        col_info =
-          def_col_info
+        type_info =
+          def_type_info
           |> Map.put(:length, length)
           |> Map.put(:data_reader, :bytelen)
 
-        {col_info, rest}
+        {type_info, rest}
 
       data_type_code == @tds_data_type_variant ->
         <<length::signed-32, rest::binary>> = tail
 
-        col_info =
-          def_col_info
+        type_info =
+          def_type_info
           |> Map.put(:length, length)
           |> Map.put(:data_reader, :variant)
 
-        {col_info, rest}
+        {type_info, rest}
     end
   end
 
-  def decode_collation(<<lcid::size(20), colFlags::size(6), _::size(2),
-  version::size(4), sortId::size(8)>>) do
-    %{
-      lcid: lcid,
-      col_flags: colFlags,
-      version: version,
-      sort_id: sortId
-    }
-  end
+  @spec decode_collation(binpart :: <<_::40>>) ::
+          {:ok, Tds.Protocol.Collation.t()}
+          | {:error, :more}
+          | {:error, any}
+  defdelegate decode_collation(binpart),
+    to: Tds.Protocol.Collation,
+    as: :decode
 
   #
   #  Data Decoders
@@ -430,7 +496,7 @@ defmodule Tds.Types do
           decode_datetimeoffset(data_info[:scale], data)
 
         data_type_code == @tds_data_type_uniqueidentifier ->
-          decode_uuid(data)
+          decode_uuid(:binary.copy(data))
 
         data_type_code == @tds_data_type_intn ->
           case length do
@@ -466,7 +532,7 @@ defmodule Tds.Types do
           data = data <> tail
           len = length * 8
           <<val::little-float-size(len), _::binary>> = data
-              val
+          val
 
         data_type_code == @tds_data_type_moneyn ->
           case length do
@@ -484,13 +550,13 @@ defmodule Tds.Types do
           @tds_data_type_char,
           @tds_data_type_varchar
         ] ->
-          decode_char(data_info[:collation], data)
+          decode_char(data_info, data)
 
         data_type_code in [
           @tds_data_type_binary,
           @tds_data_type_varbinary
         ] ->
-          data
+          :binary.copy(data)
       end
 
     {value, tail}
@@ -510,13 +576,13 @@ defmodule Tds.Types do
           @tds_data_type_bigvarchar,
           @tds_data_type_bigchar
         ] ->
-          decode_char(data_info[:collation], data)
+          decode_char(data_info, data)
 
         data_type_code in [
           @tds_data_type_bigvarbinary,
           @tds_data_type_bigbinary
         ] ->
-          data
+          :binary.copy(data)
 
         data_type_code in [
           @tds_data_type_nvarchar,
@@ -525,7 +591,7 @@ defmodule Tds.Types do
           decode_nchar(data_info, data)
 
         data_type_code == @tds_data_type_udt ->
-          decode_udt(data_info, data)
+          decode_udt(data_info, :binary.copy(data))
       end
 
     {value, tail}
@@ -549,7 +615,7 @@ defmodule Tds.Types do
       case data_type_code do
         @tds_data_type_text -> decode_char(data_info, data)
         @tds_data_type_ntext -> decode_nchar(data_info, data)
-        @tds_data_type_image -> data
+        @tds_data_type_image -> :binary.copy(data)
         _ -> nil
       end
 
@@ -580,7 +646,7 @@ defmodule Tds.Types do
           @tds_data_type_bigchar,
           @tds_data_type_text
         ] ->
-          decode_char(data_info[:collation], data)
+          decode_char(data_info, data)
 
         data_type_code in [
           @tds_data_type_bigvarbinary,
@@ -615,7 +681,7 @@ defmodule Tds.Types do
         >>,
         buf
       ) do
-    decode_plp_chunk(tail, buf <> chunk)
+    decode_plp_chunk(tail, buf <> :binary.copy(chunk))
   end
 
   def decode_smallmoney(<<money::little-signed-32>>) do
@@ -631,14 +697,20 @@ defmodule Tds.Types do
   end
 
   # UUID
-  def decode_uuid(<<_::128>>=bin), do: bin
+  def decode_uuid(<<_::128>> = bin), do: bin
 
-  def encode_uuid(<<_::64, ?-, _::32, ?-, _::32, ?-, _::32, ?-, _::96>> = string) do
-    raise ArgumentError, "trying to load string UUID as Tds.Types.UUID: #{inspect string}. " <>
-                         "Maybe you wanted to declare :uuid as your database field?"
+  def encode_uuid(
+        <<_::64, ?-, _::32, ?-, _::32, ?-, _::32, ?-, _::96>> = string
+      ) do
+    raise ArgumentError,
+          "trying to load string UUID as Tds.Types.UUID: #{inspect(string)}. " <>
+            "Maybe you wanted to declare :uuid as your database field?"
   end
-  def encode_uuid(<<_::128>>=bin), do: bin
-  def encode_uuid(any), do: raise ArgumentError, "Invalid uuid value #{inspect(any)}"
+
+  def encode_uuid(<<_::128>> = bin), do: bin
+
+  def encode_uuid(any),
+    do: raise(ArgumentError, "Invalid uuid value #{inspect(any)}")
 
   # Decimal
   def decode_decimal(precision, scale, <<sign::int8, value::binary>>) do
@@ -655,22 +727,24 @@ defmodule Tds.Types do
     end
   end
 
-  def decode_char(_data_info, <<data::binary>>) do
-    data
+  def decode_char(data_info, <<data::binary>>) do
+    Tds.Encoding.decode(data, data_info.collation.codepage)
   end
 
   def decode_nchar(_data_info, <<data::binary>>) do
-    :unicode.characters_to_binary(data, {:utf16, :little}, :utf8)
+    ucs2_to_utf(data)
   end
 
-  def decode_xml(_data_info, <<_data::binary>>) do
-    # TODO: Decode XML Data
-    nil
+  def decode_xml(_data_info, <<data::binary>>) do
+    ucs2_to_utf(data)
   end
 
-  def decode_udt(%{}, <<_data::binary>>) do
-    # TODO: Decode UDT Data
-    nil
+  def decode_udt(%{}, <<data::binary>>) do
+    # UDT, if used, should be decoded by app that uses it,
+    # tho we could've registered UDT types on connection
+    # Example could be ecto, where custom type is created
+    # special case are built in udt types such as HierarchyId
+    data
   end
 
   @doc """
@@ -685,8 +759,8 @@ defmodule Tds.Types do
       :integer -> encode_integer_type(param)
       :decimal -> encode_decimal_type(param)
       :float -> encode_float_type(param)
-      :smalldatetime -> encode_smalldatetime_type(param)
       :datetime -> encode_datetime_type(param)
+      :smalldatetime -> encode_smalldatetime_type(param)
       :datetime2 -> encode_datetime2_type(param)
       :datetimeoffset -> encode_datetimeoffset_type(param)
       :date -> encode_date_type(param)
@@ -738,28 +812,12 @@ defmodule Tds.Types do
     encode_data_type(%{param | type: :decimal})
   end
 
-  def encode_data_type(%Parameter{value: %Time{}} = param) do
-    encode_data_type(%{param | type: :time})
-  end
-
-  def encode_data_type(%Parameter{value: %Date{}} = param) do
-    encode_data_type(%{param | type: :date})
-  end
-
-  def encode_data_type(%Parameter{value: %DateTime{microsecond: {_, 6}}} = param) do
-    encode_data_type(%{param | type: :datetime2})
-  end
-
   def encode_data_type(%Parameter{value: %DateTime{}} = param) do
     encode_data_type(%{param | type: :datetime})
   end
 
-  def encode_data_type(%Parameter{value: %NaiveDateTime{microsecond: {_, 6}}} = param) do
+  def encode_data_type(%Parameter{value: %DateTime2{}} = param) do
     encode_data_type(%{param | type: :datetime2})
-  end
-
-  def encode_data_type(%Parameter{value: %NaiveDateTime{}} = param) do
-    encode_data_type(%{param | type: :datetime})
   end
 
   def encode_data_type(%Parameter{value: {{_, _, _}, {_, _, _}}} = param) do
@@ -950,8 +1008,7 @@ defmodule Tds.Types do
 
   def encode_float_type(%Parameter{value: value} = param)
       when is_float(value) do
-    value = Decimal.from_float(value)
-    encode_float_type(%{param | value: value})
+    encode_float_type(%{param | value: to_decimal(value)})
   end
 
   def encode_float_type(%Parameter{value: %Decimal{} = value}) do
@@ -984,11 +1041,12 @@ defmodule Tds.Types do
 
     value_size = byte_size(value)
 
-    len = 8 # keep max precision
-      # cond do
-      #   precision <= 9 -> 4
-      #   precision <= 19 -> 8
-      # end
+    # keep max precision
+    len = 8
+    # cond do
+    #   precision <= 9 -> 4
+    #   precision <= 19 -> 8
+    # end
 
     padding = len - value_size
     value_size = value_size + padding
@@ -1033,18 +1091,18 @@ defmodule Tds.Types do
 
         :string ->
           cond do
-            is_nil(value)                 -> "nvarchar(1)"
-            String.length(value) <= 0     -> "nvarchar(1)"
+            is_nil(value) -> "nvarchar(1)"
+            String.length(value) <= 0 -> "nvarchar(1)"
             String.length(value) <= 2_000 -> "nvarchar(2000)"
-            true                          -> "nvarchar(max)"
+            true -> "nvarchar(max)"
           end
 
         :varchar ->
           cond do
-            is_nil(value)                 -> "varchar(1)"
-            String.length(value) <= 0     -> "varchar(1)"
+            is_nil(value) -> "varchar(1)"
+            String.length(value) <= 0 -> "varchar(1)"
             String.length(value) <= 2_000 -> "varchar(2000)"
-            true                          -> "varchar(max)"
+            true -> "varchar(max)"
           end
 
         :integer ->
@@ -1077,19 +1135,22 @@ defmodule Tds.Types do
           # this should fix issues when column is varchar but parameter
           # is threated as nvarchar(..) since nothing defines parameter
           # as varchar.
-          latin1  = :unicode.characters_to_list(value || "", :latin1)
-          utf8    = :unicode.characters_to_list(value || "", :utf8)
-          db_type = if latin1 == utf8,
-                    do: "varchar",
-                    else: "nvarchar"
+          latin1 = :unicode.characters_to_list(value || "", :latin1)
+          utf8 = :unicode.characters_to_list(value || "", :utf8)
+
+          db_type =
+            if latin1 == utf8,
+              do: "varchar",
+              else: "nvarchar"
+
           # this is same .net driver uses in order to avoid too many
           # cached execution plans, it must be always same length otherwise it will
           # use too much memory in sql server to cache each plan per param size
           cond do
-            is_nil(value)                 -> "#{db_type}(1)"
-            String.length(value) <= 0     -> "#{db_type}(1)"
+            is_nil(value) -> "#{db_type}(1)"
+            String.length(value) <= 0 -> "#{db_type}(1)"
             String.length(value) <= 2_000 -> "#{db_type}(2000)"
-            true                          -> "#{db_type}(max)"
+            true -> "#{db_type}(max)"
           end
       end
 
@@ -1113,37 +1174,11 @@ defmodule Tds.Types do
     encode_param_descriptor(param)
   end
 
-  # DateTime/DateTime2
-  def encode_param_descriptor(%Parameter{value: %DateTime{microsecond: {_, 6}}} = param) do
-    param = %{param | type: :datetime2}
-    encode_param_descriptor(param)
-  end
-
-  def encode_param_descriptor(%Parameter{value: %DateTime{}} = param) do
+  # DateTime
+  def encode_param_descriptor(%Parameter{value: %Tds.DateTime{}} = param) do
     param = %{param | type: :datetime}
     encode_param_descriptor(param)
   end
-
-  def encode_param_descriptor(%Parameter{value: %NaiveDateTime{microsecond: {_, 6}}} = param) do
-    param = %{param | type: :datetime2}
-    encode_param_descriptor(param)
-  end
-
-  def encode_param_descriptor(%Parameter{value: %NaiveDateTime{}} = param) do
-    param = %{param | type: :datetime}
-    encode_param_descriptor(param)
-  end
-
-  def encode_param_descriptor(%Parameter{value: %Date{}} = param) do
-    param = %{param | type: :date}
-    encode_param_descriptor(param)
-  end
-
-  def encode_param_descriptor(%Parameter{value: %Time{}} = param) do
-    param = %{param | type: :time}
-    encode_param_descriptor(param)
-  end
-
 
   def encode_param_descriptor(
         %Parameter{
@@ -1154,9 +1189,16 @@ defmodule Tds.Types do
     encode_param_descriptor(param)
   end
 
+  # DateTime2
+  def encode_param_descriptor(%Parameter{value: %Tds.DateTime2{}} = param) do
+    param = %{param | type: :datetime2}
+    encode_param_descriptor(param)
+  end
+
   def encode_param_descriptor(
         %Parameter{value: {{_, _, _}, {_, _, _, _}}} = param
       ) do
+    # Logger.debug "Param Descriptor datetime2"
     param = %{param | type: :datetime2}
     encode_param_descriptor(param)
   end
@@ -1164,12 +1206,14 @@ defmodule Tds.Types do
   def encode_param_descriptor(
         %Parameter{value: {{_, _, _}, {_, _, _, _}, _}} = param
       ) do
+    ## Logger.debug "Param Descriptor datetime2"
     encode_param_descriptor(%{param | type: :datetimeoffset})
   end
 
   def encode_param_descriptor(
         %Parameter{value: {{_, _, _}, {_, _, _}, _}} = param
       ) do
+    ## Logger.debug "Param Descriptor datetime2"
     encode_param_descriptor(%{param | type: :datetimeoffset})
   end
 
@@ -1224,7 +1268,7 @@ defmodule Tds.Types do
       when is_float(value) do
     param =
       param
-      |> Map.put(:value, Decimal.from_float(value))
+      |> Map.put(:value, Decimal.new(value))
 
     encode_decimal_descriptor(param)
   end
@@ -1266,9 +1310,9 @@ defmodule Tds.Types do
 
   def encode_float_descriptor(%Parameter{value: value} = param)
       when is_float(value) do
-    param = Map.put(param, :value, Decimal.from_float(value))
-
-    encode_float_descriptor(param)
+    param
+    |> Map.put(:value, to_decimal(value))
+    |> encode_float_descriptor
   end
 
   def encode_float_descriptor(%Parameter{value: %Decimal{} = _dec}) do
@@ -1396,9 +1440,9 @@ defmodule Tds.Types do
     # if precision <= 7 + 1 do
     #   <<0x04, value::little-float-32>>
     # else
-      # up to 15 digits of precision
-      # https://docs.microsoft.com/en-us/sql/t-sql/data-types/float-and-real-transact-sql
-      <<0x08, value::little-float-64>>
+    # up to 15 digits of precision
+    # https://docs.microsoft.com/en-us/sql/t-sql/data-types/float-and-real-transact-sql
+    <<0x08, value::little-float-64>>
     # end
   end
 
@@ -1551,8 +1595,17 @@ defmodule Tds.Types do
   defp int_type_size(int) when int in 0..255, do: 4
   defp int_type_size(int) when int in -32_768..32_767, do: 4
   defp int_type_size(int) when int in -2_147_483_648..2_147_483_647, do: 4
-  defp int_type_size(int) when int in -9_223_372_036_854_775_808..9_223_372_036_854_775_807, do: 8
-  defp int_type_size(int), do: raise ArgumentError, "Erlang integer value #{int} is too big (more than 64bits) to fit tds integer/bigint. Please consider using Decimal.new/1 to maintain precision."
+
+  defp int_type_size(int)
+       when int in -9_223_372_036_854_775_808..9_223_372_036_854_775_807,
+       do: 8
+
+  defp int_type_size(int),
+    do:
+      raise(
+        ArgumentError,
+        "Erlang integer value #{int} is too big (more than 64bits) to fit tds integer/bigint. Please consider using Decimal.new/1 to maintain precision."
+      )
 
   @doc """
   Data Encoding DateTime Types
@@ -1585,15 +1638,10 @@ defmodule Tds.Types do
     date = :calendar.gregorian_days_to_date(@year_1900_days + days)
     hour = trunc(mins / 60)
     min = trunc(mins - hour * 60)
-    {date, {hour, min, 0}}
-    |> NaiveDateTime.from_erl!()
+    {date, {hour, min, 0, 0}}
   end
 
   def encode_smalldatetime(nil), do: nil
-
-  def encode_smalldatetime(%{calendar: _}=naive_datetime) do
-    NaiveDateTime.to_erl(naive_datetime)
-  end
 
   def encode_smalldatetime({date, {hour, min, _}}),
     do: encode_smalldatetime({date, {hour, min, 0, 0}})
@@ -1609,15 +1657,21 @@ defmodule Tds.Types do
   end
 
   # DateTime
-  def decode_datetime(<<days::little-signed-32, secs300::little-unsigned-32>>) do
+  def decode_datetime(<<
+        days::little-signed-32,
+        secs300::little-unsigned-32
+      >>) do
+    # Logger.debug "#{inspect {days, secs300}}"
     date = :calendar.gregorian_days_to_date(@year_1900_days + days)
-    secs = div(secs300, 300)
+    secs = secs300 |> div(300)
     {_, {h, m, s}} = secs |> :calendar.seconds_to_daystime()
+
+    # Logger.debug "#{inspect {secs}}"
+    # remaining fractional
     sub_sec = secs300 / 300 - secs
-    case trunc(sub_sec * @usecs_in_sec + 0.5) do
-      0 -> NaiveDateTime.from_erl!({date, {h, m, s}})
-      usec -> NaiveDateTime.from_erl!({date, {h, m, s}}, {usec, 6})
-    end
+    # Logger.debug "#{inspect {sub_sec}}"
+    usec = trunc(sub_sec * @usecs_in_sec + 0.5)
+    {date, {h, m, s, usec}}
   end
 
   def encode_datetime(nil), do: nil
@@ -1626,25 +1680,15 @@ defmodule Tds.Types do
     do: encode_datetime({date, {h, m, s, 0}})
 
   def encode_datetime({date, {h, m, s, us}}) do
+    # Logger.debug "#{inspect {h,m,s,us}}"
     days = :calendar.date_to_gregorian_days(date) - @year_1900_days
     secs = h * @secs_in_hour + m * @secs_in_min + s
+    # Logger.debug "secs #{inspect {secs}}"
     secs = secs + us / @usecs_in_sec
+    # Logger.debug "secs #{inspect {secs}}"
     secs300 = trunc(secs * 300 + 0.5)
+    # Logger.debug "#{inspect {days, secs300}}"
     <<days::little-signed-32, secs300::little-unsigned-32>>
-  end
-
-  def encode_datetime(%{calendar: _, microsecond: {ms, _}}=datetime) do
-    {date, {h, m, s}} = datetime
-    |> NaiveDateTime.to_erl()
-
-    {date, {h, m , s, ms}}
-    |> encode_datetime()
-  end
-
-  def encode_datetime(%{calendar: _}=datetime) do
-    datetime
-    |> NaiveDateTime.to_erl()
-    |> encode_datetime()
   end
 
   # Time
@@ -1687,7 +1731,7 @@ defmodule Tds.Types do
   # 5 bytes if 5 <= n < = 7.
   def encode_time(nil), do: nil
   def encode_time({h, m, s}), do: encode_time({h, m, s, 0})
-
+  def encode_time(time), do: encode_time(time, @max_time_scale)
   def encode_time({h, m, s}, scale), do: encode_time({h, m, s, 0}, scale)
 
   def encode_time({hour, min, sec, fsec}, scale) do
@@ -1708,7 +1752,7 @@ defmodule Tds.Types do
         <<fsec::little-unsigned-40>>
     end
   end
-  def encode_time(time), do: encode_time(time, @max_time_scale)
+
   # DateTime2
   def decode_datetime2(scale, <<data::binary>>) do
     {time, date} =
@@ -1729,41 +1773,15 @@ defmodule Tds.Types do
           raise "DateTime Scale Unknown"
       end
 
-    {hour, min, sec, msec} = decode_time(scale, time)
-    date = decode_date(date)
-
-    # erlang scale is at maximum 6
-    NaiveDateTime.from_erl!({date, {hour, min, sec}}, {msec,  min(scale, 6)})
+    {decode_date(date), decode_time(scale, time)}
   end
 
   def encode_datetime2(nil), do: nil
-  def encode_datetime2(%NaiveDateTime{}=datetime) do
-    datetime
-    |> NaiveDateTime.to_erl()
-    |> encode_datetime2()
-  end
 
-  def encode_datetime2(datetime, scale \\ @max_time_scale)
-  def encode_datetime2({date, time}, scale) do
+  def encode_datetime2({date, time}, scale \\ @max_time_scale) do
     time = encode_time(time, scale)
     date = encode_date(date)
     time <> date
-  end
-
-  def encode_datetime2(%{calendar: _}=datetime, scale) do
-    datetime
-    |> NaiveDateTime.to_erl()
-    |> encode_datetime2(scale)
-  end
-
-  def encode_datetime2(%DateTime{}=datetime, scale) do
-    datetime
-    |> DateTime.to_naive()
-    |> encode_datetime2(scale)
-  end
-
-  def encode_datetime2(datetime, _scale) do
-    raise ArgumentError, inspect(datetime)
   end
 
   # DateTimeOffset
@@ -1793,9 +1811,9 @@ defmodule Tds.Types do
   def encode_datetimeoffset(nil), do: nil
 
   def encode_datetimeoffset(
-      {date, time, offset_min},
-      scale \\ @max_time_scale
-    ) do
+        {date, time, offset_min},
+        scale \\ @max_time_scale
+      ) do
     datetime = encode_datetime2({date, time}, scale)
     datetime <> <<offset_min::little-signed-16>>
   end

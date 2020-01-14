@@ -52,8 +52,6 @@ defmodule QueryTest do
       """,
       []
     )
-    smalldatetime = ~N[2014-01-10 12:30:00]
-    datetime = NaiveDateTime.from_iso8601!("2014-01-11T11:34:25Z")
 
     assert [
              [
@@ -61,10 +59,10 @@ defmodule QueryTest do
                false,
                12,
                100,
-               smalldatetime,
+               {{2014, 01, 10}, {12, 30, 0, 0}},
                0.5,
                -822_337_203_685_477.5808,
-               datetime,
+               {{2014, 01, 11}, {11, 34, 25, 0}},
                5.6,
                -214_748.3648,
                1000

@@ -45,6 +45,16 @@ defmodule Tds.TestHelper do
     end
   end
 
+  defmacro drop_table(table) do
+    quote bind_quoted: [table: table] do
+      statement =
+        "if exists(select * from sys.tables where [name] = '#{table}')" <>
+          " drop table #{table}"
+
+      Tds.query!(var!(context)[:pid], statement, [])
+    end
+  end
+
   def sqlcmd(params, sql, args \\ []) do
     args = [
       "-U",
@@ -73,7 +83,7 @@ database = opts[:database]
   CREATE DATABASE [#{database}];
   """)
 
-{"Changed database context to 'test'." <> _newline, 0} =
+{"Changed database context to 'test'." <> _, 0} =
   Tds.TestHelper.sqlcmd(opts, """
   USE [test];
 
@@ -84,7 +94,7 @@ database = opts[:database]
   CREATE TABLE [uniques] ([id] int NOT NULL, CONSTRAINT UIX_uniques_id UNIQUE([id]))
   """)
 
-{"Changed database context to 'test'." <> _newline, 0} =
+{"Changed database context to 'test'." <> _, 0} =
   Tds.TestHelper.sqlcmd(opts, """
   USE test
   GO
@@ -93,10 +103,8 @@ database = opts[:database]
 
 # :dbg.start()
 # :dbg.tracer()
-# :dbg.p(:all, :c)
-# :dbg.tpl(:gen_tcp, :_, [])
-# :dbg.tpl(Tds.Protocol, :_, [])
-# :dbg.tpl(DBConnection, :_, :x)
+# :dbg.p(:all,:c)
+# :dbg.tpl(Tds, :query, :x)
 
 ExUnit.start()
 ExUnit.configure(exclude: [:manual])

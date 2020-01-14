@@ -1,0 +1,80 @@
+os: Visual Studio 2015
+version: 1.2.{build}
+environment:
+  SQL_PASSWORD: Password12!
+  matrix:
+  ### MSVC Toolchains ###
+  # Stable 64-bit MSVC
+    - channel: stable
+      target: x86_64-pc-windows-msvc
+  # Stable 32-bit MSVC
+    - channel: stable
+      target: i686-pc-windows-msvc
+  # Beta 64-bit MSVC
+    - channel: beta
+      target: x86_64-pc-windows-msvc
+  # Beta 32-bit MSVC
+    - channel: beta
+      target: i686-pc-windows-msvc
+  # Nightly 64-bit MSVC
+    - channel: nightly
+      target: x86_64-pc-windows-msvc
+      #cargoflags: --features "unstable"
+  # Nightly 32-bit MSVC
+    - channel: nightly
+      target: i686-pc-windows-msvc
+      #cargoflags: --features "unstable"
+  ### GNU Toolchains ###
+  # Stable 64-bit GNU
+    - channel: stable
+      target: x86_64-pc-windows-gnu
+  # Stable 32-bit GNU
+    - channel: stable
+      target: i686-pc-windows-gnu
+  # Beta 64-bit GNU
+    - channel: beta
+      target: x86_64-pc-windows-gnu
+  # Beta 32-bit GNU
+    - channel: beta
+      target: i686-pc-windows-gnu
+  # Nightly 64-bit GNU
+    - channel: nightly
+      target: x86_64-pc-windows-gnu
+      #cargoflags: --features "unstable"
+  # Nightly 32-bit GNU
+    - channel: nightly
+      target: i686-pc-windows-gnu
+      #cargoflags: --features "unstable"
+matrix:
+  allow_failures:
+    - channel: nightly
+
+services: mssql2016
+install:
+  - appveyor DownloadFile https://win.rustup.rs/ -FileName rustup-init.exe
+  - rustup-init -yv --default-toolchain %channel% --default-host %target%
+  - set PATH=%PATH%;%USERPROFILE%\.cargo\bin
+  - rustc -vV
+  - cargo -vV
+  - ps: >-
+      iwr https://chocolatey.org/install.ps1 -UseBasicParsing | iex
+      choco install elixir -version 1.6.5
+      refreshenv
+build_script:
+  - cmd: >-
+      refreshenv
+      C:\ProgramData\chocolatey\lib\Elixir\bin\mix.bat local.hex --force
+      C:\ProgramData\chocolatey\lib\Elixir\bin\mix.bat local.rebar --force
+      C:\ProgramData\chocolatey\lib\Elixir\bin\mix.bat deps.get
+test_script:
+  - cmd: >-
+      refreshenv
+      C:\ProgramData\chocolatey\lib\Elixir\bin\mix.bat test
+notifications:
+  - provider: Email
+    to:
+      - milan.jaric@gmail.com
+    subject: TDS build fail
+    on_build_success: false
+    on_build_failure: true
+    on_build_status_changed: true

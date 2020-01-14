@@ -1,7 +1,7 @@
 defmodule Tds.Messages do
   import Record, only: [defrecord: 2]
   import Tds.Utils
-  import Tds.Tokens, only: [decode_tokens: 2]
+  import Tds.Tokens, only: [decode_tokens: 1]
 
   alias Tds.Parameter
   alias Tds.Types
@@ -9,29 +9,22 @@ defmodule Tds.Messages do
   require Bitwise
   require Logger
 
+  # requests
   defrecord :msg_prelogin, [:params]
   defrecord :msg_login, [:params]
-  defrecord :msg_login_ack, [:type, :redirect, :tokens]
   defrecord :msg_ready, [:status]
   defrecord :msg_sql, [:query]
-  defrecord :msg_trans, [:trans]
   defrecord :msg_transmgr, [:command, :name]
-  defrecord :msg_sql_result, [:columns, :rows, :done]
-  defrecord :msg_sql_empty, []
   defrecord :msg_rpc, [:proc, :query, :params]
-  defrecord :msg_prepared, [:params]
-  defrecord :msg_error, [:e]
   defrecord :msg_attn, []
 
-  ## TDS Versions
-  # @tds_ver_70     0x70000000
-  # @tds_ver_71     0x71000000
-  # @tds_ver_71rev1 0x71000001
-  # @tds_ver_72     0x72090002
-  # @tds_ver_73A    0x730A0003
-  # @tds_ver_73     @tds_ver_73A
-  # @tds_ver_73B    0x730B0003
-  # @tds_ver_74     0x74000004
+  # responses
+  defrecord :msg_loginack, [:redirect]
+  defrecord :msg_prepared, [:params]
+  defrecord :msg_sql_result, [:columns, :rows, :row_count]
+  defrecord :msg_result, [:set, :params, :status]
+  defrecord :msg_trans, [:trans]
+  defrecord :msg_error, [:error]
 
   ## Microsoft Stored Procedures
   # @tds_sp_cursor 1
@@ -50,10 +43,6 @@ defmodule Tds.Messages do
   # @tds_sp_prepexecrpc 14
   @tds_sp_unprepare 15
 
-  # Parameter Flags
-  # @fByRefValue 1
-  # @fDefaultValue 2
-
   ## Packet Size
   @tds_pack_data_size 4088
   @tds_pack_header_size 8
@@ -62,7 +51,6 @@ defmodule Tds.Messages do
   ## Packet Types
   # @tds_pack_sqlbatch    1
   # @tds_pack_rpcRequest  3
-  @tds_pack_reply 4
   @tds_pack_cancel 6
   # @tds_pack_bulkloadbcp 7
   # @tds_pack_transmgrreq 14
@@ -71,50 +59,178 @@ defmodule Tds.Messages do
   # @tds_pack_sspimessage 17
   # @tds_pack_prelogin    18
 
-  ## Prelogin Fields
-  # http://msdn.microsoft.com/en-us/library/dd357559.aspx
-  # @tds_prelogin_version     0
-  # @tds_prelogin_encryption  1
-  # @tds_prelogin_instopt     2
-  # @tds_prelogin_threadid    3
-  # @tds_prelogin_mars        4
-  # @tds_prelogin_traceid     5
-  # @tds_prelogin_terminator  0xFF
-
   ## Parsers
 
-  def parse(:login, @tds_pack_reply, _header, tail) do
-    case tail do
-      <<170::little-size(8), _::binary>> ->
-        [error: error] = decode_tokens(tail, [])
-        msg_error(e: error)
+  def parse(:login, packet_data, s) do
+    packet_data
+    |> decode_tokens()
+    |> Enum.reduce({msg_loginack(), s}, fn
+      {:envchange, {:routing, r, _}}, {msg_loginack() = msg, s} ->
+        {msg_loginack(msg, redirect: r), s}
+
+      {:envchange, other}, {msg, s} ->
+        {msg, on_envchange(other, s)}
+
+      {:loginack, %{tds_version: version}}, {msg, s} ->
+        Process.put(:tds_version, version)
+        {msg, s}
+
+      {:error, error}, {msg_error(), _s} = msg_s ->
+        Tds.Error.message(%Tds.Error{mssql: error})
+        |> Logger.error()
+
+        msg_s
+
+      {:error, error}, _ ->
+        {msg_error(error: error), s}
+
+      _, msg ->
+        # FeatureExtAck should be processed here in future
+        msg
+    end)
+  end
+
+  def parse(:prepare, packet_data, s) do
+    # IO.inspect(decode_tokens(packet_data), label: "PREPARE TOKENS" )
+    packet_data
+    |> decode_tokens()
+    |> Enum.reduce({msg_prepared(), s}, fn
+      {:envchange, env}, {msg, s} ->
+        {msg, on_envchange(env, s)}
+
+      {:error, error}, {msg_error(), _s} = msg_s ->
+        Tds.Error.message(%Tds.Error{mssql: error})
+        |> Logger.error()
+
+        msg_s
+
+      {:error, error}, {_, s} ->
+        {msg_error(error: error), s}
+
+      {:returnvalue, param}, {msg_prepared(params: params) = m, s} ->
+        m = msg_prepared(m, params: [param | List.wrap(params)])
+        {m, s}
+
+      _, msg ->
+        msg
+    end)
+  end
+
+  def parse(:transaction_manager, packet_data, s) do
+    # IO.inspect(packet_data, base: :hex, label: "TRANSACTION MANAGER")
+    # IO.inspect(decode_tokens(packet_data), label: "TRANSACTION MANAGER")
+    packet_data
+    |> decode_tokens()
+    |> Enum.reduce({msg_trans(), s}, fn
+      {:envchange, env}, {msg, s} ->
+        {msg, on_envchange(env, s)}
+
+      {:error, error}, {msg_error(), _s} = msg_s ->
+        Tds.Error.message(%Tds.Error{mssql: error})
+        |> Logger.error()
+
+        msg_s
+
+      {:error, error}, {_, s} ->
+        {msg_error(error: error), s}
+
+      _, msg ->
+        msg
+    end)
+  end
+
+  def parse(:executing, packet_data, s) do
+    # IO.inspect(packet_data, base: :hex, label: "EXECUTING")
+    # IO.inspect(decode_tokens(packet_data), label: "EXECUTING" )
+    packet_data
+    |> decode_tokens()
+    |> Enum.reduce({msg_result(set: [], params: [], status: 0), nil, s}, fn
+      {:envchange, env}, {m, c, s} ->
+        {m, c, on_envchange(env, s)}
+
+      {:colmetadata, colmetadata}, {msg_result() = m, _, s} ->
+        curr = %Tds.Result{
+          columns: transform(colmetadata, :name),
+          rows: [],
+          num_rows: 0
+        }
+
+        {m, curr, s}
+
+      {:row, row}, {msg_result() = m, c, s} ->
+        c = %{c | rows: [row | c.rows], num_rows: c.num_rows + 1}
+        {m, c, s}
+
+      {token, %{status: status, rows: num_rows}},
+      {msg_result(set: set) = m, c, s}
+      when token in [:done, :doneinproc, :doneproc] ->
+        cond do
+          status.count? and is_nil(c) ->
+            c = %Tds.Result{num_rows: num_rows}
+            {msg_result(m, set: [c | set]), nil, s}
+
+          not is_nil(c) ->
+            {msg_result(m, set: [c | set]), nil, s}
+
+          :else ->
+            {m, nil, s}
+        end
+
+      {:parameters, param}, {msg_result(params: params) = m, c, s} ->
+        m = msg_result(m, params: [param | params])
+        {m, c, s}
+
+      {:returnstatus, status}, {msg_result() = m, c, s} ->
+        m = msg_result(m, status: status)
+        {m, c, s}
+
+      {:error, error}, {_, _, s} ->
+        {msg_error(error: error), nil, s}
+
+      _, any ->
+        any
+    end)
+    |> case do
+      {msg_result(set: set) = msg, _, s} ->
+        set = Enum.reverse(set)
+        {msg_result(msg, set: set), s}
+
+      {msg_error() = msg, _, s} ->
+        {msg, s}
+    end
+  end
+
+  defp on_envchange(envchnage, %{env: env} = s) do
+    # IO.inspect(envchnage)
+    case envchnage do
+      {:packetsize, new_value, _} ->
+        %{s | env: Map.put(env, :packetsize, new_value)}
+
+      {:collation, new_value, _} ->
+        %{s | env: Map.put(env, :collation, new_value)}
+
+      {:transaction_begin, new_value, _} ->
+        %{s | env: %{env | trans: new_value}}
+
+      {:transaction_commit, new_value, _} ->
+        %{s | env: %{env | trans: new_value, savepoint: 0}, transaction: nil}
+
+      {:transaction_rollback, new_value, _} ->
+        %{s | env: %{env | trans: new_value, savepoint: 0}, transaction: nil}
 
       _ ->
-        tokens = decode_tokens(tail, [])
-        msg_login_ack(type: 4, redirect: Keyword.has_key?(tokens, :env_redirect), tokens: tokens)
+        s
     end
   end
 
-  def parse(:executing, @tds_pack_reply, _header, tail) do
-    case decode_tokens(tail, []) do
-      [error: error] ->
-        msg_error(e: error)
+  defp transform(list, key, acc \\ [])
+  defp transform([], _key, acc), do: acc |> Enum.reverse()
 
-      [done: %{}, trans: <<trans::binary>>] ->
-        msg_trans(trans: trans)
+  defp transform([h | t], key, acc) when is_map(h),
+    do: transform(t, key, [Map.get(h, key) | acc])
 
-      tokens ->
-        if Keyword.has_key?(tokens, :parameters) do
-          msg_prepared(params: tokens[:parameters])
-        else
-          msg_sql_result(
-            columns: tokens[:columns],
-            rows: tokens[:rows],
-            done: tokens[:done]
-          )
-        end
-    end
-  end
+  defp transform([h | t], key, acc) when is_list(h),
+    do: transform(t, key, [Keyword.get(h, key) | acc])
 
   ## Encoders
 
@@ -130,7 +246,7 @@ defmodule Tds.Messages do
     terminator = <<0xFF>>
     prelogin_data = version_data
     data = version <> terminator <> prelogin_data
-    encode_packets(0x12, data, [])
+    encode_packets(0x12, data)
     # encode_header(0x12, data) <> data
   end
 
@@ -185,12 +301,12 @@ defmodule Tds.Messages do
 
     login_data =
       hostname_ucs <>
-      username_ucs <>
-      password_ucs_xor <>
-      app_name_ucs <>
-      servername_ucs <>
-      clt_int_name_ucs <>
-      database_ucs
+        username_ucs <>
+        password_ucs_xor <>
+        app_name_ucs <>
+        servername_ucs <>
+        clt_int_name_ucs <>
+        database_ucs
 
     curr_offset = offset_start + 58
     ibHostName = <<curr_offset::little-size(16)>>
@@ -274,7 +390,7 @@ defmodule Tds.Messages do
 
     login7_len = byte_size(login7) + 4
     data = <<login7_len::little-size(32)>> <> login7
-    encode_packets(0x10, data, [])
+    encode_packets(0x10, data)
     # header = encode_header(0x10, data)
 
     # header <> data
@@ -305,7 +421,7 @@ defmodule Tds.Messages do
     total_length = byte_size(headers) + 4
     all_headers = <<total_length::little-size(32)>> <> headers
     data = all_headers <> q_ucs
-    encode_packets(0x01, data, [])
+    encode_packets(0x01, data)
     # header = encode_header(0x01, data)
     # header <> data
   end
@@ -330,7 +446,7 @@ defmodule Tds.Messages do
 
     data = all_headers <> encode_rpc(proc, params)
     # layout Data
-    encode_packets(0x03, data, [])
+    encode_packets(0x03, data)
     # header = encode_header(0x03, data)
     # pak = header <> data
     # pak
@@ -339,12 +455,17 @@ defmodule Tds.Messages do
   defp encode(msg_transmgr(command: "TM_BEGIN_XACT"), %{trans: trans}) do
     encode_trans(5, trans)
   end
+
   defp encode(msg_transmgr(command: "TM_COMMIT_XACT"), %{trans: trans}) do
     encode_trans(7, trans)
   end
-  defp encode(msg_transmgr(command: "TM_ROLLBACK_XACT", name: name), %{trans: trans}) do
+
+  defp encode(msg_transmgr(command: "TM_ROLLBACK_XACT", name: name), %{
+         trans: trans
+       }) do
     encode_trans(8, trans, name)
   end
+
   defp encode(msg_transmgr(command: "TM_SAVE_XACT", name: name), %{trans: trans}) do
     encode_trans(9, trans, name)
   end
@@ -367,8 +488,11 @@ defmodule Tds.Messages do
     total_length = byte_size(headers) + 4
     all_headers = <<total_length::little-size(32)>> <> headers
     request_payload = encode_trans_request(request_type, savepoint)
-    data = all_headers <> <<request_type::little-size(2)-unit(8)>> <> request_payload
-    encode_packets(0x0E, data, [])
+
+    data =
+      all_headers <> <<request_type::little-size(2)-unit(8)>> <> request_payload
+
+    encode_packets(0x0E, data)
   end
 
   @trans_iso_no_isolation_level 0x00
@@ -380,30 +504,34 @@ defmodule Tds.Messages do
 
   @trans_iso_level @trans_iso_no_isolation_level
 
-
   # begin transaction
   defp encode_trans_request(5, _) do
     <<@trans_iso_level::size(1)-unit(8), 0x0::size(1)-unit(8)>>
   end
+
   # commit transaction
   defp encode_trans_request(7, _) do
     <<0x00::size(2)-unit(8)>>
   end
+
   # rollback transaction
   defp encode_trans_request(8, savepoint) when savepoint > 0 do
     # rollback to save point
 
     <<
-    2::unsigned-8,  savepoint::little-size(2)-unit(8),
-    0x0::size(1)-unit(8)
+      2::unsigned-8,
+      savepoint::little-size(2)-unit(8),
+      0x0::size(1)-unit(8)
     >>
   end
+
   defp encode_trans_request(8, _) do
     <<0x00::size(2)-unit(8)>>
   end
+
   # save trans [name]
   defp encode_trans_request(9, savepoint) when is_number(savepoint) do
-    <<2::unsigned-8,  savepoint::little-size(2)-unit(8)>>
+    <<2::unsigned-8, savepoint::little-size(2)-unit(8)>>
   end
 
   defp encode_rpc(:sp_executesql, params) do
@@ -452,7 +580,7 @@ defmodule Tds.Messages do
     p_meta_data <> Types.encode_data(type_code, param.value, type_attr)
   end
 
-  defp encode_header(type, data, opts \\ []) do
+  def encode_header(type, data, opts \\ []) do
     status = opts[:status] || 1
 
     id = opts[:id] || 1
@@ -469,23 +597,26 @@ defmodule Tds.Messages do
     >>
   end
 
-  defp encode_packets(_type, <<>>, paks) do
-    Enum.reverse(paks)
+  @spec encode_packets(integer, binary, non_neg_integer) :: [binary, ...]
+  def encode_packets(type, binary, id \\ 1)
+
+  def encode_packets(_type, <<>>, _) do
+    []
   end
 
-  defp encode_packets(
-    type,
-    <<data::binary-size(@tds_pack_data_size)-unit(8), tail::binary>>,
-    paks
-  ) do
+  def encode_packets(
+        type,
+        <<data::binary-size(@tds_pack_data_size)-unit(8), tail::binary>>,
+        id
+      ) do
     status = if byte_size(tail) > 0, do: 0, else: 1
-    header = encode_header(type, data, id: length(paks) + 1, status: status)
-    encode_packets(type, tail, [header <> data | paks])
+    header = encode_header(type, data, id: rem(id, 255), status: status)
+    [[header, data] | encode_packets(type, tail, id + 1)]
   end
 
-  defp encode_packets(type, <<data::binary>>, paks) do
-    header = encode_header(type, data, id: length(paks) + 1, status: 1)
-    encode_packets(type, <<>>, [header <> data | paks])
+  def encode_packets(type, data, id) do
+    header = encode_header(type, data, id: id + 1, status: 1)
+    [header <> data]
   end
 
   defp encode_tdspassword(list) do
@@ -493,6 +624,6 @@ defmodule Tds.Messages do
       <<c>> = <<a::size(4), b::size(4)>>
       Bitwise.bxor(c, 0xA5)
     end
-    |> Enum.map_join(& <<&1>>)
+    |> Enum.map_join(&<<&1>>)
   end
 end

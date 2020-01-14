@@ -22,25 +22,40 @@ defmodule Tds.Utils do
     Enum.join(x, " ")
   end
 
+  # def to_little_ucs2(str) do
+  #   with utf16 when is_bitstring(utf16) <-
+  #          :unicode.characters_to_binary(
+  #            str,
+  #            :unicode,
+  #            {:utf16, :little}
+  #          ) do
+  #     utf16
+  #   else
+  #     _ ->
+  #       error = ~s(failed to convert string "#{inspect(str)}" to ucs2 binary)
+  #       raise Tds.Error, error
+  #   end
+  # end
+
+  # def ucs2_to_utf(s) do
+  #   :binary.bin_to_list(s)
+  #   |> Enum.reject(&(&1 == 0))
+  #   |> to_string()
+  # end
+
+  
+  def to_little_ucs2(str) when is_list(str) do
+    str
+    |> IO.iodata_to_binary()
+    |> to_little_ucs2()
+  end
+
   def to_little_ucs2(str) do
-    with utf16 when is_bitstring(utf16) <-
-           :unicode.characters_to_binary(
-             str,
-             :unicode,
-             {:utf16, :little}
-           ) do
-      utf16
-    else
-      _ ->
-        error = ~s(failed to convert string "#{inspect(str)}" to ucs2 binary)
-        raise Tds.Error, error
-    end
+    Tds.Encoding.encode(str, "utf-16le")
   end
 
   def ucs2_to_utf(s) do
-    :binary.bin_to_list(s)
-    |> Enum.reject(&(&1 == 0))
-    |> to_string()
+    Tds.Encoding.decode(s, "utf-16le")
   end
 
   def to_boolean(<<1>>) do
@@ -53,5 +68,11 @@ defmodule Tds.Utils do
 
   def error(error, _s) do
     {:error, error}
+  end
+
+  if Kernel.function_exported?(Decimal, :from_float, 1) do
+    def to_decimal(float), do: Decimal.from_float(float)
+  else
+    def to_decimal(float), do: Decimal.new(float)
   end
 end

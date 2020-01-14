@@ -9,3 +9,5 @@ cover/
 .idea/
 .code/
 .tool-versions
+priv/native
+native/tds_encoding/target

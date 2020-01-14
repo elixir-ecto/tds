@@ -8,6 +8,7 @@ defmodule Tds.Mixfile do
       version: "2.1.0",
       elixir: "~> 1.0",
       deps: deps(),
+      compilers: [:rustler] ++ Mix.compilers(),
       test_coverage: [tool: ExCoveralls],
       preferred_cli_env: [
         coveralls: :test,
@@ -17,6 +18,11 @@ defmodule Tds.Mixfile do
       ],
       description: description(),
       package: package(),
+      rustler_crates: [
+        tds_encoding: [
+          mode: (if Mix.env() == :prod, do: :release, else: :debug)
+        ]
+      ],
 
       # Docs
       name: "Tds",
@@ -30,7 +36,7 @@ defmodule Tds.Mixfile do
 
   def application do
     [
-      applications: [:logger, :db_connection, :decimal],
+      applications: [:logger, :db_connection, :decimal, :rustler],
       env: [
         json_library: Jason
       ]
@@ -46,7 +52,8 @@ defmodule Tds.Mixfile do
       {:db_connection, "~> 2.0"},
       {:dialyxir, "~> 0.5", only: [:dev], runtime: false},
       {:excoveralls, "~> 0.7", only: :test},
-      {:ex_doc, "~> 0.18", only: :dev}
+      {:ex_doc, "~> 0.19", only: :dev},
+      {:rustler, "~> 0.20.0"}
     ]
   end
 
@@ -59,7 +66,7 @@ defmodule Tds.Mixfile do
   defp package do
     [
       name: "tds",
-      files: ["lib", "mix.exs", "README*"],
+      files: ["lib", "mix.exs", "README*", "native"],
       maintainers: ["Eric Witchin", "Milan Jaric"],
       licenses: ["Apache 2.0"],
       links: %{"Github" => "https://github.com/livehelpnow/tds"}

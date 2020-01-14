@@ -6,61 +6,66 @@ defmodule Tds.Protocol do
   import Tds.Messages
   import Tds.Utils
 
-  alias Tds.Protocol
   alias Tds.Parameter
   alias Tds.Query
-  import Bitwise
 
   require Logger
 
   @behaviour DBConnection
-  @behaviour Access
-
-  # @packet_status_NORMAL 0x0 # more messaes
-  # end of message
-  @packet_status_EOM 0x1
 
   @timeout 5000
-  @max_packet 4 * 1024
-  @sock_opts [packet: :raw, mode: :binary, active: false, recbuf: 4096]
+  @sock_opts [packet: :raw, mode: :binary, active: false]
   @trans_levels [
-    :read_uncommited,
-    :read_commited,
+    :read_uncommitted,
+    :read_committed,
     :repeatable_read,
     :snapshot,
     :serializable
   ]
 
-  @type t :: %Protocol{
-          sock: any,
-          usock: any,
-          itcp: integer(),
+  @type sock :: {:gen_tcp | :ssl, pid}
+  @type env :: %{
+          trans: <<_::8>>,
+          savepoint: non_neg_integer,
+          collation: Tds.Protocol.Collation.t(),
+          packetsize: integer
+        }
+  @type transaction :: nil | :started | :successful | :failed
+  @type state ::
+          :ready
+          | :prelogin
+          | :login
+          | :prepare
+          | :executing
+  @type packet_data :: binary
+
+  @type t :: %__MODULE__{
+          sock: nil | sock,
+          usock: nil | pid,
+          itcp: term,
           opts: Keyword.t(),
-          state: :ready,
-          tail: binary(),
-          pak_header: binary(),
-          pak_data: binary(),
-          result: list() | nil,
-          query: list() | nil,
-          transaction_status: :idle | :transaction | :error,
-          env: map()
+          state: state,
+          result: nil | list(),
+          query: nil | String.t(),
+          transaction: transaction,
+          env: env
         }
 
   defstruct sock: nil,
             usock: nil,
             itcp: nil,
             opts: nil,
+            # Tells if connection is ready or executing command
             state: :ready,
-            # only has non-empty value when waiting for more data
-            tail: "",
-            # current tds packet header
-            pak_header: "",
-            # current tds message holding previous tds packets
-            pak_data: "",
             result: nil,
             query: nil,
-            transaction_status: :idle,
-            env: %{trans: <<0x00>>, savepoint: 0}
+            transaction: nil,
+            env: %{
+              trans: <<0x00>>,
+              savepoint: 0,
+              collation: %Tds.Protocol.Collation{},
+              packetsize: 4096
+            }
 
   @impl DBConnection
   @spec connect(opts :: Keyword.t()) ::
@@ -101,8 +106,7 @@ defmodule Tds.Protocol do
   end
 
   @impl DBConnection
-  @spec ping(Protocol.t()) ::
-          {:ok, Protocol.t()} | {:disconnect, Exception.t(), Protocol.t()}
+  @spec ping(t) :: {:ok, t} | {:disconnect, Exception.t(), t}
   def ping(state) do
     case send_query(~s{SELECT 'pong' as [msg]}, state) do
       {:ok, _, s} ->
@@ -127,32 +131,59 @@ defmodule Tds.Protocol do
   end
 
   @impl DBConnection
-  @spec checkout(state :: Protocol.t()) ::
+  @spec checkout(state :: t) ::
           {:ok, new_state :: any}
-          | {:disconnect, Exception.t(), new_state :: any}
-  def checkout(%{sock: {_mod, sock}} = s) do
+          | {:disconnect, Exception.t(), new_state :: t}
+  def checkout(%{transaction: :started} = s) do
+    err = %Tds.Error{message: "Unexpected transaction status `:started`"}
+    {:disconnect, err, s}
+  end
+
+  def checkout(%{sock: {mod, sock}} = s) do
+    sock_mod = inspect(mod)
+
     case :inet.setopts(sock, active: false) do
-      :ok -> {:ok, s}
-      {:error, posix} -> {:disconnect, Tds.Error.exception(posix), s}
+      :ok ->
+        {:ok, s}
+
+      {:error, reason} ->
+        msg = "Failed to #{sock_mod}.setops(active: false) due `#{reason}`"
+        {:disconnect, %Tds.Error{message: msg}, s}
     end
   end
 
   @impl DBConnection
-  @spec checkin(state :: any) ::
-          {:ok, new_state :: any}
-          | {:disconnect, Exception.t(), new_state :: any}
-  def checkin(%{sock: {_mod, sock}} = s) do
+  @spec checkin(state :: t) ::
+          {:ok, new_state :: t}
+          | {:disconnect, Exception.t(), new_state :: t}
+  def checkin(%{transaction: :started} = s) do
+    err = %Tds.Error{message: "Unexpected transaction status `:started`"}
+    {:disconnect, err, s}
+  end
+
+  def checkin(%{sock: {mod, sock}} = s) do
+    sock_mod = inspect(mod)
+
     case :inet.setopts(sock, active: :once) do
-      :ok -> {:ok, s}
-      {:error, posix} -> {:disconnect, Tds.Error.exception(posix), s}
+      :ok ->
+        {:ok, s}
+
+      {:error, reason} ->
+        msg = "Failed to #{sock_mod}.setops(active: false) due `#{reason}`"
+        {:disconnect, %Tds.Error{message: msg}, s}
     end
   end
 
   @impl DBConnection
-  @spec handle_execute(Tds.Query.t(), DBConnection.params(), Keyword.t(), Protocol.t()) ::
-    {:ok, Tds.Query.t(), Tds.Result.t(), new_state :: Protocol.t()}
-    | {:error | :disconnect, Exception.t(), new_state :: Protocol.t()}
-  def handle_execute(%Query{} = query, params, opts, %{sock: _sock} = s) do
+  @spec handle_execute(Tds.Query.t(), DBConnection.params(), Keyword.t(), t) ::
+    {:ok, Tds.Query.t(), Tds.Result.t(), new_state :: t}
+    | {:error | :disconnect, Exception.t(), new_state :: t}
+  def handle_execute(
+        %Query{handle: handle, statement: statement} = query,
+        params,
+        opts,
+        %{sock: _sock} = s
+      ) do
     params = opts[:parameters] || params
     if params != [] do
       send_param_query(query, params, s)
@@ -170,29 +201,25 @@ defmodule Tds.Protocol do
       other
   after
     unless is_nil(query.handle) do
-      handle_close(query, opts, s)
+      handle_close(query, opts, %{s | state: :executing})
     end
   end
 
   @impl DBConnection
-  @spec handle_prepare(
-          Tds.Query.t(),
-          opts :: Keyword.t(),
-          state :: Protocol.t()
-        ) ::
-          {:ok, Tds.Query.t(), new_state :: Protocol.t()}
-          | {:error | :disconnect, Exception.t(), new_state :: Protocol.t()}
-  def handle_prepare(%{statement: statement} = query, opts, %{sock: _sock} = s) do
+  @spec handle_prepare(Tds.Query.t(), Keyword.t(), t) ::
+          {:ok, Tds.Query.t(), new_state :: t()}
+          | {:error | :disconnect, Exception.t(), new_state :: t}
+  def handle_prepare(%{statement: statement} = query, opts, s) do
     case Keyword.get(opts, :execution_mode, :prepare_execute) do
       :prepare_execute ->
         params =
           opts[:parameters]
           |> Parameter.prepared_params()
 
-        send_prepare(statement, params, s)
+        send_prepare(statement, params, %{s | state: :prepare})
 
       :executesql ->
-        {:ok, query, %{s | state: :ready}}
+        {:ok, query, %{s | state: :executing}}
 
       execution_mode ->
         message =
@@ -204,83 +231,87 @@ defmodule Tds.Protocol do
   end
 
   @impl DBConnection
-  @spec handle_close(Query.t(), opts :: Keyword.t(), state :: Protocol.t()) ::
-          {:ok, Tds.Result.t(), new_state :: Protocol.t()}
-          | {:error | :disconnect, Exception.t(), new_state :: Protocol.t()}
-  def handle_close(query, opts, %{sock: _sock} = s) do
+  @spec handle_close(Query.t(), Keyword.t(), t) ::
+          {:ok, Tds.Result.t(), new_state :: t}
+          | {:error | :disconnect, Exception.t(), new_state :: t}
+  def handle_close(query, opts, s) do
     params = opts[:parameters]
-
     send_close(query, params, s)
   end
 
   @impl DBConnection
-  @spec handle_begin(opts :: Keyword.t(), state :: Protocol.t()) ::
-          {:ok, Tds.Result.t(), new_state :: Protocol.t()}
-          | {DBConnection.status(), new_state :: Protocol.t()}
-          | {:error | :disconnect, Exception.t(), new_state :: Prototcol.t()}
-  def handle_begin(opts, %{sock: _, env: env, transaction_status: status} = s) do
+  @spec handle_begin(Keyword.t(), t) ::
+          {:ok, Tds.Result.t(), new_state :: t}
+          | {DBConnection.status(), new_state :: t}
+          | {:error | :disconnect, Exception.t(), new_state :: t}
+  def handle_begin(opts, %{env: env, transaction: tran} = s) do
     case Keyword.get(opts, :mode, :transaction) do
-      :transaction when status == :idle ->
-        send_transaction("TM_BEGIN_XACT", nil, %{
-          s
-          | transaction_status: :transaction
-        })
+      :transaction when tran == nil ->
+        send_transaction("TM_BEGIN_XACT", nil, %{s | transaction: :started})
 
-      :savepoint when status == :transaction ->
+      :savepoint when tran == :started ->
         savepoint = env.savepoint + 1
-        s = put_in(s[:env][:savepoint], savepoint)
+        env = %{env | savepoint: savepoint}
+        s = %{s | transaction: :started, env: env}
         send_transaction("TM_SAVE_XACT", savepoint, s)
 
       mode when mode in [:transaction, :savepoint] ->
-        {status, s}
+        handle_status(opts, s)
     end
   end
 
   @impl DBConnection
-  @spec handle_commit(opts :: Keyword.t(), state :: any) ::
-          {:ok, Tds.Result.t(), new_state :: Protocol.t()}
-          | {DBConnection.status(), new_state :: Protocol.t()}
-          | {:error | :disconnect, Exception.t(), new_state :: Protocol.t()}
-  def handle_commit(opts, %{transaction_status: status, env: env} = s) do
+  @spec handle_commit(Keyword.t(), t) ::
+          {:ok, Tds.Result.t(), new_state :: t}
+          | {DBConnection.status(), new_state :: t}
+          | {:error | :disconnect, Exception.t(), new_state :: t}
+  def handle_commit(opts, %{transaction: transaction, env: env} = s) do
     case Keyword.get(opts, :mode, :transaction) do
-      :transaction when status == :transaction ->
-        send_transaction("TM_COMMIT_XACT", nil, %{s | transaction_status: :idle})
+      :transaction when transaction == :started ->
+        send_transaction("TM_COMMIT_XACT", nil, %{s | transaction: :successful})
 
-      :savepoint when status == :transaction ->
+      :savepoint when transaction == :started ->
         send_transaction("TM_SAVE_XACT", env.savepoint, s)
 
       mode when mode in [:transaction, :savepoint] ->
-        {status, s}
+        handle_status(opts, s)
     end
   end
 
   @impl DBConnection
-  @spec handle_rollback(opts :: Keyword.t(), state :: any) ::
-          {:ok, Tds.Result.t(), new_state :: Protocol.t()}
-          | {:idle, new_state :: Protocol.t()}
-          | {:error | :disconnect, Exception.t(), new_state :: Protocol.t()}
-  def handle_rollback(opts, %{env: env, transaction_status: status} = s) do
+  @spec handle_rollback(Keyword.t(), t) ::
+          {:ok, Tds.Result.t(), new_state :: t}
+          | {:idle, new_state :: t}
+          | {:error | :disconnect, Exception.t(), new_state :: t}
+  def handle_rollback(opts, %{env: env, transaction: transaction} = s) do
     case Keyword.get(opts, :mode, :transaction) do
-      :transaction when status in [:transaction, :error] ->
+      :transaction when transaction in [:started, :failed] ->
         env = %{env | savepoint: 0}
-        s = %{s | transaction_status: :idle, env: env}
+        s = %{s | transaction: :failed, env: env}
         send_transaction("TM_ROLLBACK_XACT", 0, s)
 
-      :savepoint when status in [:transaction, :error] ->
-        s = %{s | transaction_status: :error}
+      :savepoint when transaction in [:transaction, :failed] ->
+        # todo: should set trasaction status to :failed? tho user can continue by deciding
+        # if he wants to rollback transaction or to exec other sql script branch
+        # other option is that we track explicit mssql transaction state with %Protocol{mssql: ... }
         send_transaction("TM_ROLLBACK_XACT", env.savepoint, s)
 
       mode when mode in [:transaction, :savepoint] ->
-        {status, s}
+        handle_status(opts, s)
     end
   end
 
   @impl DBConnection
-  @spec handle_status(Keyword.t(), Protocol.t()) ::
-          {:idle | :transaction | :error, Protocol.t()}
-          | {:disconnect, Exception.t(), Protocol.t()}
-  def handle_status(_, %Protocol{transaction_status: status} = state) do
-    {status, state}
+  @spec handle_status(Keyword.t(), t) ::
+          {:idle | :transaction | :error, t}
+          | {:disconnect, Exception.t(), t}
+  def handle_status(_, %{transaction: transaction} = state) do
+    case transaction do
+      nil -> {:idle, state}
+      :successful -> {:idle, state}
+      :started -> {:transaction, state}
+      :failed -> {:error, state}
+    end
   end
 
   @impl DBConnection
@@ -315,10 +346,10 @@ defmodule Tds.Protocol do
           Query.t(),
           params :: any,
           opts :: Keyword.t(),
-          state :: Protocol.t()
+          state :: t
         ) ::
-          {:ok, Query.t(), cursor :: any, new_state :: Protocol.t()}
-          | {:error | :disconnect, Exception.t(), new_state :: Protocol.t()}
+          {:ok, Query.t(), cursor :: any, new_state :: t}
+          | {:error | :disconnect, Exception.t(), new_state :: t}
   def handle_declare(_query, _params, _opts, state) do
     {:error, Tds.Error.exception("Cursor operations are not supported in TDS"),
      state}
@@ -391,7 +422,7 @@ defmodule Tds.Protocol do
         server =
           str
           |> String.split(";")
-          |> Enum.chunk(2)
+          |> Enum.chunk_every(2)
           |> Enum.reduce([], fn [k, v], acc ->
             k =
               k
@@ -409,11 +440,14 @@ defmodule Tds.Protocol do
 
     case server do
       nil ->
-        error(%Tds.Error{message: "Instance #{opts[:instance]} not found"}, s)
+        error(%Tds.Error{message: "Instance #{opts[:instance]} not found"}, %{
+          s
+          | usock: nil
+        })
 
       serv ->
         {port, _} = Integer.parse(serv[:tcp])
-        {:ok, %{s | opts: opts, itcp: port}}
+        {:ok, %{s | opts: opts, itcp: port, usock: nil}}
     end
   end
 
@@ -446,94 +480,40 @@ defmodule Tds.Protocol do
   end
 
   def handle_info(msg, s) do
-    Logger.debug(fn -> "Unhandled info: #{inspect(msg)}" end)
+    Logger.error(fn ->
+	"Unhandled message! \n\n" <>
+         "  Tds.Protocol.hand_info/2 \n\n" <>
+	 "    Arg #1 \n" <>
+         inspect(msg) <>
+         "    Arg #2 \n" <>
+         inspect(s)
+    end)
 
     {:ok, s}
   end
 
-  # no data to process
-  defp new_data(<<_data::0>>, s) do
-    {:ok, s}
-  end
+  defp decode(packet_data, %{state: state} = s) do
+    {msg, s} = parse(state, packet_data, s)
 
-  # DONE_ATTN The DONE message is a server acknowledgement of a client ATTENTION
-  # message.
-  defp new_data(
-         <<0xFD, 0x20, _cur_cmd::binary(2), 0::size(8)-unit(8), _tail::binary>>,
-         %{state: :attn} = s
-       ) do
-    s = %{s | pak_header: "", pak_data: "", tail: ""}
-    message(:attn, :attn, s)
-  end
+    case message(state, msg, s) do
+      {:ok, s} ->
+        # message processed, reset header and msg buffer, then process
+        # tail
+        {:ok, s}
 
-  # shift 8 bytes while in attention state, Protocol updates state
-  defp new_data(<<_b::size(1)-unit(8), tail::binary>>, %{state: :attn} = s) do
-    new_data(tail, s)
-  end
+      {:ok, _result, s} ->
+        # send_query returns a result
+        {:ok, s}
 
-  # no packet header yet
-  defp new_data(<<data::binary>>, %{pak_header: ""} = s) do
-    if byte_size(data) >= 8 do
-      # assume incoming data starts with packet header, if it's long enough
-      # Logger.debug "S: #{inspect s}"
-      <<pak_header::binary(8), tail::binary>> = data
-      new_data(tail, %{s | pak_header: pak_header})
-    else
-      # have no packet header yet, wait for more data
-      {:ok, %{s | tail: data}}
-    end
-  end
-
-  defp new_data(
-         <<data::binary>>,
-         %{state: state, pak_header: pak_header, pak_data: pak_data} = s
-       ) do
-    <<type::int8, status::int8, size::int16, _head_rem::int32>> = pak_header
-    # size includes packet header
-    size = size - 8
-
-    case data do
-      <<package::binary(size), tail::binary>> ->
-        # satisfied size specified in packet header
-        case status &&& @packet_status_EOM do
-          1 ->
-            # status 1 means last packet of message
-            # TODO Messages.parse does not use pak_header
-
-            # :binpp.pprint(pak_header <> pak_data)
-
-            msg = parse(state, type, pak_header, pak_data <> package)
-
-            case message(state, msg, s) do
-              {:ok, s} ->
-                # message processed, reset header and msg buffer, then process
-                # tail
-                new_data(tail, %{s | pak_header: "", pak_data: ""})
-
-              {:ok, _result, s} ->
-                # send_query returns a result
-                new_data(tail, %{s | pak_header: "", pak_data: ""})
-
-              {:error, _, _} = err ->
-                err
-            end
-
-          _ ->
-            # not the last packet of message, more packets coming with new
-            # packet header
-            new_data(tail, %{s | pak_header: "", pak_data: pak_data <> package})
-        end
-
-      data ->
-        # size specified in packet header still unsatisfied, wait for more data
-        {:ok, %{s | tail: data, pak_header: pak_header}}
+      {:error, _, _} = err ->
+        err
     end
   end
 
   defp flush(%{sock: sock} = s) do
     receive do
       {:tcp, ^sock, data} ->
-        _ = new_data(data, s)
+        _ = decode(data, s)
         {:ok, s}
 
       {:tcp_closed, ^sock} ->
@@ -570,7 +550,7 @@ defmodule Tds.Protocol do
 
     case login_send(msg, s) do
       {:ok, s} ->
-        {:ok, %{s | state: :executing}}
+        {:ok, %{s | state: :ready}}
 
       err ->
         err
@@ -580,12 +560,12 @@ defmodule Tds.Protocol do
   def send_query(statement, s) do
     msg = msg_sql(query: statement)
 
-    case msg_send(msg, s) do
+    case msg_send(msg, %{s | state: :executing}) do
       {:ok, %{result: result} = s} ->
-        {:ok, result, %{s | state: :ready}}
+        {:ok, result, s}
 
-      {:error, err, %{transaction_status: :transaction} = s} ->
-        {:error, err, %{s | transaction_status: :error}}
+      {:error, err, %{transaction: :started} = s} ->
+        {:error, err, %{s | transaction: :failed}}
 
       err ->
         err
@@ -606,12 +586,12 @@ defmodule Tds.Protocol do
 
     msg = msg_rpc(proc: :sp_prepare, query: statement, params: params)
 
-    case msg_send(msg, s) do
+    case msg_send(msg, %{s | state: :prepare}) do
       {:ok, %{query: query} = s} ->
-        {:ok, %{query | statement: statement}, %{s | state: :ready}}
+        {:ok, %{query | statement: statement}, %{s | state: :executing}}
 
-      {:error, err, %{transaction_status: :transaction} = s} ->
-        {:error, err, %{s | transaction_status: :error}}
+      {:error, err, %{transaction: :started} = s} ->
+        {:error, err, %{s | transaction: :failed}}
 
       err ->
         err
@@ -621,34 +601,29 @@ defmodule Tds.Protocol do
   def send_transaction(command, name, s) do
     msg = msg_transmgr(command: command, name: name)
 
-    case msg_send(msg, s) do
+    case msg_send(msg, %{s | state: :transaction_manager}) do
       {:ok, %{result: result} = s} ->
-        {:ok, result, %{s | state: :ready}}
+        {:ok, result, s}
 
       err ->
         err
     end
   end
 
-  @spec send_param_query(Tds.Query.t(), list(), %{
-          env: any(),
-          sock: {atom(), port()}
-        }) ::
-          {:error, any()}
-          | {:ok, %{optional(:result) => none()}}
-          | {:disconnect, any(), %{env: any(), sock: {any(), any()}}}
-          | {:error, Tds.Error.t(), %{pak_header: <<>>, tail: <<>>}}
-          | {:ok, any(), %{result: any(), state: :ready}}
-  def send_param_query(%Query{} = query, params, s) do
+  def send_param_query(
+        %Query{handle: handle, statement: statement} = _,
+        params,
+        %{transaction: :started} = s
+      ) do
     msg =
-      case query.handle do
+      case handle do
         nil ->
           p = [
             %Parameter{
               name: "@statement",
               type: :string,
               direction: :input,
-              value: query.statement
+              value: statement
             },
             %Parameter{
               name: "@params",
@@ -679,8 +654,66 @@ defmodule Tds.Protocol do
       {:ok, %{result: result} = s} ->
         {:ok, result, %{s | state: :ready}}
 
-      {:error, err, %{transaction_status: :transaction} = s} ->
-        {:error, err, %{s | transaction_status: :error}}
+      {:error, err, %{transaction: :started} = s} ->
+        {:error, err, %{s | transaction: :failed}}
+
+      err ->
+        err
+    end
+  end
+
+  @spec send_param_query(Tds.Query.t(), list(), t) ::
+          {:error, any()}
+          | {:ok, %{optional(:result) => none()}}
+          | {:disconnect, any(), %{env: any(), sock: {any(), any()}}}
+          | {:error, Tds.Error.t(), %{pak_header: <<>>, tail: <<>>}}
+          | {:ok, any(), %{result: any(), state: :ready}}
+  def send_param_query(
+        %Query{handle: handle, statement: statement} = _,
+        params,
+        s
+      ) do
+    msg =
+      case handle do
+        nil ->
+          p = [
+            %Parameter{
+              name: "@statement",
+              type: :string,
+              direction: :input,
+              value: statement
+            },
+            %Parameter{
+              name: "@params",
+              type: :string,
+              direction: :input,
+              value: Parameter.prepared_params(params)
+            }
+            | Parameter.prepare_params(params)
+          ]
+
+          msg_rpc(proc: :sp_executesql, params: p)
+
+        handle ->
+          p = [
+            %Parameter{
+              name: "@handle",
+              type: :integer,
+              direction: :input,
+              value: handle
+            }
+            | Parameter.prepare_params(params)
+          ]
+
+          msg_rpc(proc: :sp_execute, params: p)
+      end
+
+    case msg_send(msg, s) do
+      {:ok, %{result: result} = s} ->
+        {:ok, result, %{s | state: :ready}}
+
+      {:error, err, %{transaction: :started} = s} ->
+        {:error, err, %{s | transaction: :failed}}
 
       err ->
         err
@@ -703,21 +736,21 @@ defmodule Tds.Protocol do
       {:ok, %{result: result} = s} ->
         {:ok, result, %{s | state: :ready}}
 
-      {:error, err, %{transaction_status: :transaction} = s} ->
-        {:error, err, %{s | transaction_status: :error}}
+      {:error, err, %{transaction: :started} = s} ->
+        {:error, err, %{s | transaction: :failed}}
 
       err ->
         err
     end
   end
 
-  def message(:login, msg_login_ack(redirect: true)=msg, %{opts: opts} = s ) do
+  def message(
+        :login,
+        msg_loginack(redirect: %{hostname: host, port: port}),
+        %{opts: opts} = s
+      ) do
     # we got an ENVCHANGE:redirection token, we need to disconnect and start over with new server
-    disconnect(Tds.Error.exception(:redirected), s)
-    %{hostname: host, port: port} =
-      msg
-      |> msg_login_ack(:tokens)
-      |> Keyword.get(:env_redirect)
+    disconnect("redirected", s)
 
     new_opts =
       opts
@@ -727,61 +760,51 @@ defmodule Tds.Protocol do
     connect(new_opts)
   end
 
-  def message(:login, msg_login_ack(), %{opts: opts} = s) do
+  def message(:login, msg_loginack(), %{opts: opts} = s) do
     state = %{s | opts: clean_opts(opts)}
 
     opts
-    |> prepare_envvars()
+    |> conn_opts()
+    |> IO.iodata_to_binary()
     |> send_query(state)
   end
 
-  ## executing
-
-  def message(:executing, msg_sql_result(columns: cols, rows: rows, done: done), s) do
-    num_rows = done.rows
-    rows = List.wrap(rows)
-    rows = if num_rows > 0 and length(rows) == 0, do: nil, else: rows
-    columns =
-      unless is_nil(cols) do
-        cols
-        |> Enum.reduce([], fn col, acc -> [col[:name] | acc] end)
-        |> Enum.reverse()
+  def message(
+        :executing,
+        msg_result(set: set, status: _status, params: _params),
+        %{} = s
+      ) do
+    result =
+      case set do
+        [] -> %Tds.Result{rows: nil}
+        [h | _t] -> h
       end
 
-    result = %Tds.Result{
-      columns: columns,
-      rows: rows,
-      num_rows: done.rows
-    }
-
-    {:ok, %{s | state: :executing, result: result}}
+    {:ok, mark_ready(%{s | result: result})}
   end
 
-  def message(:executing, msg_trans(trans: trans), %{env: env} = s) do
+  def message(:transaction_manager, msg_trans(), s) do
     result = %Tds.Result{columns: [], rows: [], num_rows: 0}
 
-    {:ok,
-     %{
-       s
-       | state: :ready,
-         result: result,
-         env: %{trans: trans, savepoint: env.savepoint}
-     }}
+    {:ok, %{s | state: :ready, result: result}}
   end
 
-  def message(:executing, msg_prepared(params: params), %{} = s) do
-    {"@handle", handle} = params
+  def message(:prepare, msg_prepared(params: params), %{} = s) do
+    handle =
+      params
+      |> Enum.find(%{}, &(&1.name == "@handle" and &1.direction == :output))
+      |> Map.get(:value, nil)
 
     result = %Tds.Result{columns: [], rows: [], num_rows: 0}
     query = %Tds.Query{handle: handle}
 
-    {:ok, %{s | state: :ready, result: result, query: query}}
+    {:ok, mark_ready(%{s | result: result, query: query})}
   end
 
   ## Error
-  def message(_, msg_error(e: e), %{} = s) do
+  def message(_, msg_error(error: e), %{} = s) do
     error = %Tds.Error{mssql: e}
-    {:error, error, %{s | pak_header: "", tail: ""}}
+    {:error, error, mark_ready(s)}
   end
 
   ## ATTN Ack
@@ -791,75 +814,11 @@ defmodule Tds.Protocol do
     {:ok, %{s | statement: "", state: :ready, result: result}}
   end
 
-  defp msg_send(msg, %{sock: {mod, sock}, env: env} = s) do
-    :inet.setopts(sock, active: false)
-
-    paks = encode_msg(msg, env)
-
-    Enum.each(paks, fn pak ->
-      mod.send(sock, pak)
-    end)
-
-    case msg_recv(<<>>, s) do
-      {:disconnect, _ex, _s} = res ->
-        res
-
-      buffer ->
-        new_data(buffer, %{s | state: :executing, pak_header: ""})
-    end
+  defp mark_ready(%{state: _} = s) do
+    %{s | state: :ready}
   end
 
-  defp msg_recv(buffer, %{sock: {mod, sock}} = s) do
-    case mod.recv(sock, 8) do
-      # there is more tds packages after this one
-      {:ok,
-       <<_type::int8, 0x00, length::int16, _spid::int16, _package::int8,
-         _window::int8>> = header} ->
-        (buffer <> header)
-        |> package_recv(s, length - 8)
-        |> msg_recv(s)
-
-      # this heder belongs to last package
-      {:ok,
-       <<_type::int8, 0x01, length::int16, _spid::int16, _package::int8,
-         _window::int8>> = header} ->
-        package_recv(buffer <> header, s, length - 8)
-
-      {:ok,
-       <<_type::int8, stat::int8, length::int16, _spid::int16, _package::int8,
-         _window::int8>> = header} ->
-        package_recv(buffer <> header, s, length - 8)
-        msg = "Status #{inspect(stat)} of tds package is not yer supported!"
-        {:disconnect, Tds.Error.exception(msg), s}
-
-      {:error, :closed} ->
-        ex = DBConnection.ConnectionError.exception("connection is closed")
-        {:disconnect, ex, s}
-
-      {:error, error} ->
-        {:disconnect, Tds.Error.exception(error), s}
-    end
-  end
-
-  defp package_recv(buffer, %{sock: {mod, sock}} = s, length) do
-    case mod.recv(sock, min(length, @max_packet)) do
-      # TODO: not much likely but since case `byte_size(data) > length` is not handled
-      # it could be that here we have a bug
-      # since more than one package could arrive for any reason
-      # it should put to state tail and then return buffered package.
-      # When respond to client parsed result, then continue receiving and processing tail
-      {:ok, data} when byte_size(data) < length ->
-        length = length - byte_size(data)
-        package_recv(buffer <> data, s, length)
-
-      {:ok, data} ->
-        buffer <> data
-
-      {:error, exception} ->
-        {:disconnect, exception, s}
-    end
-  end
-
+  # Send Command To Sql Server
   defp login_send(msg, %{sock: {mod, sock}, env: env} = s) do
     paks = encode_msg(msg, env)
 
@@ -867,12 +826,140 @@ defmodule Tds.Protocol do
       mod.send(sock, pak)
     end)
 
-    case msg_recv(<<>>, s) do
+    case msg_recv(s) do
       {:disconnect, ex, s} ->
         {:error, ex, s}
 
       buffer ->
-        new_data(buffer, %{s | state: :login})
+        buffer
+        |> IO.iodata_to_binary()
+        |> decode(%{s | state: :login})
+    end
+  end
+
+  defp msg_send(msg, %{sock: {mod, sock}, env: env, state: state} = s) do
+    :inet.setopts(sock, active: false)
+
+    {t_send, _} =
+      :timer.tc(fn ->
+        msg
+        |> encode_msg(env)
+        |> Enum.each(&mod.send(sock, &1))
+      end)
+
+    {t_recv, {t_decode, result}} =
+      :timer.tc(fn ->
+        case msg_recv(s) do
+          {:disconnect, _ex, _s} = res ->
+            {0, res}
+
+          buffer ->
+            :timer.tc(fn ->
+              buffer
+              |> IO.iodata_to_binary()
+              |> decode(s)
+            end)
+        end
+      end)
+
+    stm = Map.get(s, :query)
+
+    if Keyword.get(s.opts, :trace, false) == true do
+      Logger.debug(fn ->
+        "[trace] [Tds.Protocod.msg_send/2] " <>
+          "state=#{inspect(state)} " <>
+          "send=#{Tds.Perf.to_string(t_send)} " <>
+          "receive=#{Tds.Perf.to_string(t_recv - t_decode)} " <>
+          "decode=#{Tds.Perf.to_string(t_decode)}" <>
+          "\n" <>
+          "#{inspect(stm)}"
+      end)
+    end
+
+    result
+  end
+
+  defp msg_recv(%{sock: {mod, pid}} = s) do
+    case mod.recv(pid, 0) do
+      {:ok, pkg} ->
+        pkg
+        |> next_tds_pkg([])
+        |> msg_recv(s)
+
+      {:error, error} ->
+        {:disconnect,
+         %Tds.Error{
+           message: "Connection failed to receive packet due #{inspect(error)}"
+         }, s}
+    end
+  catch
+    {:error, error} -> {:disconnect, error, s}
+  end
+
+  defp msg_recv({:done, buffer, _}, _s) do
+    Enum.reverse(buffer)
+  end
+
+  defp msg_recv({:more, buffer, more, last?}, %{sock: {mod, pid}} = s) do
+    take = if last?, do: more, else: 0
+
+    case mod.recv(pid, take) do
+      {:ok, pkg} ->
+        next_tds_pkg(pkg, buffer, more, last?)
+        |> msg_recv(s)
+
+      {:error, error} ->
+        throw({:error, error})
+    end
+  end
+
+  defp msg_recv({:more, buffer, unknown_pkg}, %{sock: {mod, pid}} = s) do
+    case mod.recv(pid, 0) do
+      {:ok, pkg} ->
+        unknown_pkg
+        |> Kernel.<>(pkg)
+        |> next_tds_pkg(buffer)
+        |> msg_recv(s)
+
+      {:error, error} ->
+        throw({:error, error})
+    end
+  end
+
+  defp next_tds_pkg(pkg, buffer) do
+    case pkg do
+      <<0x04, 0x01, size::int16, _::int32, chunk::binary>> ->
+        more = size - 8
+        next_tds_pkg(chunk, buffer, more, true)
+
+      <<0x04, 0x00, size::int16, _::int32, chunk::binary>> ->
+        more = size - 8
+        next_tds_pkg(chunk, buffer, more, false)
+
+      unknown_pkg ->
+        {:more, buffer, unknown_pkg}
+    end
+  end
+
+  defp next_tds_pkg(pkg, buffer, more, true) do
+    case pkg do
+      <<chunk::binary(more, 8), tail::binary>> ->
+        {:done, [chunk | buffer], tail}
+
+      <<chunk::binary>> ->
+        more = more - byte_size(chunk)
+        {:more, [chunk | buffer], more, true}
+    end
+  end
+
+  defp next_tds_pkg(pkg, buffer, more, false) do
+    case pkg do
+      <<chunk::binary(more, 8), tail::binary>> ->
+        next_tds_pkg(tail, [chunk | buffer])
+
+      <<chunk::binary>> ->
+        more = more - byte_size(chunk)
+        {:more, [chunk | buffer], more, false}
     end
   end
 
@@ -880,8 +967,8 @@ defmodule Tds.Protocol do
     Keyword.put(opts, :password, :REDACTED)
   end
 
-  @spec prepare_envvars(Keyword.t()) :: list() | no_return
-  defp prepare_envvars(opts) do
+  @spec conn_opts(Keyword.t()) :: list() | no_return
+  defp conn_opts(opts) do
     [
       "SET ANSI_NULLS ON; ",
       "SET QUOTED_IDENTIFIER ON; ",
@@ -890,152 +977,139 @@ defmodule Tds.Protocol do
       "SET ANSI_PADDING ON; ",
       "SET ANSI_WARNINGS ON; ",
       "SET CONCAT_NULL_YIELDS_NULL ON; ",
-      "SET TEXTSIZE 2147483647; ",
-      append_envvar(opts, :set_xact_abort),
-      append_envvar(opts, :set_language),
-      append_envvar(opts, :set_datefirst),
-      append_envvar(opts, :set_dateformat),
-      append_envvar(opts, :set_deadlock_priority),
-      append_envvar(opts, :set_lock_timeout),
-      append_envvar(opts, :set_remote_proc_transactions),
-      append_envvar(opts, :set_implicit_transactions),
-      append_envvar(opts, :set_transaction_isolation_level),
-      append_envvar(opts, :set_read_committed_snapshot),
-      append_envvar(opts, :set_allow_snapshot_isolation)
+      "SET TEXTSIZE 2147483647; "
     ]
-    |> Enum.reject(&is_nil/1)
-    |> IO.iodata_to_binary()
+    |> append_opts(opts, :set_language)
+    |> append_opts(opts, :set_datefirst)
+    |> append_opts(opts, :set_dateformat)
+    |> append_opts(opts, :set_deadlock_priority)
+    |> append_opts(opts, :set_lock_timeout)
+    |> append_opts(opts, :set_remote_proc_transactions)
+    |> append_opts(opts, :set_implicit_transactions)
+    |> append_opts(opts, :set_transaction_isolation_level)
+    |> append_opts(opts, :set_allow_snapshot_isolation)
   end
 
-  defp append_envvar(opts, :set_xact_abort) do
-    case Keyword.get(opts, :set_xact_abort) do
-      nil -> nil
-      :on -> "SET XACT_ABORT ON; "
-      :off -> "SET XACT_ABORT OFF; "
-    end
-  end
-
-  defp append_envvar(opts, :set_language) do
+  defp append_opts(conn, opts, :set_language) do
     case Keyword.get(opts, :set_language) do
-      nil -> nil
-      val -> "SET LANGUAGE #{val}; "
+      nil -> conn
+      val -> conn ++ ["SET LANGUAGE #{val}; "]
     end
   end
 
-  defp append_envvar(opts, :set_datefirst) do
+  defp append_opts(conn, opts, :set_datefirst) do
     case Keyword.get(opts, :set_datefirst) do
       nil ->
-        nil
+        conn
 
       val when val in 1..7 ->
-        "SET DATEFIRST #{val}; "
+        conn ++ ["SET DATEFIRST #{val}; "]
 
       val ->
         raise(
-          Tds.ConfigError,
+          ArgumentError,
           "set_datefirst: #{inspect(val)} is out of bounds, valid range is 1..7"
         )
     end
   end
 
-  defp append_envvar(opts, :set_dateformat) do
+  defp append_opts(conn, opts, :set_dateformat) do
     case Keyword.get(opts, :set_dateformat) do
       nil ->
-        nil
+        conn
 
       val when val in [:mdy, :dmy, :ymd, :ydm, :myd, :dym] ->
-        "SET DATEFORMAT #{val}; "
+        conn ++ ["SET DATEFORMAT #{val}; "]
 
       val ->
         raise(
-          Tds.ConfigError,
+          ArgumentError,
           "set_dateformat: #{inspect(val)} is an invalid value, " <>
             "valid values are [:mdy, :dmy, :ymd, :ydm, :myd, :dym]"
         )
     end
   end
 
-  defp append_envvar(opts, :set_deadlock_priority) do
+  defp append_opts(conn, opts, :set_deadlock_priority) do
     case Keyword.get(opts, :set_deadlock_priority) do
       nil ->
-        nil
+        conn
 
       val when val in [:low, :high, :normal] ->
-        "SET DEADLOCK_PRIORITY #{val}; "
+        conn ++ ["SET DEADLOCK_PRIORITY #{val}; "]
+
+      nil ->
+        conn
 
       val when val in -10..10 ->
-        "SET DEADLOCK_PRIORITY #{val}; "
+        conn ++ ["SET DEADLOCK_PRIORITY #{val}; "]
 
       val ->
         raise(
-          Tds.ConfigError,
+          ArgumentError,
           "set_deadlock_priority: #{inspect(val)} is an invalid value, " <>
             "valid values are #{inspect([:low, :high, :normal | -10..10])}"
         )
     end
   end
 
-  defp append_envvar(opts, :set_lock_timeout) do
+  defp append_opts(conn, opts, :set_lock_timeout) do
     case Keyword.get(opts, :set_lock_timeout) do
       nil ->
-        nil
+        conn
 
       val when val > 0 ->
-        "SET LOCK_TIMEOUT #{val}; "
+        conn ++ ["SET LOCK_TIMEOUT #{val}; "]
 
       val ->
         raise(
-          Tds.ConfigError,
+          ArgumentError,
           "set_lock_timeout: #{inspect(val)} is an invalid value, " <>
             "must be an positive integer."
         )
     end
   end
 
-  defp append_envvar(opts, :set_remote_proc_transactions) do
+  defp append_opts(conn, opts, :set_remote_proc_transactions) do
     case Keyword.get(opts, :set_remote_proc_transactions) do
       nil ->
-        nil
+        conn
 
-      :on ->
-        "SET REMOTE_PROC_TRANSACTIONS ON; "
-
-      :off ->
-        "SET REMOTE_PROC_TRANSACTIONS OFF; "
+      val when val in [:on, :off] ->
+        val = val |> Atom.to_string() |> String.upcase()
+        conn ++ ["SET REMOTE_PROC_TRANSACTIONS #{val}; "]
 
       val ->
         raise(
-          Tds.ConfigError,
+          ArgumentError,
           "set_remote_proc_transactions: #{inspect(val)} is an invalid value, " <>
             "should be either :on, :off, nil"
         )
     end
   end
 
-  defp append_envvar(opts, :set_implicit_transactions) do
+  defp append_opts(conn, opts, :set_implicit_transactions) do
     case Keyword.get(opts, :set_implicit_transactions) do
       nil ->
-        "SET IMPLICIT_TRANSACTIONS OFF; "
+        conn ++ ["SET IMPLICIT_TRANSACTIONS OFF; "]
 
-      :on ->
-        "SET IMPLICIT_TRANSACTIONS ON; "
-
-      :off ->
-        "SET IMPLICIT_TRANSACTIONS OFF; "
+      val when val in [:on, :off] ->
+        val = val |> Atom.to_string() |> String.upcase()
+        conn ++ ["SET IMPLICIT_TRANSACTIONS #{val}; "]
 
       val ->
         raise(
-          Tds.ConfigError,
+          ArgumentError,
           "set_implicit_transactions: #{inspect(val)} is an invalid value, " <>
             "should be either :on, :off, nil"
         )
     end
   end
 
-  defp append_envvar(opts, :set_transaction_isolation_level) do
+  defp append_opts(conn, opts, :set_transaction_isolation_level) do
     case Keyword.get(opts, :set_transaction_isolation_level) do
       nil ->
-        nil
+        conn
 
       val when val in @trans_levels ->
         t =
@@ -1044,104 +1118,52 @@ defmodule Tds.Protocol do
           |> String.replace("_", " ")
           |> String.upcase()
 
-        "SET TRANSACTION ISOLATION LEVEL #{t}; "
+        conn ++ ["SET TRANSACTION ISOLATION LEVEL #{t}; "]
 
       val ->
         raise(
-          Tds.ConfigError,
+          ArgumentError,
           "set_transaction_isolation_level: #{inspect(val)} is an invalid value, " <>
             "should be one of #{inspect(@trans_levels)} or nil"
         )
     end
   end
 
-  defp append_envvar(opts, :set_read_committed_snapshot) do
+  defp append_opts(conn, opts, :set_allow_snapshot_isolation) do
     database = Keyword.get(opts, :database)
-    level = Keyword.get(opts, :set_read_committed_snapshot)
 
-    case {database, level} do
-      {nil, _} ->
+    case Keyword.get(opts, :set_allow_snapshot_isolation) do
+      nil ->
+        conn
+
+      val when val in [:on, :off] ->
+        val = val |> Atom.to_string() |> String.upcase()
+
+        conn ++
+          ["ALTER DATABASE [#{database}] SET ALLOW_SNAPSHOT_ISOLATION #{val}; "]
+
+      val ->
         raise(
-          Tds.Error,
-          "Option `:set_read_committed_snapshot` requres `:database` to be set."
-        )
-
-      {_, nil} ->
-        nil
-
-      {db, val} when val in [:on, :off] ->
-        on_off = val |> Atom.to_string() |> String.upcase()
-        "ALTER DATABASE [#{db}] SET READ_COMMITTED_SNAPSHOT #{on_off}; "
-
-      {_, val} ->
-        raise(
-          Tds.ConfigError,
-          "Option `:set_read_committed_snapshot` has has invalid value " <>
-            "'#{inspect(val)}'. should be either :on, :off, nil"
+          ArgumentError,
+          "set_allow_snapshot_isolation: #{inspect(val)} is an invalid value, " <>
+            "should be either :on, :off, nil"
         )
     end
   end
 
-  defp append_envvar(opts, :set_allow_snapshot_isolation) do
-    database = Keyword.get(opts, :database)
-    level = Keyword.get(opts, :set_allow_snapshot_isolation)
+  # defp query_error(s, msg) do
+  #   {:error, ArgumentError.exception(msg), s}
+  # end
 
-    case {database, level} do
-      {nil, _} ->
-        raise(
-          Tds.ConfigError,
-          "Option :set_allow_snapshot_isolation requires :database to be set."
-        )
+  # defp lock_error(s, fun) do
+  #   msg = "connection is locked copying to or from the database and " <>
+  #     "can not #{fun} transaction"
+  #   {:disconnect, RuntimeError.exception(msg), s}
+  # end
 
-      {_, nil} ->
-        nil
-
-      {db, :on} ->
-        "ALTER DATABASE [#{db}] SET ALLOW_SNAPSHOT_ISOLATION ON; "
-
-      {db, :off} ->
-        "ALTER DATABASE [#{db}] SET ALLOW_SNAPSHOT_ISOLATION OFF; "
-
-      {_, val} ->
-        raise(
-          Tds.ConfigError,
-          "Option :set_allow_snapshot_isolation has has invalid value " <>
-            "'#{inspect(val)}'. should be either :on, :off, nil"
-        )
-    end
-  end
-
-  # Access callbacks
-  @impl Access
-  def fetch(data, key) do
-    if Map.has_key?(data, key) do
-      {:ok, Map.get(data, key)}
-    else
-      :error
-    end
-  end
-
-  @impl Access
-  def get_and_update(data, key, fun) do
-    get_value = Map.get(data, key)
-    {get_value, new_data} = fun.(get_value)
-    data = Map.put(data, key, new_data)
-    {get_value, data}
-  end
-
-  @impl Access
-  def get(data, key, default) do
-    case fetch(data, key) do
-      {:ok, value} -> value
-      :error       -> default
-    end
-  end
-
-  @impl Access
-  def pop(data, key) do
-    case fetch(data, key) do
-      {:ok, value} -> {value, data}
-      :error       -> {nil, data}
-    end
-  end
+  # defp lock_error(s, fun, query) do
+  #   msg = "connection is locked copying to or from the database and " <>
+  #     "can not #{fun} #{inspect query}"
+  #   {:error, RuntimeError.exception(msg), s}
+  # end
 end

@@ -40,4 +40,20 @@ defmodule PLPTest do
 
     # :dbg.stop_clear()
   end
+
+  test "xml data type should be returned as string", context do
+    drop_table("dbo.xml_data")
+    xml_value = "<element1>Element With Text</element1>"
+    :ok =
+      query(
+        """
+        CREATE TABLE dbo.xml_data (
+          val xml not null
+        )
+        """,
+        []
+      )
+    :ok = query("insert into dbo.xml_data values (N'#{xml_value}')", [])
+    assert [[xml_value]] == query("select val from dbo.xml_data", [])
+  end
 end

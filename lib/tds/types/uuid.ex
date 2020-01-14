@@ -27,12 +27,12 @@ defmodule Tds.Types.UUID do
     casted -> {:ok, casted}
   end
 
-  def cast(<< _::128 >> = binary), do: encode(binary)
+  def cast(<<bin::binary-size(16)>>), do: encode(bin)
 
   def cast(_), do: :error
 
   @doc """
-  Same as `cast/1` but raises `ArgumentError` on invalid arguments.
+  Same as `cast/1` but raises `Ecto.CastError` on invalid arguments.
   """
   def cast!(value) do
     case cast(value) do
