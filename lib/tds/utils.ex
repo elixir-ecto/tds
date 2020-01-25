@@ -43,7 +43,7 @@ defmodule Tds.Utils do
   #   |> to_string()
   # end
 
-  
+
   def to_little_ucs2(str) when is_list(str) do
     str
     |> IO.iodata_to_binary()
@@ -70,9 +70,6 @@ defmodule Tds.Utils do
     {:error, error}
   end
 
-  if Kernel.function_exported?(Decimal, :from_float, 1) do
-    def to_decimal(float), do: Decimal.from_float(float)
-  else
-    def to_decimal(float), do: Decimal.new(float)
-  end
+
+  def to_decimal(float), do: Decimal.from_float(float)
 end
