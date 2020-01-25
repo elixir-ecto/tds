@@ -722,8 +722,8 @@ defmodule Tds.Types do
     |> Decimal.set_context()
 
     case sign do
-      0 -> Decimal.new(-1, value, scale * -1)
-      _ -> Decimal.new(1, value, scale * -1)
+      0 -> Decimal.new(-1, value, -scale)
+      _ -> Decimal.new(1, value, -scale)
     end
   end
 
@@ -1776,12 +1776,17 @@ defmodule Tds.Types do
     {decode_date(date), decode_time(scale, time)}
   end
 
-  def encode_datetime2(nil), do: nil
+  def encode_datetime2(value, scale \\ @max_time_scale)
+  def encode_datetime2(nil, _), do: nil
 
-  def encode_datetime2({date, time}, scale \\ @max_time_scale) do
+  def encode_datetime2({date, time}, scale) do
     time = encode_time(time, scale)
     date = encode_date(date)
     time <> date
+  end
+
+  def encode_datetime2(value, scale) do
+    raise ArgumentError, "value #{inspect value} with scale #{inspect scale} is not supported DateTime2 value"
   end
 
   # DateTimeOffset

@@ -176,8 +176,8 @@ defmodule Tds.Protocol do
 
   @impl DBConnection
   @spec handle_execute(Tds.Query.t(), DBConnection.params(), Keyword.t(), t) ::
-    {:ok, Tds.Query.t(), Tds.Result.t(), new_state :: t}
-    | {:error | :disconnect, Exception.t(), new_state :: t}
+          {:ok, Tds.Query.t(), Tds.Result.t(), new_state :: t}
+          | {:error | :disconnect, Exception.t(), new_state :: t}
   def handle_execute(
         %Query{handle: handle, statement: statement} = query,
         params,
@@ -185,10 +185,11 @@ defmodule Tds.Protocol do
         %{sock: _sock} = s
       ) do
     params = opts[:parameters] || params
+
     if params != [] do
       send_param_query(query, params, s)
     else
-      send_query(query.statement, s)
+      send_query(statement, s)
     end
   rescue
     exception ->
@@ -200,7 +201,7 @@ defmodule Tds.Protocol do
     other ->
       other
   after
-    unless is_nil(query.handle) do
+    unless is_nil(handle) do
       handle_close(query, opts, %{s | state: :executing})
     end
   end
@@ -231,9 +232,9 @@ defmodule Tds.Protocol do
   end
 
   @impl DBConnection
-  @spec handle_close(Query.t(), Keyword.t(), t) ::
-          {:ok, Tds.Result.t(), new_state :: t}
-          | {:error | :disconnect, Exception.t(), new_state :: t}
+  @spec handle_close(Tds.Query.t(), Keyword.t(), t()) ::
+          {:ok, Tds.Result.t(), new_state :: t()}
+          | {:error | :disconnect, Exception.t(), new_state :: t()}
   def handle_close(query, opts, s) do
     params = opts[:parameters]
     send_close(query, params, s)
@@ -243,7 +244,7 @@ defmodule Tds.Protocol do
   @spec handle_begin(Keyword.t(), t) ::
           {:ok, Tds.Result.t(), new_state :: t}
           | {DBConnection.status(), new_state :: t}
-          | {:error | :disconnect, Exception.t(), new_state :: t}
+          | {:disconnect, Exception.t(), new_state :: t}
   def handle_begin(opts, %{env: env, transaction: tran} = s) do
     case Keyword.get(opts, :mode, :transaction) do
       :transaction when tran == nil ->
@@ -481,12 +482,12 @@ defmodule Tds.Protocol do
 
   def handle_info(msg, s) do
     Logger.error(fn ->
-	"Unhandled message! \n\n" <>
-         "  Tds.Protocol.hand_info/2 \n\n" <>
-	 "    Arg #1 \n" <>
-         inspect(msg) <>
-         "    Arg #2 \n" <>
-         inspect(s)
+      "Unhandled message! \n\n" <>
+        "  Tds.Protocol.hand_info/2 \n\n" <>
+        "    Arg #1 \n" <>
+        inspect(msg) <>
+        "    Arg #2 \n" <>
+        inspect(s)
     end)
 
     {:ok, s}

@@ -91,7 +91,6 @@ defmodule Tds.Messages do
   end
 
   def parse(:prepare, packet_data, s) do
-    # IO.inspect(decode_tokens(packet_data), label: "PREPARE TOKENS" )
     packet_data
     |> decode_tokens()
     |> Enum.reduce({msg_prepared(), s}, fn
@@ -117,8 +116,6 @@ defmodule Tds.Messages do
   end
 
   def parse(:transaction_manager, packet_data, s) do
-    # IO.inspect(packet_data, base: :hex, label: "TRANSACTION MANAGER")
-    # IO.inspect(decode_tokens(packet_data), label: "TRANSACTION MANAGER")
     packet_data
     |> decode_tokens()
     |> Enum.reduce({msg_trans(), s}, fn
@@ -140,8 +137,6 @@ defmodule Tds.Messages do
   end
 
   def parse(:executing, packet_data, s) do
-    # IO.inspect(packet_data, base: :hex, label: "EXECUTING")
-    # IO.inspect(decode_tokens(packet_data), label: "EXECUTING" )
     packet_data
     |> decode_tokens()
     |> Enum.reduce({msg_result(set: [], params: [], status: 0), nil, s}, fn
@@ -201,7 +196,6 @@ defmodule Tds.Messages do
   end
 
   defp on_envchange(envchnage, %{env: env} = s) do
-    # IO.inspect(envchnage)
     case envchnage do
       {:packetsize, new_value, _} ->
         %{s | env: Map.put(env, :packetsize, new_value)}

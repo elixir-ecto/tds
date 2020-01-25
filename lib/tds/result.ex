@@ -17,5 +17,5 @@ defmodule Tds.Result do
           num_rows: integer
         }
 
-  defstruct columns: nil, rows: [], num_rows: 0
+  defstruct columns: nil, rows: nil, num_rows: 0
 end
