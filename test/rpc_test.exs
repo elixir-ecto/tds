@@ -9,6 +9,7 @@ defmodule RPCTest do
 
   setup do
     opts = Application.fetch_env!(:tds, :opts)
+
     # |> Keyword.put(:after_connect, {Tds, :query!, ["SET TRANSACTION ISOLATION LEVEL READ UNCOMMITTED", []]})
     {:ok, pid} = Tds.start_link(opts)
 
@@ -37,28 +38,40 @@ defmodule RPCTest do
 
       Enum.each(nums, fn num ->
         assert [[num]] ==
-                 query("SELECT cast(@n1 as bigint)", [%Parameter{name: "@n1", value: num, type: :integer}])
+                 query("SELECT cast(@n1 as bigint)", [
+                   %Parameter{name: "@n1", value: num, type: :integer}
+                 ])
       end)
 
-      query("""
-      IF OBJECT_ID('int_test') IS NOT NULL DROP TABLE int_test;
-      CREATE TABLE int_test (
-        val bigint
+      query(
+        """
+        IF OBJECT_ID('int_test') IS NOT NULL DROP TABLE int_test;
+        CREATE TABLE int_test (
+          val bigint
+        )
+        """,
+        []
       )
-      """, [])
-      Enum.each(nums, fn (num) -> query("insert into int_test values (@n1)", [%Parameter{name: "@n1", value: num}]) end)
-      
-      result = Enum.map(nums, fn (num) -> [num] end)
+
+      Enum.each(nums, fn num ->
+        query("insert into int_test values (@n1)", [
+          %Parameter{name: "@n1", value: num}
+        ])
+      end)
+
+      result = Enum.map(nums, fn num -> [num] end)
       assert result == query("SELECT val FROM int_test ORDER BY val asc", [])
       query("IF OBJECT_ID('int_test') IS NOT NULL DROP TABLE int_test;", [])
     end
 
-    test "should raise ArgumentError if erlang integer value is not in range -9,223,372,036,854,775,807..9,223,372,036,854,775,807", _context do
+    test "should raise ArgumentError if erlang integer value is not in range -9,223,372,036,854,775,807..9,223,372,036,854,775,807",
+         _context do
       nums = [
         -11_111_111_111_111_111_111_111_111_111_111_111_111,
         11_111_111_111_111_111_111_111_111_111_111_111_111
       ]
-      Enum.each(nums, fn (num) ->
+
+      Enum.each(nums, fn num ->
         assert_raise(ArgumentError, fn ->
           Tds.Types.encode_data("@1", num, :integer)
         end)
@@ -86,6 +99,15 @@ defmodule RPCTest do
                    %Parameter{name: "@n1", value: Decimal.new("#{num}")}
                  ])
       end)
+
+      assert [[Decimal.new("1.0")]] ==
+               query("SELECT @1", [
+                 %Parameter{name: "@1", value: Decimal.new("1.0")}
+               ])
+      assert [[Decimal.new("1")]] ==
+               query("SELECT @1", [
+                 %Parameter{name: "@1", value: Decimal.new("1")}
+               ])
     end
 
     test "with varchar string", context do
@@ -292,11 +314,12 @@ defmodule RPCTest do
 
   test "read large table", context do
     pid = context[:pid]
-    
-    {:ok, res} = Tds.query(pid, "SELECT @1 as c1, @2 as c2", [
-      %Tds.Parameter{name: "@1", value: "some string"},
-      %Tds.Parameter{name: "@2", value: "some string", type: :binary}
-    ])
+
+    {:ok, res} =
+      Tds.query(pid, "SELECT @1 as c1, @2 as c2", [
+        %Tds.Parameter{name: "@1", value: "some string"},
+        %Tds.Parameter{name: "@2", value: "some string", type: :binary}
+      ])
 
     assert res.num_rows > 0
   end
