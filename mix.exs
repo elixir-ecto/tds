@@ -2,7 +2,7 @@ defmodule Tds.Mixfile do
   @moduledoc false
   use Mix.Project
 
-  @version "2.0.1-rc1"
+  @version "2.0.1-rc2"
   def project do
     [
       app: :tds,
@@ -38,7 +38,7 @@ defmodule Tds.Mixfile do
 
   def application do
     [
-      applications: [:logger, :db_connection, :decimal],
+      extra_applications: [:logger, :db_connection, :decimal],
       env: [
         json_library: Jason
       ]
