@@ -82,7 +82,11 @@ defmodule QueryTest do
              query("select CAST(10000000000000 AS bigint)", [])
 
     assert [["string"]] = query("SELECT 'string'", [])
+
+    Application.put_env(:tds, :text_encoder, Tds.Encoding)
     assert [["ẽstring"]] = query("SELECT N'ẽstring'", [])
+    Application.delete_env(:tds, :text_encoder)
+
     assert [[true, false]] = query("SELECT CAST(1 AS BIT), CAST(0 AS BIT)", [])
     uuid = Tds.Types.UUID.bingenerate()
     {:ok, uuid_string} = Tds.Types.UUID.load(uuid)

@@ -7,7 +7,7 @@
 MSSQL / TDS Database driver for Elixir.
 
 ### NOTE: 
-Since TDS version 2.0, `tds_ecto` package is deprecated, this version supports `ecto_sql` since version 3.1.0. 
+Since TDS version 2.0, `tds_ecto` package is deprecated, this version supports `ecto_sql` since version 3.3.4. 
 
 Please check out the issues for a more complete overview. This branch should not be considered stable or ready for production yet.
 
@@ -15,20 +15,32 @@ For stable versions always use [hex.pm](https://hex.pm/packages/tds) as source f
 
 ## Usage
 
-As of TDS version `>= 1.2`, it requires `rust` to be installed for nif required to 
-properly encode/decode `char`, `text` and `varchars`. In previous versions only 
-SQL_Latin1_General was suported. Please follow instructions at [rust website](https://www.rust-lang.org/tools/install)
-
-
-Add Tds as a dependency in your `mix.exs` file.
+Add `:tds` as a dependency in your `mix.exs` file.
 
 ```elixir
 def deps do
-  [{:tds, "~> 2.0"} ]
+  [{:tds, "~> 2.0"}]
 end
 ```
 
-When you are done, run `mix deps.get` in your shell to fetch and compile Tds. Start an interactive Elixir shell with `iex -S mix`.
+As of TDS version `>= 1.2`, tds can support windows codepages other than `windows-1252` (latin1). 
+If you need such support you will need to include additional dependency `{:tds_encoding, "~> 1.0"}` 
+and configure `:tds` app to use `Tds.Encoding` module like this:
+
+
+```elixr
+import Mix.Config
+
+config :tds, :text_encoder, Tds.Encoding
+```
+
+Note that `:tds_encoding` requires Rust compiler installed in order to compile nif. 
+In previous versions only SQL_Latin1_General was suported (codepage `windows-1252`). 
+Please follow instructions at [rust website](https://www.rust-lang.org/tools/install) 
+to install rust.
+
+When you are done, run `mix deps.get` in your shell to fetch and compile Tds. 
+Start an interactive Elixir shell with `iex -S mix`.
 
 ```iex
 iex> {:ok, pid} = Tds.start_link([hostname: "localhost", username: "test_user", password: "test_password", database: "test_db", port: 4000])
@@ -68,7 +80,7 @@ There is additional parameter that can be used in configuration and
 can improve query execution in SQL Server. If you find out that 
 your queries suffer from "density estimation" as described [here](https://www.brentozar.com/archive/2018/03/sp_prepare-isnt-good-sp_executesql-performance/)
 
-you can try switching  how tds executes queries as below:
+you can try switching how tds executes queries as below:
 
 ```elixr
 import Mix.Config
@@ -81,7 +93,9 @@ config :your_app, tds_conn,
   port: 1433,
   execution_mode: :executesql
 ```
-This will skip calling `sp_prepare` and query will be executed using `sp_executesql` instead. Please note that only one execution mode can be set at a time, and SQL Server will probably use single execution plan (since it is NOT estimated by checking data density!).
+This will skip calling `sp_prepare` and query will be executed using `sp_executesql` instead. 
+Please note that only one execution mode can be set at a time, and SQL Server will probably 
+use single execution plan (since it is NOT estimated by checking data density!).
 
 ## Connecting to SQL Server Instances
 
@@ -98,7 +112,9 @@ Since v1.0.16, additional connection parameters are:
   - `:set_allow_snapshot_isolation` - atom, one of `:on | :off`
   - `:set_read_committed_snapshot` - atom, one of `:on | :off`
 
-Set this option to enable snapshot isolation on the database level. Requires connecting with a user with appropriate rights. More info [here](https://docs.microsoft.com/en-us/dotnet/framework/data/adonet/sql/snapshot-isolation-in-sql-server).
+Set this option to enable snapshot isolation on the database level. 
+Requires connecting with a user with appropriate rights. 
+More info [here](https://docs.microsoft.com/en-us/dotnet/framework/data/adonet/sql/snapshot-isolation-in-sql-server).
 
 ## Data representation
 
@@ -145,15 +161,17 @@ You can test the library with `mix test`. Use `mix credo` for linting and
 `mix dialyzer` for static code analysis. Dialyzer will take a while when you
 use it for the first time.
 
-### SQL Server Setup
+### Development SQL Server Setup
 
-The tests require an SQL Server database to be available on localhost.
+The tests require an SQL Server database to be available on localhost. 
+If you are not using Windows OS you can start sql server instance using Docker.
+Official SQL Server Docker image can be found [here](https://hub.docker.com/r/microsoft/mssql-server-linux).
 
-If you have Docker installed, you can use the official [SQL Server Docker image](https://hub.docker.com/r/microsoft/mssql-server-linux).
-To start the container, run:
+If you do not have specific requirements on how you would like to start sql server 
+in docker, you can use script for this repo.
 
 ```bash
-./docker-mssql.sh
+$ ./docker-mssql.sh
 ```
 
 If you prefer to install SQL Server directly on your computer, you can find

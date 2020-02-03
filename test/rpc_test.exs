@@ -2,7 +2,7 @@ defmodule RPCTest do
   @moduledoc false
   import Tds.TestHelper
   require Logger
-  use ExUnit.Case
+  use ExUnit.Case, async: false
   alias Tds.Parameter
 
   @tag timeout: 50_000
@@ -128,6 +128,7 @@ defmodule RPCTest do
     end
 
     test "with nvarchar strings", context do
+      Application.put_env(:tds, :text_encoder, Tds.Encoding)
       strs = [
         "hello",
         "'",
@@ -147,6 +148,8 @@ defmodule RPCTest do
       # assert [{{{2014, 06, 20}, {10, 21, 42}}}] = query(
       # "SELECT @n1",
       # [%Parameter{name: "@n", value: {{2014, 06, 20}, {10, 21, 42}}])
+
+      Application.delete_env(:tds, :text_encoder)
     end
   end
 

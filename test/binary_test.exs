@@ -1,7 +1,7 @@
 defmodule BinaryTest do
   import Tds.TestHelper
   require Logger
-  use ExUnit.Case, async: true
+  use ExUnit.Case, async: false
   alias Tds.Parameter
 
   @pangrams [
@@ -227,6 +227,7 @@ defmodule BinaryTest do
   end
 
   test "strings as nvarchar", context do
+    Application.put_env(:tds, :text_encoder, Tds.Encoding)
     query("DROP TABLE pangrams", [])
 
     query(
@@ -252,6 +253,7 @@ defmodule BinaryTest do
     end)
 
     assert @pangrams == query("select [lang], [pangram] from pangrams", [])
+    Application.delete_env(:tds, :text_encoder)
   end
 
 

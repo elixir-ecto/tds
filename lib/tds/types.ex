@@ -728,7 +728,7 @@ defmodule Tds.Types do
   end
 
   def decode_char(data_info, <<data::binary>>) do
-    Tds.Encoding.decode(data, data_info.collation.codepage)
+    Tds.Utils.decode_chars(data, data_info.collation.codepage)
   end
 
   def decode_nchar(_data_info, <<data::binary>>) do
