@@ -2,10 +2,11 @@ defmodule Tds.Mixfile do
   @moduledoc false
   use Mix.Project
 
+  @version "2.0.1-rc1"
   def project do
     [
       app: :tds,
-      version: "2.0.1-rc1",
+      version: @version,
       elixir: "~> 1.0",
       deps: deps(),
       test_coverage: [tool: ExCoveralls],
@@ -28,7 +29,9 @@ defmodule Tds.Mixfile do
       source_url: "https://github.com/livehelpnow/tds",
       docs: [
         main: "readme",
-        extras: ["README.md"]
+        extras: ["README.md", "CHANGELOG.md"],
+        source_ref: "v#{@version}",
+        source_url: "https://github.com/livehelpnow/tds"
       ]
     ]
   end

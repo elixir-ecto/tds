@@ -1,15 +1,11 @@
-# v2.1.0
-
+# v2.0.1-rc1
 ### Breaking changes
 In order to improve compatibility with `ecto_sql`, following breaking changes are introduced in this release:
-
-* Sql data types `Time`, `Date`, `SmallDateTime`, `DateTime` and `DateTime2` are encoded from and decoded to
-elixir types `Time`, `Date`, `NavieDateTime`. It is still possible to use erlang datetime tuple as query parameter, 
-but any query output will be decoded always into one of above types.
-* Sql data type `DateTimeOffset` is decoded to `DateTime`
 * Since `tds_ecto` package is deprecated and adapter is moving to `ecto_sql`, use `Tds.Types.UUID` for 
 column types `binary_id` (`uuid`). 
 * For same reason as above `Tds.VarChar` is now `Tds.Types.VarChar`
+* If you are using collation other than Latin1 please add dependency to `:tds_encoding` package and followin instructions
+in readme on how to configure tds to use this encoder.
 
 # v1.2.0
 ### Improvements
