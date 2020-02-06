@@ -110,7 +110,7 @@ defmodule Tds.Protocol.Header do
       @messages,
       type,
       0,
-      {:error, "[Protocol Error]: Message type `#{type}` is unknown type."}
+      {:error, Tds.Error.exception("TDS received unknown message type `#{type}`")}
     )
   end
 

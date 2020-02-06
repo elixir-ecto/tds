@@ -97,7 +97,7 @@ defmodule Tds.Protocol do
   end
 
   @impl DBConnection
-  @spec disconnect(err :: Exception.t(), state :: Protocol.t()) :: :ok
+  @spec disconnect(err :: Exception.t() | String.t(), state :: Protocol.t()) :: :ok
   def disconnect(_err, %{sock: {mod, sock}} = s) do
     # If socket is active we flush any socket messages so the next
     # socket does not get the messages.
@@ -232,7 +232,7 @@ defmodule Tds.Protocol do
   end
 
   @impl DBConnection
-  @spec handle_close(Tds.Query.t(), Keyword.t(), t()) ::
+  @spec handle_close(Tds.Query.t(), nil | keyword | map, t()) ::
           {:ok, Tds.Result.t(), new_state :: t()}
           | {:error | :disconnect, Exception.t(), new_state :: t()}
   def handle_close(query, opts, s) do
@@ -265,7 +265,7 @@ defmodule Tds.Protocol do
   @spec handle_commit(Keyword.t(), t) ::
           {:ok, Tds.Result.t(), new_state :: t}
           | {DBConnection.status(), new_state :: t}
-          | {:error | :disconnect, Exception.t(), new_state :: t}
+          | {:disconnect, Exception.t(), new_state :: t}
   def handle_commit(opts, %{transaction: transaction, env: env} = s) do
     case Keyword.get(opts, :mode, :transaction) do
       :transaction when transaction == :started ->
@@ -283,7 +283,7 @@ defmodule Tds.Protocol do
   @spec handle_rollback(Keyword.t(), t) ::
           {:ok, Tds.Result.t(), new_state :: t}
           | {:idle, new_state :: t}
-          | {:error | :disconnect, Exception.t(), new_state :: t}
+          | {:disconnect, Exception.t(), new_state :: t}
   def handle_rollback(opts, %{env: env, transaction: transaction} = s) do
     case Keyword.get(opts, :mode, :transaction) do
       :transaction when transaction in [:started, :failed] ->
@@ -606,8 +606,11 @@ defmodule Tds.Protocol do
       {:ok, %{result: result} = s} ->
         {:ok, result, s}
 
-      err ->
-        err
+      {:error, err} ->
+        {:disconnect, err, s}
+
+      {:error, err, s} ->
+        {:disconnect, err, s}
     end
   end
 

@@ -4,8 +4,6 @@ defmodule Tds.Types do
   use Bitwise
 
   alias Tds.Parameter
-  alias Tds.DateTime
-  alias Tds.DateTime2
 
   @year_1900_days :calendar.date_to_gregorian_days({1900, 1, 1})
   # @days_in_month 30
@@ -299,6 +297,7 @@ defmodule Tds.Types do
       ] ->
         <<length::little-unsigned-8, collation::binary-5, rest::binary>> = tail
         {:ok, collation} = decode_collation(collation)
+
         type_info =
           def_type_info
           |> Map.put(:length, length)
@@ -340,6 +339,7 @@ defmodule Tds.Types do
             if(length == 0xFFFF, do: :plp, else: :shortlen)
           )
           |> Map.put(:length, length)
+
         {type_info, rest}
 
       data_type_code in [
@@ -366,7 +366,9 @@ defmodule Tds.Types do
           numparts::signed-8,
           rest::binary
         >> = tail
+
         {:ok, collation} = decode_collation(collation)
+
         type_info =
           def_type_info
           |> Map.put(:collation, collation)
@@ -377,9 +379,13 @@ defmodule Tds.Types do
           Enum.reduce(
             1..numparts,
             rest,
-            fn _, <<tsize::little-unsigned-16, _table_name::binary-size(tsize)-unit(16), next_rest::binary>> ->
+            fn _,
+               <<tsize::little-unsigned-16,
+                 _table_name::binary-size(tsize)-unit(16),
+                 next_rest::binary>> ->
               next_rest
-            end)
+            end
+          )
 
         {type_info, rest}
 
@@ -389,11 +395,11 @@ defmodule Tds.Types do
 
         rest =
           Enum.reduce(1..numparts, rest, fn _,
-                                              <<
-                                                size::unsigned-16,
-                                                _str::size(size)-unit(16),
-                                                next_rest::binary
-                                              >> ->
+                                            <<
+                                              size::unsigned-16,
+                                              _str::size(size)-unit(16),
+                                              next_rest::binary
+                                            >> ->
             next_rest
           end)
 
@@ -812,11 +818,13 @@ defmodule Tds.Types do
     encode_data_type(%{param | type: :decimal})
   end
 
-  def encode_data_type(%Parameter{value: %DateTime{}} = param) do
+  def encode_data_type(%Parameter{value: %{__struct__: type}} = param)
+  when type in [Tds.DateTime, Elixir.DateTime] do
     encode_data_type(%{param | type: :datetime})
   end
 
-  def encode_data_type(%Parameter{value: %DateTime2{}} = param) do
+  def encode_data_type(%Parameter{value: %{__struct__: type}} = param)
+  when type in [Tds.DateTime2, Elixir.DateTime2, Elixir.NaiveDateTime] do
     encode_data_type(%{param | type: :datetime2})
   end
 
@@ -1175,7 +1183,8 @@ defmodule Tds.Types do
   end
 
   # DateTime
-  def encode_param_descriptor(%Parameter{value: %Tds.DateTime{}} = param) do
+  def encode_param_descriptor(%Parameter{value: %{__struct__: type}} = param)
+  when type in [Tds.DateTime, Elixir.DateTime] do
     param = %{param | type: :datetime}
     encode_param_descriptor(param)
   end
@@ -1190,7 +1199,8 @@ defmodule Tds.Types do
   end
 
   # DateTime2
-  def encode_param_descriptor(%Parameter{value: %Tds.DateTime2{}} = param) do
+  def encode_param_descriptor(%Parameter{value: %{__struct__: type}} = param)
+  when type in [Tds.DateTime2, Elixir.DateTime2, Elixir.NaiveDateTime] do
     param = %{param | type: :datetime2}
     encode_param_descriptor(param)
   end
@@ -1268,7 +1278,7 @@ defmodule Tds.Types do
       when is_float(value) do
     param =
       param
-      |> Map.put(:value, Decimal.new(value))
+      |> Map.put(:value, Decimal.from_float(value))
 
     encode_decimal_descriptor(param)
   end
@@ -1678,6 +1688,15 @@ defmodule Tds.Types do
 
   def encode_datetime(nil), do: nil
 
+  def encode_datetime(%Elixir.DateTime{} = dt),
+    do: encode_datetime(Elixir.DateTime.to_naive(dt))
+
+  def encode_datetime(%NaiveDateTime{} = dt) do
+    {date, {h, m, s}} = NaiveDateTime.to_erl(dt)
+    {msec, _} = dt.microsecond
+    encode_datetime({date, {h, m, s, msec}})
+  end
+
   def encode_datetime({date, {h, m, s}}),
     do: encode_datetime({date, {h, m, s, 0}})
 
@@ -1787,8 +1806,16 @@ defmodule Tds.Types do
     time <> date
   end
 
+  def encode_datetime2(%{__struct__: type} = value, scale)
+      when type in [Elixir.DateTime, Elixir.DateTime2, Elixir.NaiveDateTime] do
+    {date, {h, m, s}} = NaiveDateTime.to_erl(value)
+    {ms, _scale} = value.microsecond
+    encode_datetime2({date, {h, m, s, ms}}, scale)
+  end
+
   def encode_datetime2(value, scale) do
-    raise ArgumentError, "value #{inspect value} with scale #{inspect scale} is not supported DateTime2 value"
+    raise ArgumentError,
+          "value #{inspect(value)} with scale #{inspect(scale)} is not supported DateTime2 value"
   end
 
   # DateTimeOffset

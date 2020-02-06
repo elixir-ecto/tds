@@ -24,7 +24,8 @@ defmodule Tds do
 
     case DBConnection.prepare_execute(pid, query, params, opts) do
       {:ok, _query, result} -> result
-      {:error, err} -> raise err.mssql.msg_text
+      {:error, %{mssql: %{msg_text: msg}}} -> raise Tds.Error, msg
+      {:error, err} -> raise err
     end
   end
 
@@ -42,7 +43,8 @@ defmodule Tds do
 
     case DBConnection.prepare(pid, query, opts) do
       {:ok, query} -> query
-      {:error, err} -> raise err.mssql.msg_text
+      {:error, %{mssql: %{msg_text: msg}}} -> raise Tds.Error, msg
+      {:error, err} -> raise err
     end
   end
 
@@ -56,7 +58,8 @@ defmodule Tds do
   def execute!(pid, query, params, opts \\ []) do
     case DBConnection.execute(pid, query, params, opts) do
       {:ok, _q, result} -> result
-      {:error, err} -> err.mssql.msg_text
+      {:error, %{mssql: %{msg_text: msg}}} -> raise Tds.Error, msg
+      {:error, err} -> raise err
     end
   end
 
@@ -70,7 +73,8 @@ defmodule Tds do
   def close!(pid, query, opts \\ []) do
     case DBConnection.close(pid, query, opts) do
       {:ok, result} -> result
-      {:error, err} -> err.mssql.msg_text
+      {:error, %{mssql: %{msg_text: msg}}} -> raise Tds.Error, msg
+      {:error, err} -> raise err
     end
   end
 

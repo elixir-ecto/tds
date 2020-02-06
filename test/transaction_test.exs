@@ -96,7 +96,7 @@ defmodule Tds.TransactionTest do
 
                assert DBConnection.status(conn, opts) == :error
 
-               #  assert {:error, %Tds.Error{mssql: %{class: 16, number: 3971}}} =
+               # assert {:error, %Tds.Error{mssql: %{class: 16, number: 3971}}} =
                assert {:ok,
                        %Tds.Result{columns: [""], num_rows: 1, rows: ['*']}} =
                         Tds.query(conn, "SELECT 42", [], opts)
