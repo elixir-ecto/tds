@@ -1,4 +1,4 @@
-name: Elixir TDS
+name: Elixir TDS CI
 
 on: 
   push:
