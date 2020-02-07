@@ -187,10 +187,10 @@ defmodule BinaryTest do
     # query("DROP TABLE bin_test", [])
   end
 
-  test "Support large binary with length over 8000", _context do
+  test "Support large binary with length over 8000", context do
     value =
       "W"
-      |> String.repeat(9000)
+      |> String.duplicate(9000)
       |> :unicode.characters_to_binary(:utf8, {:utf16, :little})
 
     """

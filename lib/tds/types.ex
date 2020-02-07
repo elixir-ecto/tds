@@ -819,12 +819,12 @@ defmodule Tds.Types do
   end
 
   def encode_data_type(%Parameter{value: %{__struct__: type}} = param)
-  when type in [Tds.DateTime, Elixir.DateTime] do
+      when type in [Tds.DateTime, DateTime] do
     encode_data_type(%{param | type: :datetime})
   end
 
   def encode_data_type(%Parameter{value: %{__struct__: type}} = param)
-  when type in [Tds.DateTime2, Elixir.DateTime2, Elixir.NaiveDateTime] do
+      when type in [Tds.DateTime2, DateTime2, NaiveDateTime] do
     encode_data_type(%{param | type: :datetime2})
   end
 
@@ -1188,7 +1188,7 @@ defmodule Tds.Types do
 
   # DateTime
   def encode_param_descriptor(%Parameter{value: %{__struct__: type}} = param)
-  when type in [Tds.DateTime, Elixir.DateTime] do
+      when type in [Tds.DateTime, DateTime] do
     param = %{param | type: :datetime}
     encode_param_descriptor(param)
   end
@@ -1204,7 +1204,7 @@ defmodule Tds.Types do
 
   # DateTime2
   def encode_param_descriptor(%Parameter{value: %{__struct__: type}} = param)
-  when type in [Tds.DateTime2, Elixir.DateTime2, Elixir.NaiveDateTime] do
+      when type in [Tds.DateTime2, DateTime2, NaiveDateTime] do
     param = %{param | type: :datetime2}
     encode_param_descriptor(param)
   end
@@ -1280,11 +1280,12 @@ defmodule Tds.Types do
 
   def encode_decimal_descriptor(%Parameter{value: value} = param)
       when is_float(value) do
-    param =
-      param
-      |> Map.put(:value, Decimal.from_float(value))
+    encode_decimal_descriptor(%{param | value: Decimal.from_float(value)})
+  end
 
-    encode_decimal_descriptor(param)
+  def encode_decimal_descriptor(%Parameter{value: value} = param)
+      when is_binary(value) or is_integer(value) do
+    encode_decimal_descriptor(%{param | value: Decimal.new(value)})
   end
 
   def encode_decimal_descriptor(%Parameter{value: %Decimal{} = dec}) do
@@ -1329,29 +1330,7 @@ defmodule Tds.Types do
     |> encode_float_descriptor
   end
 
-  def encode_float_descriptor(%Parameter{value: %Decimal{} = _dec}) do
-    # to save precisoon as much as possible, below is commented out
-    # d_ctx = Decimal.get_context()
-    # d_ctx = %{d_ctx | precision: 38}
-    # Decimal.set_context(d_ctx)
-
-    # value_list =
-    #   dec
-    #   |> Decimal.abs()
-    #   |> Decimal.to_string(:normal)
-    #   |> String.split(".")
-
-    # precision =
-    #   case value_list do
-    #     [p, s] ->
-    #       String.length(p) + String.length(s)
-
-    #     [p] ->
-    #       String.length(p)
-    #   end
-
-    "float(53)"
-  end
+  def encode_float_descriptor(%Parameter{value: %Decimal{}}), do: "float(53)"
 
   @doc """
   Binary Type Parameter Descriptor
@@ -1697,8 +1676,8 @@ defmodule Tds.Types do
 
   def encode_datetime(nil), do: nil
 
-  def encode_datetime(%Elixir.DateTime{} = dt),
-    do: encode_datetime(Elixir.DateTime.to_naive(dt))
+  def encode_datetime(%DateTime{} = dt),
+    do: encode_datetime(DateTime.to_naive(dt))
 
   def encode_datetime(%NaiveDateTime{} = dt) do
     {date, {h, m, s}} = NaiveDateTime.to_erl(dt)
@@ -1761,6 +1740,11 @@ defmodule Tds.Types do
   # 5 bytes if 5 <= n < = 7.
   def encode_time(nil), do: nil
   def encode_time({h, m, s}), do: encode_time({h, m, s, 0})
+  def encode_time(%Time{}=t) do
+    {h, m, s} = Time.to_erl(t)
+    {ms, _scale} = t.microsecond
+    encode_time({h, m, s, ms})
+  end
   def encode_time(time), do: encode_time(time, @max_time_scale)
   def encode_time({h, m, s}, scale), do: encode_time({h, m, s, 0}, scale)
 
@@ -1816,7 +1800,7 @@ defmodule Tds.Types do
   end
 
   def encode_datetime2(%{__struct__: type} = value, scale)
-      when type in [Elixir.DateTime, Elixir.DateTime2, Elixir.NaiveDateTime] do
+      when type in [DateTime, DateTime2, NaiveDateTime] do
     {date, {h, m, s}} = NaiveDateTime.to_erl(value)
     {ms, _scale} = value.microsecond
     encode_datetime2({date, {h, m, s, ms}}, scale)
