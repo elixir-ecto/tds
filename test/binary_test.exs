@@ -187,6 +187,24 @@ defmodule BinaryTest do
     # query("DROP TABLE bin_test", [])
   end
 
+  test "Support large binary with length over 8000", _context do
+    value =
+      "W"
+      |> String.repeat(9000)
+      |> :unicode.characters_to_binary(:utf8, {:utf16, :little})
+
+    """
+    DROP TABLE bin_test
+    CREATE TABLE bin_test (varbinary varbinary(max) NULL)
+    INSERT INTO bin_test (varbinary) VALUES (@1)
+    """
+    |> query([
+      %Parameter{name: "@1", value: value, type: :binary}
+    ])
+
+    assert [[^value]] = query("SELECT TOP(1) * FROM bin_test", [])
+  end
+
   test "Binary NULL Types", context do
     query("DROP TABLE bin_test", [])
 

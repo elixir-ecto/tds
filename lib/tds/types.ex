@@ -863,16 +863,20 @@ defmodule Tds.Types do
   end
 
   def encode_binary_type(%Parameter{value: value}) do
-    length =
-      if value == nil do
-        <<0xFF, 0xFF>>
-      else
-        <<byte_size(value)::little-unsigned-16>>
-      end
-
+    length = length_for_binary(value)
     type = @tds_data_type_bigvarbinary
     data = <<type>> <> length
     {type, data, []}
+  end
+
+  defp length_for_binary(nil), do: <<0xFF, 0xFF>>
+
+  defp length_for_binary(value) do
+    case byte_size(value) do
+      # varbinary(max)
+      value_size when value_size > 8000 -> <<0xFF, 0xFF>>
+      value_size -> <<value_size::little-unsigned-16>>
+    end
   end
 
   def encode_bit_type(%Parameter{}) do
@@ -1378,8 +1382,13 @@ defmodule Tds.Types do
   def encode_data(@tds_data_type_bigvarbinary, nil, _),
     do: <<@tds_plp_null::little-unsigned-64>>
 
-  def encode_data(@tds_data_type_bigvarbinary, value, _),
-    do: <<byte_size(value)::little-unsigned-16>> <> value
+  def encode_data(@tds_data_type_bigvarbinary, value, _) do
+    case byte_size(value) do
+      # varbinary(max) gets encoded in chunks
+      value_size when value_size > 8000 -> encode_plp(value)
+      value_size -> <<value_size::little-unsigned-16>> <> value
+    end
+  end
 
   @doc """
   Data Encoding String Types
