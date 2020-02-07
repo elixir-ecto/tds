@@ -1,7 +1,7 @@
 # Tds - MSSQL Driver for Elixir
 
 [![Hex.pm](https://img.shields.io/hexpm/v/tds.svg)](https://hex.pm/packages/tds) 
-[![Coverage Status](https://coveralls.io/repos/github/livehelpnow/tds/badge.svg?branch=support-1.1)](https://coveralls.io/github/livehelpnow/tds?branch=support-1.1)
+[![Coverage Status](https://coveralls.io/repos/github/livehelpnow/tds/badge.svg?branch=support-1.1)](https://coveralls.io/github/livehelpnow/tds?branch=master)
 ![Build Status](https://github.com/livehelpnow/tds/workflows/Elixir%20CI/badge.svg)
 
 MSSQL / TDS Database driver for Elixir.
