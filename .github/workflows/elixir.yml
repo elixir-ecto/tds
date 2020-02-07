@@ -19,10 +19,14 @@ jobs:
     strategy:
       matrix:
         mssql_version: ["2017-latest", "2019-latest"]
+        otp: [21.3.8.10, 22.1.7]
+        elixir: [1.8.2, 1.9.4]
 
 
     env:
       ACCEPT_EULA: Y
+      MIX_ENV: test
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
     steps:
       - name: Install MsSql Client Tools
@@ -33,11 +37,12 @@ jobs:
       - name: Setup elixir
         uses: actions/setup-elixir@v1
         with:
-          elixir-version: 1.9.4 # Define the elixir version [required]
-          otp-version: 21.3 # Define the OTP version [required]
+          otp-version: ${{matrix.otp}}
+          elixir-version: ${{matrix.elixir}}
       - name: Install Dependencies
         run: mix deps.get
       - name: Run Tests
         run: |
           export PATH="/opt/mssql-tools/bin:$PATH"
           mix test
+      - run: mix coveralls.github
