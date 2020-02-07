@@ -27,13 +27,12 @@ jobs:
     steps:
       - name: Install MsSql Client Tools
         run: |
-          apt-get update
-          apt-get install -y curl wget ca-certificates gnupg 
-          curl https://packages.microsoft.com/keys/microsoft.asc | apt-key add -
-          curl https://packages.microsoft.com/config/ubuntu/16.04/prod.list | tee /etc/apt/sources.list.d/msprod.list
-          apt-get update
-          apt-get install -y mssql-tools unixodbc-dev
-          export PATH="/opt/mssql-tools/bin:$PATH"
+          sudo apt-get update
+          sudo apt-get install -y curl wget ca-certificates gnupg 
+          sudo curl https://packages.microsoft.com/keys/microsoft.asc | apt-key add -
+          sudo curl https://packages.microsoft.com/config/ubuntu/16.04/prod.list | tee /etc/apt/sources.list.d/msprod.list
+          sudo apt-get update
+          sudo apt-get install -y mssql-tools unixodbc-dev
       - uses: actions/checkout@v2
       - name: Setup elixir
         uses: actions/setup-elixir@v1
@@ -43,4 +42,6 @@ jobs:
       - name: Install Dependencies
         run: mix deps.get
       - name: Run Tests
-        run: mix test
+        run: |
+          export PATH="/opt/mssql-tools/bin:$PATH"
+          mix test
