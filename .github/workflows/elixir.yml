@@ -28,10 +28,6 @@ jobs:
       - name: Install MsSql Client Tools
         run: |
           sudo apt-get update
-          sudo apt-get install -y curl wget ca-certificates gnupg 
-          sudo curl https://packages.microsoft.com/keys/microsoft.asc | apt-key add -
-          sudo curl https://packages.microsoft.com/config/ubuntu/16.04/prod.list | tee /etc/apt/sources.list.d/msprod.list
-          sudo apt-get update
           sudo apt-get install -y mssql-tools unixodbc-dev
       - uses: actions/checkout@v2
       - name: Setup elixir
