@@ -76,7 +76,8 @@ defmodule Tds.Messages do
         {msg, s}
 
       {:error, error}, {msg_error(), _s} = msg_s ->
-        Tds.Error.message(%Tds.Error{mssql: error})
+        %Tds.Error{mssql: error}
+        |> Tds.Error.message()
         |> Logger.error()
 
         msg_s
@@ -98,8 +99,10 @@ defmodule Tds.Messages do
         {msg, on_envchange(env, s)}
 
       {:error, error}, {msg_error(), _s} = msg_s ->
-        Tds.Error.message(%Tds.Error{mssql: error})
-        |> Logger.error()
+        Logger.debug(fn ->
+          %Tds.Error{mssql: error}
+          |> Tds.Error.message()
+        end)
 
         msg_s
 
@@ -123,7 +126,8 @@ defmodule Tds.Messages do
         {msg, on_envchange(env, s)}
 
       {:error, error}, {msg_error(), _s} = msg_s ->
-        Tds.Error.message(%Tds.Error{mssql: error})
+        %Tds.Error{mssql: error}
+        |> Tds.Error.message()
         |> Logger.error()
 
         msg_s
