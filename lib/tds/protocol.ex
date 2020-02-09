@@ -250,7 +250,7 @@ defmodule Tds.Protocol do
       :transaction when tran == nil ->
         send_transaction("TM_BEGIN_XACT", nil, %{s | transaction: :started})
 
-      :savepoint when tran == :started ->
+      :savepoint when tran in [:started, :failed] ->
         savepoint = env.savepoint + 1
         env = %{env | savepoint: savepoint}
         s = %{s | transaction: :started, env: env}
@@ -269,7 +269,7 @@ defmodule Tds.Protocol do
   def handle_commit(opts, %{transaction: transaction, env: env} = s) do
     case Keyword.get(opts, :mode, :transaction) do
       :transaction when transaction == :started ->
-        send_transaction("TM_COMMIT_XACT", nil, %{s | transaction: :successful})
+        send_transaction("TM_COMMIT_XACT", nil, %{s | transaction: nil})
 
       :savepoint when transaction == :started ->
         send_transaction("TM_SAVE_XACT", env.savepoint, s)
@@ -288,14 +288,11 @@ defmodule Tds.Protocol do
     case Keyword.get(opts, :mode, :transaction) do
       :transaction when transaction in [:started, :failed] ->
         env = %{env | savepoint: 0}
-        s = %{s | transaction: :failed, env: env}
+        s = %{s | transaction: nil, env: env}
         send_transaction("TM_ROLLBACK_XACT", 0, s)
 
-      :savepoint when transaction in [:transaction, :failed] ->
-        # todo: should set trasaction status to :failed? tho user can continue by deciding
-        # if he wants to rollback transaction or to exec other sql script branch
-        # other option is that we track explicit mssql transaction state with %Protocol{mssql: ... }
-        send_transaction("TM_ROLLBACK_XACT", env.savepoint, s)
+      :savepoint when transaction in [:started, :failed] ->
+        send_transaction("TM_ROLLBACK_XACT", env.savepoint, %{s| transaction: :started})
 
       mode when mode in [:transaction, :savepoint] ->
         handle_status(opts, s)
@@ -614,6 +611,12 @@ defmodule Tds.Protocol do
     end
   end
 
+  @spec send_param_query(Tds.Query.t(), list(), t) ::
+          {:error, any()}
+          | {:ok, %{optional(:result) => none()}}
+          | {:disconnect, any(), %{env: any(), sock: {any(), any()}}}
+            | {:error, Tds.Error.t(), %{pak_header: <<>>, tail: <<>>}}
+            | {:ok, any(), %{result: any(), state: :ready}}
   def send_param_query(
         %Query{handle: handle, statement: statement} = _,
         params,
@@ -666,12 +669,6 @@ defmodule Tds.Protocol do
     end
   end
 
-  @spec send_param_query(Tds.Query.t(), list(), t) ::
-          {:error, any()}
-          | {:ok, %{optional(:result) => none()}}
-          | {:disconnect, any(), %{env: any(), sock: {any(), any()}}}
-          | {:error, Tds.Error.t(), %{pak_header: <<>>, tail: <<>>}}
-          | {:ok, any(), %{result: any(), state: :ready}}
   def send_param_query(
         %Query{handle: handle, statement: statement} = _,
         params,
@@ -1159,11 +1156,11 @@ defmodule Tds.Protocol do
   #   {:error, ArgumentError.exception(msg), s}
   # end
 
-  # defp lock_error(s, fun) do
-  #   msg = "connection is locked copying to or from the database and " <>
-  #     "can not #{fun} transaction"
-  #   {:disconnect, RuntimeError.exception(msg), s}
-  # end
+   defp lock_error(s, fun) do
+     msg = "connection is locked copying to or from the database and " <>
+       "can not #{fun} transaction"
+     {:disconnect, RuntimeError.exception(msg), s}
+   end
 
   # defp lock_error(s, fun, query) do
   #   msg = "connection is locked copying to or from the database and " <>
