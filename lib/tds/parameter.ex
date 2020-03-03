@@ -1,7 +1,5 @@
 defmodule Tds.Parameter do
   alias Tds.Types
-  alias Tds.DateTime
-  alias Tds.DateTime2
 
   @type t :: %__MODULE__{
           name: String.t() | nil,
@@ -76,8 +74,14 @@ defmodule Tds.Parameter do
     param
   end
 
+  def fix_data_type(%Tds.Parameter{type: nil, value: nil} = param) do
+    # should fix ecto has_one, on_change :nulify issue where type is not know when ecto
+    # build query/statement for on_chage callback
+    %{param | type: :binary}
+  end
+
   def fix_data_type(%Tds.Parameter{value: value} = param)
-      when value == true or value == false do
+      when is_boolean(value) do
     %{param | type: :boolean}
   end
 
@@ -97,6 +101,11 @@ defmodule Tds.Parameter do
 
   def fix_data_type(%Tds.Parameter{value: value} = param)
       when is_integer(value) do
+    # if -2_147_483_648 >= value and value <= 2_147_483_647 do
+    #   %{param | type: :integer}
+    # else
+    #   %{param | type: :bigint}
+    # end
     %{param | type: :integer}
   end
 
@@ -105,7 +114,15 @@ defmodule Tds.Parameter do
     %{param | type: :float}
   end
 
+  def fix_data_type(%Tds.Parameter{value: %Decimal{}} = param) do
+    %{param | type: :decimal}
+  end
+
   def fix_data_type(%Tds.Parameter{value: {{_, _, _}}} = param) do
+    %{param | type: :date}
+  end
+
+  def fix_data_type(%Tds.Parameter{value: %Date{}} = param) do
     %{param | type: :date}
   end
 
@@ -113,50 +130,34 @@ defmodule Tds.Parameter do
     %{param | type: :time}
   end
 
-  def fix_data_type(%Tds.Parameter{value: %Decimal{}} = param) do
-    %{param | type: :decimal}
-  end
-
-  def fix_data_type(%Tds.Parameter{value: %DateTime{}} = param) do
-    %{param | type: :datetime}
-  end
-
-  def fix_data_type(%Tds.Parameter{value: %DateTime2{}} = param) do
-    %{param | type: :datetime2}
-  end
-
   def fix_data_type(%Tds.Parameter{value: %Time{}} = param) do
     %{param | type: :time}
-  end
-
-  def fix_data_type(%Tds.Parameter{value: %Date{}} = param) do
-    %{param | type: :date}
   end
 
   def fix_data_type(%Tds.Parameter{value: {{_, _, _}, {_, _, _}}} = param) do
     %{param | type: :datetime}
   end
 
-  def fix_data_type(%Tds.Parameter{value: {{_, _, _}, {_, _, _, _}}} = param) do
-    %{param | type: :datetime2}
+  def fix_data_type(
+        %Tds.Parameter{value: %NaiveDateTime{microsecond: {_, s}}} = param
+      ) do
+    type = if s > 3, do: :datetime2, else: :datetime
+    %{param | type: type}
+  end
+
+  def fix_data_type(%Tds.Parameter{value: {{_, _, _}, {_, _, _, fsec}}} = param) do
+    type = if fsec > 999, do: :datetime2, else: :datetime
+    %{param | type: type}
+  end
+
+  def fix_data_type(%Tds.Parameter{value: %DateTime{}} = param) do
+    %{param | type: :datetimeoffset}
   end
 
   def fix_data_type(
-        %Tds.Parameter{
-          value: {{_, _, _}, {_, _, _, _}, _}
-        } = param
+        %Tds.Parameter{value: {{_y, _m, _d}, _time, _offset}} = param
       ) do
     %{param | type: :datetimeoffset}
-  end
-
-  def fix_data_type(%Tds.Parameter{value: {{_, _, _}, {_, _, _}, _}} = param) do
-    %{param | type: :datetimeoffset}
-  end
-
-  def fix_data_type(%Tds.Parameter{type: nil, value: nil} = param) do
-    # should fix ecto has_one, on_change :nulify issue where type is not know when ecto
-    # build query/statement for on_chage callback
-    %{param | type: :binary}
   end
 
   def fix_data_type(%Tds.Parameter{} = raw_param, acc) do
@@ -171,7 +172,8 @@ defmodule Tds.Parameter do
   end
 
   def fix_data_type(raw_param, acc) do
-    param = %Tds.Parameter{name: "@#{acc}", value: raw_param}
-    fix_data_type(param)
+    __MODULE__
+    |> struct!(name: "@#{acc}", value: raw_param)
+    |> fix_data_type()
   end
 end

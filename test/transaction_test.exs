@@ -12,6 +12,7 @@ defmodule Tds.TransactionTest do
 
     opts = [
       transactions: transactions,
+      isolation_level: :snapshot,
       idle: :active,
       backoff_type: :stop,
       prepare: context[:prepare] || :named
@@ -22,7 +23,8 @@ defmodule Tds.TransactionTest do
       |> Keyword.merge(opts)
 
     {:ok, pid} = Tds.start_link(opts)
-    {:ok, [pid: pid]}
+    {:ok, pid2} = Tds.start_link(opts)
+    {:ok, [pid: pid, pid2: pid2]}
   end
 
   @tag mode: :transaction
@@ -109,5 +111,52 @@ defmodule Tds.TransactionTest do
     assert DBConnection.status(pid, opts) == :idle
     assert query("SELECT 42", []) == [[42]]
     assert DBConnection.status(pid) == :idle
+  end
+
+  @tag mode: :transaction
+  @tag :transaction
+  test "should set transaction isolation level", context do
+    :ok = query("CREATE TABLE TranIsolation (num INT)", [])
+
+#    opts = Application.get_env(:tds, :opts)
+#    {:ok, conn} = Tds.start_link(opts)
+#    {:ok, conn2} = Tds.start_link(opts)
+    conn = context[:pid]
+    conn2 = context[:pid2]
+
+    pid = self()
+
+    new_pid = spawn_link fn ->
+      Tds.transaction(conn2, fn conn2 ->
+        Tds.query!(conn2, "insert into TranIsolation values (1)", [])
+        assert %{rows: [[1]]} = Tds.query!(conn2, "select num from TranIsolation", [])
+        send(pid, :in_transaction)
+        receive do
+          :commit -> :ok
+        after
+          5000 -> raise "timout"
+        end
+      end, [isolation_level: :snapshot])
+      send(pid, :committed)
+    end
+
+    receive do
+      :in_transaction -> :ok
+    after
+      5000 -> raise "timeout"
+    end
+
+    assert {:ok, %{rows: []}} = Tds.transaction(conn, fn conn ->
+      assert %{rows: []} = Tds.query!(conn, "select num from TranIsolation", [])
+    end, isolation_level: :snapshot)
+
+    send(new_pid, :commit)
+    receive do
+      :committed -> :ok
+    after
+      5000 -> raise "timeout"
+    end
+
+    assert %{rows: [[1]]} = Tds.query!(conn, "select num from TranIsolation", [])
   end
 end

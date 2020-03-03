@@ -69,7 +69,7 @@ defmodule Tds.Protocol do
 
   @impl DBConnection
   @spec connect(opts :: Keyword.t()) ::
-          {:ok, state :: Protocol.t()} | {:error, Exception.t()}
+          {:ok, state :: t()} | {:error, Exception.t()}
   def connect(opts) do
     opts =
       opts
@@ -97,7 +97,8 @@ defmodule Tds.Protocol do
   end
 
   @impl DBConnection
-  @spec disconnect(err :: Exception.t() | String.t(), state :: Protocol.t()) :: :ok
+  @spec disconnect(err :: Exception.t() | String.t(), state :: t()) ::
+          :ok
   def disconnect(_err, %{sock: {mod, sock}} = s) do
     # If socket is active we flush any socket messages so the next
     # socket does not get the messages.
@@ -246,15 +247,18 @@ defmodule Tds.Protocol do
           | {DBConnection.status(), new_state :: t}
           | {:disconnect, Exception.t(), new_state :: t}
   def handle_begin(opts, %{env: env, transaction: tran} = s) do
+    isolation_level = Keyword.get(opts, :isolation_level, :no_change)
+
     case Keyword.get(opts, :mode, :transaction) do
       :transaction when tran == nil ->
-        send_transaction("TM_BEGIN_XACT", nil, %{s | transaction: :started})
+        payload = [isolation_level: isolation_level]
+        send_transaction("TM_BEGIN_XACT", payload, %{s | transaction: :started})
 
       :savepoint when tran in [:started, :failed] ->
         savepoint = env.savepoint + 1
         env = %{env | savepoint: savepoint}
         s = %{s | transaction: :started, env: env}
-        send_transaction("TM_SAVE_XACT", savepoint, s)
+        send_transaction("TM_SAVE_XACT", [name: savepoint], s)
 
       mode when mode in [:transaction, :savepoint] ->
         handle_status(opts, s)
@@ -269,10 +273,10 @@ defmodule Tds.Protocol do
   def handle_commit(opts, %{transaction: transaction, env: env} = s) do
     case Keyword.get(opts, :mode, :transaction) do
       :transaction when transaction == :started ->
-        send_transaction("TM_COMMIT_XACT", nil, %{s | transaction: nil})
+        send_transaction("TM_COMMIT_XACT", [], %{s | transaction: nil})
 
       :savepoint when transaction == :started ->
-        send_transaction("TM_SAVE_XACT", env.savepoint, s)
+        send_transaction("TM_SAVE_XACT", [name: env.savepoint], s)
 
       mode when mode in [:transaction, :savepoint] ->
         handle_status(opts, s)
@@ -289,10 +293,15 @@ defmodule Tds.Protocol do
       :transaction when transaction in [:started, :failed] ->
         env = %{env | savepoint: 0}
         s = %{s | transaction: nil, env: env}
-        send_transaction("TM_ROLLBACK_XACT", 0, s)
+        send_transaction("TM_ROLLBACK_XACT", [name: 0], s)
 
       :savepoint when transaction in [:started, :failed] ->
-        send_transaction("TM_ROLLBACK_XACT", env.savepoint, %{s| transaction: :started})
+        payload = [name: env.savepoint]
+
+        send_transaction("TM_ROLLBACK_XACT", payload, %{
+          s
+          | transaction: :started
+        })
 
       mode when mode in [:transaction, :savepoint] ->
         handle_status(opts, s)
@@ -317,10 +326,10 @@ defmodule Tds.Protocol do
           Query.t(),
           cursor :: any(),
           opts :: Keyword.t(),
-          state :: Protocol.t()
+          state :: t()
         ) ::
-          {:cont | :halt, Tds.Result.t(), new_state :: Protocol.t()}
-          | {:error | :disconnect, Exception.t(), new_state :: Protocol.t()}
+          {:cont | :halt, Tds.Result.t(), new_state :: t()}
+          | {:error | :disconnect, Exception.t(), new_state :: t()}
   def handle_fetch(_query, _cursor, _opts, state) do
     {:error, Tds.Error.exception("Cursor is not supported by TDS"), state}
   end
@@ -330,10 +339,10 @@ defmodule Tds.Protocol do
           query :: Query.t(),
           cursor :: any,
           opts :: Keyword.t(),
-          state :: Protocol.t()
+          state :: t()
         ) ::
-          {:ok, Tds.Result.t(), new_state :: Protocol.t()}
-          | {:error | :disconnect, Exception.t(), new_state :: Protocol.t()}
+          {:ok, Tds.Result.t(), new_state :: t()}
+          | {:error | :disconnect, Exception.t(), new_state :: t()}
   def handle_deallocate(_query, _cursor, _opts, state) do
     {:error, Tds.Error.exception("Cursor operations are not supported in TDS"),
      state}
@@ -596,8 +605,13 @@ defmodule Tds.Protocol do
     end
   end
 
-  def send_transaction(command, name, s) do
-    msg = msg_transmgr(command: command, name: name)
+  def send_transaction(command, payload, s) do
+    msg =
+      msg_transmgr(
+        command: command,
+        name: Keyword.get(payload, :name),
+        isolation_level: Keyword.get(payload, :isolation_level)
+      )
 
     case msg_send(msg, %{s | state: :transaction_manager}) do
       {:ok, %{result: result} = s} ->
@@ -615,8 +629,8 @@ defmodule Tds.Protocol do
           {:error, any()}
           | {:ok, %{optional(:result) => none()}}
           | {:disconnect, any(), %{env: any(), sock: {any(), any()}}}
-            | {:error, Tds.Error.t(), %{pak_header: <<>>, tail: <<>>}}
-            | {:ok, any(), %{result: any(), state: :ready}}
+          | {:error, Tds.Error.t(), %{pak_header: <<>>, tail: <<>>}}
+          | {:ok, any(), %{result: any(), state: :ready}}
   def send_param_query(
         %Query{handle: handle, statement: statement} = _,
         params,
@@ -838,9 +852,11 @@ defmodule Tds.Protocol do
     end
   end
 
-  defp msg_send(msg, %{sock: {mod, sock}, env: env, state: state} = s) do
+  defp msg_send(msg, %{sock: {mod, sock}, env: env, state: state, opts: opts} = s) do
     :inet.setopts(sock, active: false)
-
+    opts
+    |> Keyword.get(:use_elixir_calendar_types, false)
+    |> use_elixir_calendar_types()
     {t_send, _} =
       :timer.tc(fn ->
         msg

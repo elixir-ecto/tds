@@ -59,4 +59,12 @@ defmodule Tds.Utils do
   end
 
   def to_decimal(float), do: Decimal.from_float(float)
+
+  @doc false
+  def use_elixir_calendar_types(value),
+    do: Process.put(:use_elixir_calendar_types, value)
+
+  @doc false
+  def use_elixir_calendar_types?,
+    do: Process.get(:use_elixir_calendar_types, false)
 end

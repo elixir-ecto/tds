@@ -776,81 +776,8 @@ defmodule Tds.Types do
     end
   end
 
-  def encode_data_type(%Parameter{value: value} = param)
-      when value == true or value == false do
-    encode_data_type(%{param | type: :boolean})
-  end
-
-  def encode_data_type(%Parameter{value: value} = param)
-      when is_binary(value) and value == "" do
-    encode_data_type(%{param | type: :string})
-  end
-
-  def encode_data_type(%Parameter{value: value} = param)
-      when is_binary(value) do
-    encode_data_type(%{param | type: :binary})
-  end
-
-  def encode_data_type(%Parameter{value: value} = param)
-      when is_integer(value) and value >= 0 do
-    encode_data_type(%{param | type: :integer})
-  end
-
-  def encode_data_type(%Parameter{value: value} = param)
-      when is_float(value) do
-    encode_data_type(%{param | type: :float})
-  end
-
-  def encode_data_type(%Parameter{value: value} = param)
-      when is_integer(value) and value < 0 do
-    encode_data_type(%{param | value: Decimal.new(value), type: :decimal})
-  end
-
-  def encode_data_type(%Parameter{value: {{_, _, _}}} = param) do
-    encode_data_type(%{param | type: :date})
-  end
-
-  def encode_data_type(%Parameter{value: {{_, _, _, _}}} = param) do
-    encode_data_type(%{param | type: :time})
-  end
-
-  def encode_data_type(%Parameter{value: %Decimal{}} = param) do
-    encode_data_type(%{param | type: :decimal})
-  end
-
-  def encode_data_type(%Parameter{value: %{__struct__: type}} = param)
-      when type in [Tds.DateTime, DateTime] do
-    encode_data_type(%{param | type: :datetime})
-  end
-
-  def encode_data_type(%Parameter{value: %{__struct__: type}} = param)
-      when type in [Tds.DateTime2, DateTime2, NaiveDateTime] do
-    encode_data_type(%{param | type: :datetime2})
-  end
-
-  def encode_data_type(%Parameter{value: {{_, _, _}, {_, _, _}}} = param) do
-    encode_data_type(%{param | type: :datetime})
-  end
-
-  # def encode_data_type(%Parameter{value: {{_,_,_},{_,_,_,0}}} = param) do
-  #   encode_data_type(%{param | type: :datetime})
-  # end
-
-  def encode_data_type(%Parameter{value: {{_, _, _}, {_, _, _, _}}} = param) do
-    encode_data_type(%{param | type: :datetime2})
-  end
-
-  def encode_data_type(
-        %Parameter{
-          value: {{_, _, _}, {_, _, _, _}, _}
-        } = param
-      ) do
-    encode_data_type(%{param | type: :datetimeoffset})
-  end
-
-  def encode_data_type(%Parameter{value: {{_, _, _}, {_, _, _}, _}} = param) do
-    encode_data_type(%{param | type: :datetimeoffset})
-  end
+  def encode_data_type(param),
+    do: param |> Parameter.fix_data_type() |> encode_data_type()
 
   def encode_binary_type(%Parameter{value: value} = param)
       when value == "" do
@@ -1084,7 +1011,13 @@ defmodule Tds.Types do
           "datetime"
 
         :datetime2 ->
-          "datetime2"
+          case value do
+            %NaiveDateTime{microsecond: {_, scale}} ->
+              "datetime2(#{scale})"
+
+            _ ->
+              "datetime2"
+          end
 
         :datetimeoffset ->
           "datetimeoffset"
@@ -1093,7 +1026,13 @@ defmodule Tds.Types do
           "date"
 
         :time ->
-          "time"
+          case value do
+            %Time{microsecond: {_, scale}} ->
+              "time(#{scale})"
+
+            _ ->
+              "time"
+          end
 
         :smalldatetime ->
           "smalldatetime"
@@ -1134,6 +1073,9 @@ defmodule Tds.Types do
               "decimal(#{precision - 1}, 0)"
           end
 
+        :bigint ->
+          "bigint"
+
         :decimal ->
           encode_decimal_descriptor(param)
 
@@ -1173,104 +1115,8 @@ defmodule Tds.Types do
   Implictly Selected Types
   """
   # nil
-  def encode_param_descriptor(%Parameter{value: nil} = param) do
-    # Logger.debug "Param Descriptor nil"
-    param = %{param | type: :boolean}
-    encode_param_descriptor(param)
-  end
-
-  # Boolean
-  def encode_param_descriptor(%Parameter{value: value} = param)
-      when value == true or value == false do
-    param = %{param | type: :boolean}
-    encode_param_descriptor(param)
-  end
-
-  # DateTime
-  def encode_param_descriptor(%Parameter{value: %{__struct__: type}} = param)
-      when type in [Tds.DateTime, DateTime] do
-    param = %{param | type: :datetime}
-    encode_param_descriptor(param)
-  end
-
-  def encode_param_descriptor(
-        %Parameter{
-          value: {{_, _, _}, {_, _, _}}
-        } = param
-      ) do
-    param = %{param | type: :datetime}
-    encode_param_descriptor(param)
-  end
-
-  # DateTime2
-  def encode_param_descriptor(%Parameter{value: %{__struct__: type}} = param)
-      when type in [Tds.DateTime2, DateTime2, NaiveDateTime] do
-    param = %{param | type: :datetime2}
-    encode_param_descriptor(param)
-  end
-
-  def encode_param_descriptor(
-        %Parameter{value: {{_, _, _}, {_, _, _, _}}} = param
-      ) do
-    # Logger.debug "Param Descriptor datetime2"
-    param = %{param | type: :datetime2}
-    encode_param_descriptor(param)
-  end
-
-  def encode_param_descriptor(
-        %Parameter{value: {{_, _, _}, {_, _, _, _}, _}} = param
-      ) do
-    ## Logger.debug "Param Descriptor datetime2"
-    encode_param_descriptor(%{param | type: :datetimeoffset})
-  end
-
-  def encode_param_descriptor(
-        %Parameter{value: {{_, _, _}, {_, _, _}, _}} = param
-      ) do
-    ## Logger.debug "Param Descriptor datetime2"
-    encode_param_descriptor(%{param | type: :datetimeoffset})
-  end
-
-  # Positive Integers
-  def encode_param_descriptor(%Parameter{value: value} = param)
-      when is_integer(value) and value >= 0 do
-    param = %{param | type: :integer}
-    encode_param_descriptor(param)
-  end
-
-  # Float
-  def encode_param_descriptor(%Parameter{value: value} = param)
-      when is_float(value) do
-    param = %{param | type: :float}
-    encode_param_descriptor(param)
-  end
-
-  # Negative Integers
-  def encode_param_descriptor(%Parameter{value: value} = param)
-      when is_integer(value) and value < 0 do
-    param = %{param | type: :decimal, value: Decimal.new(value)}
-    encode_param_descriptor(param)
-  end
-
-  # Decimal
-  def encode_param_descriptor(%Parameter{value: %Decimal{}} = param) do
-    param = %{param | type: :decimal}
-    encode_param_descriptor(param)
-  end
-
-  # Binary
-  def encode_param_descriptor(%Parameter{value: value} = param)
-      when is_binary(value) and value == "" do
-    # Logger.debug "Param Descriptor String"
-    param = %{param | type: :string}
-    encode_param_descriptor(param)
-  end
-
-  def encode_param_descriptor(%Parameter{value: value} = param)
-      when is_binary(value) do
-    param = %{param | type: :binary}
-    encode_param_descriptor(param)
-  end
+  def encode_param_descriptor(param),
+    do: param |> Parameter.fix_data_type() |> encode_param_descriptor()
 
   @doc """
   Decimal Type Parameter Descriptor
@@ -1354,9 +1200,9 @@ defmodule Tds.Types do
   @doc """
   Data Encoding Binary Types
   """
-  def encode_data(@tds_data_type_bigvarbinary = data_type, value, attr)
+  def encode_data(@tds_data_type_bigvarbinary, value, attr)
       when is_integer(value),
-      do: encode_data(data_type, <<value>>, attr)
+      do: encode_data(@tds_data_type_bigvarbinary, <<value>>, attr)
 
   def encode_data(@tds_data_type_bigvarbinary, nil, _),
     do: <<@tds_plp_null::little-unsigned-64>>
@@ -1516,19 +1362,25 @@ defmodule Tds.Types do
     if data == nil do
       <<0x00>>
     else
-      <<0x03>> <> data
+      <<0x03, data::binary>>
     end
   end
 
   def encode_data(@tds_data_type_timen, value, _attr) do
     # Logger.debug "encode_data_timen"
-    data = encode_time(value)
+    {data, scale} = encode_time(value)
     # Logger.debug "#{inspect data}"
     if data == nil do
       <<0x00>>
     else
-      # 0x08 length of binary for scale 7
-      <<0x05>> <> data
+      len =
+        cond do
+          scale < 3 -> 0x03
+          scale < 5 -> 0x04
+          scale < 8 -> 0x05
+        end
+
+      <<len, data::binary>>
     end
   end
 
@@ -1552,13 +1404,20 @@ defmodule Tds.Types do
 
   def encode_data(@tds_data_type_datetime2n, value, _attr) do
     # Logger.debug "EncodeData #{inspect value}"
-    data = encode_datetime2(value)
+    {data, scale} = encode_datetime2(value)
 
     if data == nil do
       <<0x00>>
     else
       # 0x08 length of binary for scale 7
-      <<0x08>> <> data
+      storage_size =
+        cond do
+          scale < 3 -> 0x06
+          scale < 5 -> 0x07
+          scale < 8 -> 0x08
+        end
+
+      <<storage_size>> <> data
     end
   end
 
@@ -1590,7 +1449,7 @@ defmodule Tds.Types do
   end
 
   defp int_type_size(int) when int == nil, do: 4
-  defp int_type_size(int) when int in 0..255, do: 4
+  defp int_type_size(int) when int in -254..255, do: 4
   defp int_type_size(int) when int in -32_768..32_767, do: 4
   defp int_type_size(int) when int in -2_147_483_648..2_147_483_647, do: 4
 
@@ -1618,7 +1477,13 @@ defmodule Tds.Types do
 
   # Date
   def decode_date(<<days::little-24>>) do
-    :calendar.gregorian_days_to_date(days + 366)
+    date = :calendar.gregorian_days_to_date(days + 366)
+
+    if use_elixir_calendar_types?() do
+      Date.from_erl!(date, Calendar.ISO)
+    else
+      date
+    end
   end
 
   def encode_date(nil), do: nil
@@ -1638,7 +1503,12 @@ defmodule Tds.Types do
     date = :calendar.gregorian_days_to_date(@year_1900_days + days)
     hour = trunc(mins / 60)
     min = trunc(mins - hour * 60)
-    {date, {hour, min, 0, 0}}
+
+    if use_elixir_calendar_types?() do
+      NaiveDateTime.from_erl!({date, {hour, min, 0}})
+    else
+      {date, {hour, min, 0, 0}}
+    end
   end
 
   def encode_smalldatetime(nil), do: nil
@@ -1665,13 +1535,27 @@ defmodule Tds.Types do
     date = :calendar.gregorian_days_to_date(@year_1900_days + days)
     secs = secs300 |> div(300)
     {_, {h, m, s}} = secs |> :calendar.seconds_to_daystime()
-
-    # Logger.debug "#{inspect {secs}}"
     # remaining fractional
     sub_sec = secs300 / 300 - secs
     # Logger.debug "#{inspect {sub_sec}}"
     usec = trunc(sub_sec * @usecs_in_sec + 0.5)
-    {date, {h, m, s, usec}}
+
+    if use_elixir_calendar_types?() do
+      precision =
+        cond do
+          usec in 0..9 -> 1
+          usec in 10..99 -> 2
+          usec in 100..999 -> 3
+        end
+
+      NaiveDateTime.from_erl!(
+        {date, {h, m, s}},
+        {precision, usec},
+        Calendar.ISO
+      )
+    else
+      {date, {h, m, s, usec}}
+    end
   end
 
   def encode_datetime(nil), do: nil
@@ -1717,7 +1601,7 @@ defmodule Tds.Types do
           parsed_fsec
       end
 
-    fs_per_sec = :math.pow(10, scale)
+    fs_per_sec = trunc(:math.pow(10, scale))
 
     hour = trunc(parsed_fsec / fs_per_sec / @secs_in_hour)
     parsed_fsec = parsed_fsec - hour * @secs_in_hour * fs_per_sec
@@ -1729,7 +1613,18 @@ defmodule Tds.Types do
 
     parsed_fsec = trunc(parsed_fsec - sec * fs_per_sec)
 
-    {hour, min, sec, parsed_fsec}
+    if use_elixir_calendar_types?() do
+      {parsed_fsec, scale} =
+        if scale > 6 do
+          {trunc(parsed_fsec / 10), 6}
+        else
+          {trunc(parsed_fsec * :math.pow(10, 6 - scale)), scale}
+        end
+
+      Time.from_erl!({hour, min, sec}, {parsed_fsec, scale})
+    else
+      {hour, min, sec, parsed_fsec}
+    end
   end
 
   # time(n) is represented as one unsigned integer that represents the number of
@@ -1738,14 +1633,26 @@ defmodule Tds.Types do
   # 3 bytes if 0 <= n < = 2.
   # 4 bytes if 3 <= n < = 4.
   # 5 bytes if 5 <= n < = 7.
-  def encode_time(nil), do: nil
+  def encode_time(nil), do: {nil, 0}
+
   def encode_time({h, m, s}), do: encode_time({h, m, s, 0})
-  def encode_time(%Time{}=t) do
+
+  def encode_time(%Time{} = t) do
     {h, m, s} = Time.to_erl(t)
-    {ms, _scale} = t.microsecond
-    encode_time({h, m, s, ms})
+    {ms, scale} = t.microsecond
+    # fix ms
+    ms =
+      if scale != 6 do
+        trunc(ms / :math.pow(10, 6 - scale))
+      else
+        ms
+      end
+
+    encode_time({h, m, s, ms}, scale)
   end
+
   def encode_time(time), do: encode_time(time, @max_time_scale)
+
   def encode_time({h, m, s}, scale), do: encode_time({h, m, s, 0}, scale)
 
   def encode_time({hour, min, sec, fsec}, scale) do
@@ -1755,16 +1662,19 @@ defmodule Tds.Types do
     fsec =
       hour * 3600 * fs_per_sec + min * 60 * fs_per_sec + sec * fs_per_sec + fsec
 
-    cond do
-      scale in [0, 1, 2] ->
-        <<fsec::little-unsigned-24>>
+    bin =
+      cond do
+        scale in [0, 1, 2] ->
+          <<fsec::little-unsigned-24>>
 
-      scale in [3, 4] ->
-        <<fsec::little-unsigned-32>>
+        scale in [3, 4] ->
+          <<fsec::little-unsigned-32>>
 
-      scale in [5, 6, 7] ->
-        <<fsec::little-unsigned-40>>
-    end
+        scale in [5, 6, 7] ->
+          <<fsec::little-unsigned-40>>
+      end
+
+    {bin, scale}
   end
 
   # DateTime2
@@ -1787,22 +1697,31 @@ defmodule Tds.Types do
           raise "DateTime Scale Unknown"
       end
 
-    {decode_date(date), decode_time(scale, time)}
+    date = decode_date(date)
+    time = decode_time(scale, time)
+
+    with true <- use_elixir_calendar_types?(),
+         {:ok, datetime2} <- NaiveDateTime.new(date, time) do
+      datetime2
+    else
+      false -> {date, time}
+      {:error, error} -> raise DBConnection.EncodeError, error
+    end
   end
 
   def encode_datetime2(value, scale \\ @max_time_scale)
-  def encode_datetime2(nil, _), do: nil
+  def encode_datetime2(nil, _), do: {nil, 0}
 
   def encode_datetime2({date, time}, scale) do
-    time = encode_time(time, scale)
+    {time, scale} = encode_time(time, scale)
     date = encode_date(date)
-    time <> date
+    {time <> date, scale}
   end
 
-  def encode_datetime2(%{__struct__: type} = value, scale)
-      when type in [DateTime, DateTime2, NaiveDateTime] do
+  def encode_datetime2(%NaiveDateTime{} = value, scale) do
     {date, {h, m, s}} = NaiveDateTime.to_erl(value)
-    {ms, _scale} = value.microsecond
+    {ms, nscale} = value.microsecond
+    ms = trunc(ms / :math.pow(10, scale - nscale))
     encode_datetime2({date, {h, m, s, ms}}, scale)
   end
 
@@ -1828,11 +1747,28 @@ defmodule Tds.Types do
           {datetime, offset_min}
 
         true ->
-          raise "DateTimeOffset Scale Unknown"
+          raise DBConnection.EncodeError, "DateTimeOffset Scale invalid"
       end
 
-    {date, time} = decode_datetime2(scale, datetime)
-    {date, time, offset_min}
+    case decode_datetime2(scale, datetime) do
+      {date, time} ->
+        {date, time, offset_min}
+
+      %NaiveDateTime{} = dt ->
+        str = NaiveDateTime.to_iso8601(dt)
+        h = trunc(offset_min / 60)
+
+        m =
+          Integer.to_string(offset_min - h * 60)
+          |> String.pad_leading(2, "0")
+
+        h =
+          Integer.to_string(h)
+          |> String.pad_leading(2, "0")
+
+        {:ok, datetime, ^offset_min} = DateTime.from_iso8601("#{str}+#{h}:#{m}")
+        datetime
+    end
   end
 
   def encode_datetimeoffset(nil), do: nil
@@ -1841,7 +1777,7 @@ defmodule Tds.Types do
         {date, time, offset_min},
         scale \\ @max_time_scale
       ) do
-    datetime = encode_datetime2({date, time}, scale)
+    {datetime, _ignore_allways_10bytes} = encode_datetime2({date, time}, scale)
     datetime <> <<offset_min::little-signed-16>>
   end
 
@@ -1865,11 +1801,27 @@ defmodule Tds.Types do
     {type, data, []}
   end
 
-  def encode_time_type(%Parameter{}) do
+  def encode_time_type(%Parameter{value: value}) do
     # Logger.debug "encode_time_type"
     type = @tds_data_type_timen
-    data = <<type, 0x07>>
-    {type, data, scale: 7}
+
+    case value do
+      nil ->
+        {type, <<type, 0x07>>, scale: 1}
+
+      {_, _, _} ->
+        {type, <<type, 0x07>>, scale: 1}
+
+      {_, _, _, fsec} ->
+        scale = Integer.digits(fsec) |> length()
+        {type, <<type, 0x07>>, scale: scale}
+
+      %Time{microsecond: {_, scale}} ->
+        {type, <<type, scale>>, scale: scale}
+
+      other ->
+        raise ArgumentError, "Value #{inspect(other)} is not valid time"
+    end
   end
 
   def encode_datetime2_type(%Parameter{}) do
