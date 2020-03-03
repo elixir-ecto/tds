@@ -62,7 +62,7 @@ defmodule Tds.Parameter do
         raw_param -> fix_data_type(raw_param, name + 1)
       end
 
-    do_name(tail, name, [param | acc])
+    do_name(tail, name + 1, [param | acc])
   end
 
   def do_name([], _, acc) do
