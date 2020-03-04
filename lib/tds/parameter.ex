@@ -146,7 +146,9 @@ defmodule Tds.Parameter do
   end
 
   def fix_data_type(%Tds.Parameter{value: {{_, _, _}, {_, _, _, fsec}}} = param) do
-    type = if fsec > 999, do: :datetime2, else: :datetime
+    # todo: enable warning and introduce Tds.Types.DateTime2 and Tds.Types.DateTime
+    # Logger.warn(fn -> "Datetime as tuple is obsolete, please use NaiveDateTime." end)
+    type = if rem(fsec, 1000) > 0, do: :datetime2, else: :datetime
     %{param | type: type}
   end
 

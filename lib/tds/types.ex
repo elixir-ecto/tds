@@ -765,8 +765,8 @@ defmodule Tds.Types do
       :integer -> encode_integer_type(param)
       :decimal -> encode_decimal_type(param)
       :float -> encode_float_type(param)
-      :datetime -> encode_datetime_type(param)
       :smalldatetime -> encode_smalldatetime_type(param)
+      :datetime -> encode_datetime_type(param)
       :datetime2 -> encode_datetime2_type(param)
       :datetimeoffset -> encode_datetimeoffset_type(param)
       :date -> encode_date_type(param)
@@ -1533,24 +1533,27 @@ defmodule Tds.Types do
       >>) do
     # Logger.debug "#{inspect {days, secs300}}"
     date = :calendar.gregorian_days_to_date(@year_1900_days + days)
-    secs = secs300 |> div(300)
-    {_, {h, m, s}} = secs |> :calendar.seconds_to_daystime()
-    # remaining fractional
-    sub_sec = secs300 / 300 - secs
-    # Logger.debug "#{inspect {sub_sec}}"
-    usec = trunc(sub_sec * @usecs_in_sec + 0.5)
+
+    milliseconds = round(secs300 * 10 / 3)
+    usec = rem(milliseconds, 1_000) |> IO.inspect()
+
+    seconds = div(milliseconds, 1_000)
+
+    {_, {h, m, s}} = :calendar.seconds_to_daystime(seconds)
 
     if use_elixir_calendar_types?() do
-      precision =
-        cond do
-          usec in 0..9 -> 1
-          usec in 10..99 -> 2
-          usec in 100..999 -> 3
-        end
+      # precision =
+      #   case Integer.digits(usec) do
+      #     [0] -> 0
+      #     [_, 0] -> 2
+      #     [_, 0, 0] -> 1
+      #     [_, _, 0] -> 2
+      #     _ -> 3
+      #   end
 
       NaiveDateTime.from_erl!(
         {date, {h, m, s}},
-        {precision, usec},
+        {usec * 1_000, 3},
         Calendar.ISO
       )
     else
@@ -1573,15 +1576,19 @@ defmodule Tds.Types do
     do: encode_datetime({date, {h, m, s, 0}})
 
   def encode_datetime({date, {h, m, s, us}}) do
-    # Logger.debug "#{inspect {h,m,s,us}}"
     days = :calendar.date_to_gregorian_days(date) - @year_1900_days
-    secs = h * @secs_in_hour + m * @secs_in_min + s
-    # Logger.debug "secs #{inspect {secs}}"
-    secs = secs + us / @usecs_in_sec
-    # Logger.debug "secs #{inspect {secs}}"
-    secs300 = trunc(secs * 300 + 0.5)
-    # Logger.debug "#{inspect {days, secs300}}"
-    <<days::little-signed-32, secs300::little-unsigned-32>>
+    milliseconds = ((h * 60 + m) * 60 + s) * 1_000 + us / 1_000
+
+    secs_300 = round(milliseconds / (10 / 3))
+
+    {days, secs_300} =
+      if secs_300 == 25_920_000 do
+        {days + 1, 0}
+      else
+        {days, secs_300}
+      end
+
+    <<days::little-signed-32, secs_300::little-unsigned-32>>
   end
 
   # Time
