@@ -4,7 +4,7 @@ defmodule ElixirCalendarTest do
   use ExUnit.Case, async: true
 
   alias Tds.Types
-  alias Tds.Parameter
+  alias Tds.Parameter, as: P
 
   setup do
     {:ok, pid} =
@@ -39,15 +39,20 @@ defmodule ElixirCalendarTest do
     Enum.each(times, fn t ->
       {time, scale} = Types.encode_time(t)
       assert t == Types.decode_time(scale, time)
-
-      assert [[^t]] =
-               query("SELECT @1", [
-                 %Parameter{
-                   name: "@1",
-                   value: t
-                 }
-               ])
+      assert [[^t]] = query("SELECT @1", [%P{name: "@1", value: t}])
     end)
+  end
+
+  test "Elixir.Date type to SQL Date", context do
+    # AD dates are not supported yet since `:calendar.date_to_georgian_days` do not
+    # support negative years
+    date = ~D[0002-02-28]
+    assert date == Types.encode_date(date) |> Types.decode_date()
+    assert [[date]] == query("select @1", [%P{name: "@1", value: date}])
+
+    date = ~D[2020-02-28]
+    assert date == Types.encode_date(date) |> Types.decode_date()
+    assert [[date]] == query("select @1", [%P{name: "@1", value: date}])
   end
 
   test "Elixir.NaiveDateTime type", context do
@@ -77,49 +82,77 @@ defmodule ElixirCalendarTest do
     Enum.each(datetimes, fn {dt_in, dt_out} ->
       token = Types.encode_datetime(dt_in)
       assert dt_out == Types.decode_datetime(token)
+
       assert [[^dt_out]] =
                query("SELECT @1", [
-                 %Parameter{
-                   name: "@1",
-                   value: dt_in,
-                   type: :datetime
-                 }
+                 %P{name: "@1", value: dt_in, type: :datetime}
                ])
     end)
-
+    type = :datetime
     datetime2s = [
-      %Parameter{name: "@1", value: ~N[2020-02-28 23:59:51.000000], type: :datetime2},
-      %Parameter{name: "@1", value: ~N[2020-02-28 23:59:51.00000], type: :datetime2},
-      %Parameter{name: "@1", value: ~N[2020-02-28 23:59:51.0000], type: :datetime2},
-      %Parameter{name: "@1", value: ~N[2020-02-28 23:59:51.000], type: :datetime2},
-      %Parameter{name: "@1", value: ~N[2020-02-28 23:59:51.00], type: :datetime2},
-      %Parameter{name: "@1", value: ~N[2020-02-28 23:59:51.0], type: :datetime2},
-      %Parameter{name: "@1", value: ~N[2020-02-28 23:59:51], type: :datetime2},
-      %Parameter{name: "@1", value: ~N[2020-02-28 23:59:51.1], type: :datetime2},
-      %Parameter{name: "@1", value: ~N[2020-02-28 23:59:51.01], type: :datetime2},
-      %Parameter{name: "@1", value: ~N[2020-02-28 23:59:51.001], type: :datetime2},
-      %Parameter{name: "@1", value: ~N[2020-02-28 23:59:51.0001], type: :datetime2},
-      %Parameter{name: "@1", value: ~N[2020-02-28 23:59:51.00001], type: :datetime2},
-      %Parameter{name: "@1", value: ~N[2020-02-28 23:59:51.000001], type: :datetime2},
-      %Parameter{name: "@1", value: ~N[2020-02-28 23:59:51.100000], type: :datetime2},
-      %Parameter{name: "@1", value: ~N[2020-02-28 23:59:51.10000], type: :datetime2},
-      %Parameter{name: "@1", value: ~N[2020-02-28 23:59:51.1000], type: :datetime2},
-      %Parameter{name: "@1", value: ~N[2020-02-28 23:59:51.100], type: :datetime2},
-      %Parameter{name: "@1", value: ~N[2020-02-28 23:59:51.10], type: :datetime2},
-      %Parameter{name: "@1", value: ~N[2020-02-28 23:59:51.1], type: :datetime2},
-      %Parameter{name: "@1", value: ~N[2020-02-28 23:59:51.12], type: :datetime2},
-      %Parameter{name: "@1", value: ~N[2020-02-28 23:59:51.123], type: :datetime2},
-      %Parameter{name: "@1", value: ~N[2020-02-28 23:59:51.1234], type: :datetime2},
-      %Parameter{name: "@1", value: ~N[2020-02-28 23:59:51.12345], type: :datetime2},
-      %Parameter{name: "@1", value: ~N[2020-02-28 23:59:51.123456], type: :datetime2},
-      %Parameter{name: "@1", value: ~N[2020-02-28 23:59:59.999999], type: :datetime2}
+      %P{name: "@1", value: ~N[2020-02-28 23:59:51.000000], type: type},
+      %P{name: "@1", value: ~N[2020-02-28 23:59:51.00000], type: type},
+      %P{name: "@1", value: ~N[2020-02-28 23:59:51.0000], type: type},
+      %P{name: "@1", value: ~N[2020-02-28 23:59:51.000], type: type},
+      %P{name: "@1", value: ~N[2020-02-28 23:59:51.00], type: type},
+      %P{name: "@1", value: ~N[2020-02-28 23:59:51.0], type: type},
+      %P{name: "@1", value: ~N[2020-02-28 23:59:51], type: type},
+      %P{name: "@1", value: ~N[2020-02-28 23:59:51.1], type: type},
+      %P{name: "@1", value: ~N[2020-02-28 23:59:51.01], type: type},
+      %P{name: "@1", value: ~N[2020-02-28 23:59:51.001], type: type},
+      %P{name: "@1", value: ~N[2020-02-28 23:59:51.0001], type: type},
+      %P{name: "@1", value: ~N[2020-02-28 23:59:51.00001], type: type},
+      %P{name: "@1", value: ~N[2020-02-28 23:59:51.000001], type: type},
+      %P{name: "@1", value: ~N[2020-02-28 23:59:51.100000], type: type},
+      %P{name: "@1", value: ~N[2020-02-28 23:59:51.10000], type: type},
+      %P{name: "@1", value: ~N[2020-02-28 23:59:51.1000], type: type},
+      %P{name: "@1", value: ~N[2020-02-28 23:59:51.100], type: type},
+      %P{name: "@1", value: ~N[2020-02-28 23:59:51.10], type: type},
+      %P{name: "@1", value: ~N[2020-02-28 23:59:51.1], type: type},
+      %P{name: "@1", value: ~N[2020-02-28 23:59:51.12], type: type},
+      %P{name: "@1", value: ~N[2020-02-28 23:59:51.123], type: type},
+      %P{name: "@1", value: ~N[2020-02-28 23:59:51.1234], type: type},
+      %P{name: "@1", value: ~N[2020-02-28 23:59:51.12345], type: type},
+      %P{name: "@1", value: ~N[2020-02-28 23:59:51.123456], type: type},
+      %P{name: "@1", value: ~N[2020-02-28 23:59:59.999999], type: type},
     ]
 
     Enum.each(datetime2s, fn %{value: dt} = p ->
       {token, scale} = Types.encode_datetime2(dt)
       assert dt == Types.decode_datetime2(scale, token)
-      # assert [[^dt]] = query("SELECT CONVERT(VARCHAR(100), @1, 126)", [p])
       assert [[^dt]] = query("SELECT @1", [p])
     end)
+  end
+
+  test "Elixir.DateTime to SQL DateTimeOffset", context do
+    type = :datetimeoffset
+    dts = [
+      %P{name: "@1", value: ~U[2020-02-28 23:59:59.000000Z], type: type},
+      %P{name: "@1", value: ~U[2020-02-28 23:59:59.00000Z], type: type},
+      %P{name: "@1", value: ~U[2020-02-28 23:59:59.0000Z], type: type},
+      %P{name: "@1", value: ~U[2020-02-28 23:59:59.000Z], type: type},
+      %P{name: "@1", value: ~U[2020-02-28 23:59:59.00Z], type: type},
+      %P{name: "@1", value: ~U[2020-02-28 23:59:59.0Z], type: type},
+      %P{name: "@1", value: ~U[2020-02-28 23:59:59Z], type: type},
+      %P{name: "@1", value: ~U[2020-02-28 23:59:59.1Z], type: type},
+      %P{name: "@1", value: ~U[2020-02-28 23:59:59.10Z], type: type},
+      %P{name: "@1", value: ~U[2020-02-28 23:59:59.100Z], type: type},
+      %P{name: "@1", value: ~U[2020-02-28 23:59:59.1000Z], type: type},
+      %P{name: "@1", value: ~U[2020-02-28 23:59:59.10000Z], type: type},
+      %P{name: "@1", value: ~U[2020-02-28 23:59:59.100000Z], type: type},
+      %P{name: "@1", value: ~U[2020-02-28 23:59:59.12Z], type: type},
+      %P{name: "@1", value: ~U[2020-02-28 23:59:59.123Z], type: type},
+      %P{name: "@1", value: ~U[2020-02-28 23:59:59.1234Z], type: type},
+      %P{name: "@1", value: ~U[2020-02-28 23:59:59.12345Z], type: type},
+      %P{name: "@1", value: ~U[2020-02-28 23:59:59.123456Z], type: type},
+      %P{name: "@1", value: ~U[2020-02-28 23:59:59.999999Z], type: type},
+    ]
+
+    Enum.each(dts, fn %{value: dt, microsecond: {_, s}} = p ->
+      {token, scale} = Types.encode_datetimeoffset(dt, s)
+      assert dt == Types.decode_datetimeoffset(scale, token)
+      assert [[^dt]] = query("SELECT @1", [p])
+    end)
+
   end
 end

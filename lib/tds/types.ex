@@ -1778,15 +1778,21 @@ defmodule Tds.Types do
         datetime
     end
   end
+  def encode_datetimeoffset(datetimetz, scale \\ @max_time_scale)
+  def encode_datetimeoffset(nil, _), do: nil
 
-  def encode_datetimeoffset(nil), do: nil
-
-  def encode_datetimeoffset(
-        {date, time, offset_min},
-        scale \\ @max_time_scale
-      ) do
+  def encode_datetimeoffset({date, time, offset_min}, scale) do
     {datetime, _ignore_allways_10bytes} = encode_datetime2({date, time}, scale)
     datetime <> <<offset_min::little-signed-16>>
+  end
+
+  def encode_datetimeoffset(%DateTime{utc_offset: offset} = dt, scale) do
+    {datetime, _ignore_allways_10bytes} =
+      dt
+      |> DateTime.to_naive()
+      |> encode_datetime2(scale)
+
+    datetime <> <<offset::little-signed-16>>
   end
 
   def encode_datetime_type(%Parameter{}) do
