@@ -29,7 +29,7 @@ If you need such support you will need to include additional dependency `{:tds_e
 and configure `:tds` app to use `Tds.Encoding` module like this:
 
 
-```elixr
+```elixir
 import Mix.Config
 
 config :tds, :text_encoder, Tds.Encoding
@@ -64,7 +64,7 @@ iex> Tds.query!(pid, "INSERT INTO MyTable (MyColumn) VALUES (@my_value)",
 
 Example configuration
 
-```elixr
+```elixir
 import Mix.Config
 
 config :your_app, tds_conn,
@@ -83,7 +83,7 @@ your queries suffer from "density estimation" as described [here](https://www.br
 
 you can try switching how tds executes queries as below:
 
-```elixr
+```elixir
 import Mix.Config
 
 config :your_app, tds_conn,
