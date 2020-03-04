@@ -1594,6 +1594,7 @@ defmodule Tds.Types do
   # Time
   def decode_time(scale, <<fsec::binary>>) do
     parsed_fsec =
+      # this is kind of rendudant, since "size" can be, and is, read from token
       cond do
         scale in [0, 1, 2] ->
           <<parsed_fsec::little-unsigned-24>> = fsec
@@ -1725,11 +1726,11 @@ defmodule Tds.Types do
     {time <> date, scale}
   end
 
-  def encode_datetime2(%NaiveDateTime{} = value, scale) do
-    {date, {h, m, s}} = NaiveDateTime.to_erl(value)
-    {ms, nscale} = value.microsecond
-    ms = trunc(ms / :math.pow(10, scale - nscale))
-    encode_datetime2({date, {h, m, s, ms}}, scale)
+  def encode_datetime2(%NaiveDateTime{} = value, _scale) do
+    t = NaiveDateTime.to_time(value)
+    {time, scale} = encode_time(t)
+    date = encode_date(NaiveDateTime.to_date(value))
+    {time <> date, scale}
   end
 
   def encode_datetime2(value, scale) do
@@ -1831,11 +1832,23 @@ defmodule Tds.Types do
     end
   end
 
+  def encode_datetime2_type(%Parameter{value: %NaiveDateTime{microsecond: {_, s}}}) do
+    type = @tds_data_type_datetime2n
+    data = <<type, s>>
+    {type, data, scale: s}
+  end
+
   def encode_datetime2_type(%Parameter{}) do
     # Logger.debug "encode_datetime2_type"
     type = @tds_data_type_datetime2n
     data = <<type, 0x07>>
     {type, data, scale: 7}
+  end
+
+  def encode_datetimeoffset_type(%Parameter{value: %DateTime{microsecond: {_, s}}}) do
+    type = @tds_data_type_datetimeoffsetn
+    data = <<type, s>>
+    {type, data, scale: s}
   end
 
   def encode_datetimeoffset_type(%Parameter{}) do

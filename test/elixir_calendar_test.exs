@@ -51,8 +51,10 @@ defmodule ElixirCalendarTest do
   end
 
   test "Elixir.NaiveDateTime type", context do
-    # Precision is not exacly to 3 decimals, they are rader round to neares
-    # .000, .003, .007 plus day is incremented if round causes midnight case
+    # sql server datetime precision is not exacly 3 decimals precise, value is rader
+    # round up to nearest .000, .003, .007. In case of near midnigh day is incremented
+    # (e.g. 2020-02-28 23:59:59.999 will increment day 2020-02-29 00:00:00.000)
+
     datetimes = [
       {~N[2020-02-28 23:59:51.000], ~N[2020-02-28 23:59:51.000]},
       {~N[2020-02-28 23:59:51.003], ~N[2020-02-28 23:59:51.003]},
@@ -69,20 +71,55 @@ defmodule ElixirCalendarTest do
       {~N[2020-02-28 23:59:51.123], ~N[2020-02-28 23:59:51.123]},
       {~N[2020-02-28 23:59:51.997], ~N[2020-02-28 23:59:51.997]},
       # midnight case, should increment day too
-      {~N[2020-02-28 23:59:59.999], ~N[2020-02-29 00:00:00.000]},
+      {~N[2020-02-28 23:59:59.999], ~N[2020-02-29 00:00:00.000]}
     ]
 
-    # here we are testing datetime and datetime2
-    # (depends on what is the microsecond precision)
     Enum.each(datetimes, fn {dt_in, dt_out} ->
-      # r = query("SELECT CONVERT(varchar(100), @1, 127)", [
+      token = Types.encode_datetime(dt_in)
+      assert dt_out == Types.decode_datetime(token)
       assert [[^dt_out]] =
-        query("SELECT @1", [
-          %Parameter{
-            name: "@1",
-            value: dt_in
-          }
-        ])
+               query("SELECT @1", [
+                 %Parameter{
+                   name: "@1",
+                   value: dt_in,
+                   type: :datetime
+                 }
+               ])
+    end)
+
+    datetime2s = [
+      %Parameter{name: "@1", value: ~N[2020-02-28 23:59:51.000000], type: :datetime2},
+      %Parameter{name: "@1", value: ~N[2020-02-28 23:59:51.00000], type: :datetime2},
+      %Parameter{name: "@1", value: ~N[2020-02-28 23:59:51.0000], type: :datetime2},
+      %Parameter{name: "@1", value: ~N[2020-02-28 23:59:51.000], type: :datetime2},
+      %Parameter{name: "@1", value: ~N[2020-02-28 23:59:51.00], type: :datetime2},
+      %Parameter{name: "@1", value: ~N[2020-02-28 23:59:51.0], type: :datetime2},
+      %Parameter{name: "@1", value: ~N[2020-02-28 23:59:51], type: :datetime2},
+      %Parameter{name: "@1", value: ~N[2020-02-28 23:59:51.1], type: :datetime2},
+      %Parameter{name: "@1", value: ~N[2020-02-28 23:59:51.01], type: :datetime2},
+      %Parameter{name: "@1", value: ~N[2020-02-28 23:59:51.001], type: :datetime2},
+      %Parameter{name: "@1", value: ~N[2020-02-28 23:59:51.0001], type: :datetime2},
+      %Parameter{name: "@1", value: ~N[2020-02-28 23:59:51.00001], type: :datetime2},
+      %Parameter{name: "@1", value: ~N[2020-02-28 23:59:51.000001], type: :datetime2},
+      %Parameter{name: "@1", value: ~N[2020-02-28 23:59:51.100000], type: :datetime2},
+      %Parameter{name: "@1", value: ~N[2020-02-28 23:59:51.10000], type: :datetime2},
+      %Parameter{name: "@1", value: ~N[2020-02-28 23:59:51.1000], type: :datetime2},
+      %Parameter{name: "@1", value: ~N[2020-02-28 23:59:51.100], type: :datetime2},
+      %Parameter{name: "@1", value: ~N[2020-02-28 23:59:51.10], type: :datetime2},
+      %Parameter{name: "@1", value: ~N[2020-02-28 23:59:51.1], type: :datetime2},
+      %Parameter{name: "@1", value: ~N[2020-02-28 23:59:51.12], type: :datetime2},
+      %Parameter{name: "@1", value: ~N[2020-02-28 23:59:51.123], type: :datetime2},
+      %Parameter{name: "@1", value: ~N[2020-02-28 23:59:51.1234], type: :datetime2},
+      %Parameter{name: "@1", value: ~N[2020-02-28 23:59:51.12345], type: :datetime2},
+      %Parameter{name: "@1", value: ~N[2020-02-28 23:59:51.123456], type: :datetime2},
+      %Parameter{name: "@1", value: ~N[2020-02-28 23:59:59.999999], type: :datetime2}
+    ]
+
+    Enum.each(datetime2s, fn %{value: dt} = p ->
+      {token, scale} = Types.encode_datetime2(dt)
+      assert dt == Types.decode_datetime2(scale, token)
+      # assert [[^dt]] = query("SELECT CONVERT(VARCHAR(100), @1, 126)", [p])
+      assert [[^dt]] = query("SELECT @1", [p])
     end)
   end
 end

@@ -56,13 +56,15 @@ defmodule Tds.Parameter do
   end
 
   def do_name([param | tail], name, acc) do
+    name = name + 1
     param =
       case param do
-        %Tds.Parameter{} -> param
-        raw_param -> fix_data_type(raw_param, name + 1)
+        %Tds.Parameter{name: nil} -> fix_data_type(%{param | name: "@#{name}"})
+        %Tds.Parameter{} -> fix_data_type(param)
+        raw_param -> fix_data_type(raw_param, name)
       end
 
-    do_name(tail, name + 1, [param | acc])
+    do_name(tail, name, [param | acc])
   end
 
   def do_name([], _, acc) do
