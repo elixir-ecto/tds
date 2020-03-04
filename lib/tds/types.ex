@@ -1535,7 +1535,7 @@ defmodule Tds.Types do
     date = :calendar.gregorian_days_to_date(@year_1900_days + days)
 
     milliseconds = round(secs300 * 10 / 3)
-    usec = rem(milliseconds, 1_000) |> IO.inspect()
+    usec = rem(milliseconds, 1_000)
 
     seconds = div(milliseconds, 1_000)
 

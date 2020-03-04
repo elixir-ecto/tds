@@ -45,7 +45,7 @@ defmodule DatetimeTest do
              |> Types.encode_datetime()
              |> Types.decode_datetime()
 
-    assert {@date, {15, 16, 23, 123_333}} ==
+    assert {@date, {15, 16, 23, 123}} ==
              @datetime_fsec
              |> Types.encode_datetime()
              |> Types.decode_datetime()
@@ -68,7 +68,7 @@ defmodule DatetimeTest do
                %Parameter{name: "@n1", value: @datetime, type: :datetime}
              ])
 
-    assert [[{{2015, 4, 8}, {15, 16, 23, 123_333}}]] ==
+    assert [[{{2015, 4, 8}, {15, 16, 23, 123}}]] ==
              "SELECT @n1"
              |> query([
                %Parameter{name: "@n1", value: @datetime_fsec, type: :datetime}
