@@ -18,7 +18,7 @@ defmodule ElixirCalendarTest do
     {:ok, [pid: pid]}
   end
 
-  test "Elixir.Time type", context do
+  test "Elixir.Time and SQL time(n) with max scale 6", context do
     times = [
       ~T[20:26:51.123000],
       ~T[20:26:51],
@@ -33,13 +33,28 @@ defmodule ElixirCalendarTest do
       ~T[20:26:51.12],
       ~T[20:26:51.123],
       ~T[20:26:51.1234],
-      ~T[20:26:51.12345]
+      ~T[20:26:51.12345],
+      ~T[20:26:51.123456]
     ]
 
     Enum.each(times, fn t ->
       {time, scale} = Types.encode_time(t)
       assert t == Types.decode_time(scale, time)
       assert [[^t]] = query("SELECT @1", [%P{name: "@1", value: t}])
+    end)
+  end
+
+  test "should truncate SQL time(7) to Elixir.Time with precision 6", context do
+    times = [
+      {~T[20:26:51.123456], "20:26:51.1234567"},
+      {~T[20:26:51.000000], "20:26:51.0000000"},
+      {~T[20:26:51.000000], "20:26:51"},
+      {~T[20:26:51.000000], "20:26:51.0000001"}
+    ]
+
+    Enum.each(times, fn {time, str} ->
+      assert [[time]] ==
+               query("SELECT cast(@1 as time(7))", P.prepare_params(str))
     end)
   end
 
@@ -126,8 +141,23 @@ defmodule ElixirCalendarTest do
     end)
   end
 
+  test "should truncate SQL datetime2(7) to Elixir.NaiveDateTime with precision 6",
+       context do
+    datetimes = [
+      {~N[2020-02-28 23:59:59.999999], "2020-02-28T23:59:59.9999999"},
+      {~N[2020-02-28 23:59:59.000000], "2020-02-28T23:59:59.0000001"},
+      {~N[2020-02-28 23:59:59.000000], "2020-02-28T23:59:59"}
+    ]
+
+    Enum.each(datetimes, fn {dt, str} ->
+      assert [[dt]] ==
+               query("SELECT cast(@1 as datetime2(7))", P.prepare_params([str]))
+    end)
+  end
+
   test "Elixir.DateTime to SQL DateTimeOffset", context do
     type = :datetimeoffset
+
     dts = [
       %P{name: "@1", value: ~U[2020-02-28 23:59:59.000000Z], type: type},
       %P{name: "@1", value: ~U[2020-02-28 23:59:59.00000Z], type: type},
@@ -154,6 +184,21 @@ defmodule ElixirCalendarTest do
       token = Types.encode_datetimeoffset(dt, s)
       assert dt == Types.decode_datetimeoffset(s, token)
       assert [[^dt]] = query("SELECT @1 ", [p])
+    end)
+  end
+
+  test "should truncate datetimeoffset(7) to Elixir.DateTime with precision 6",
+       context do
+    dts = [
+      {~U[2020-02-28 23:59:59.999999Z], "2020-02-28T23:59:59.9999999Z"},
+      {~U[2020-02-28 23:59:59.000000Z], "2020-02-28T23:59:59.0000000Z"},
+      {~U[2020-02-28 23:59:59.000000Z], "2020-02-28T23:59:59.0000001Z"},
+      {~U[2020-02-28 23:59:59.000000Z], "2020-02-28T23:59:59Z"}
+    ]
+
+    Enum.each(dts, fn {dto, p} ->
+      query = "SELECT CAST(@1 as datetimeoffset(7))"
+      assert [[dto]] == query(query, P.prepare_params([p]))
     end)
   end
 end
