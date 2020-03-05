@@ -88,7 +88,9 @@ defmodule ElixirCalendarTest do
                  %P{name: "@1", value: dt_in, type: :datetime}
                ])
     end)
-    type = :datetime
+
+    type = :datetime2
+
     datetime2s = [
       %P{name: "@1", value: ~N[2020-02-28 23:59:51.000000], type: type},
       %P{name: "@1", value: ~N[2020-02-28 23:59:51.00000], type: type},
@@ -114,7 +116,7 @@ defmodule ElixirCalendarTest do
       %P{name: "@1", value: ~N[2020-02-28 23:59:51.1234], type: type},
       %P{name: "@1", value: ~N[2020-02-28 23:59:51.12345], type: type},
       %P{name: "@1", value: ~N[2020-02-28 23:59:51.123456], type: type},
-      %P{name: "@1", value: ~N[2020-02-28 23:59:59.999999], type: type},
+      %P{name: "@1", value: ~N[2020-02-28 23:59:59.999999], type: type}
     ]
 
     Enum.each(datetime2s, fn %{value: dt} = p ->
@@ -145,14 +147,13 @@ defmodule ElixirCalendarTest do
       %P{name: "@1", value: ~U[2020-02-28 23:59:59.1234Z], type: type},
       %P{name: "@1", value: ~U[2020-02-28 23:59:59.12345Z], type: type},
       %P{name: "@1", value: ~U[2020-02-28 23:59:59.123456Z], type: type},
-      %P{name: "@1", value: ~U[2020-02-28 23:59:59.999999Z], type: type},
+      %P{name: "@1", value: ~U[2020-02-28 23:59:59.999999Z], type: type}
     ]
 
-    Enum.each(dts, fn %{value: dt, microsecond: {_, s}} = p ->
-      {token, scale} = Types.encode_datetimeoffset(dt, s)
-      assert dt == Types.decode_datetimeoffset(scale, token)
-      assert [[^dt]] = query("SELECT @1", [p])
+    Enum.each(dts, fn %{value: %{microsecond: {_, s}} = dt} = p ->
+      token = Types.encode_datetimeoffset(dt, s)
+      assert dt == Types.decode_datetimeoffset(s, token)
+      assert [[^dt]] = query("SELECT @1 ", [p])
     end)
-
   end
 end

@@ -1020,7 +1020,13 @@ defmodule Tds.Types do
           end
 
         :datetimeoffset ->
-          "datetimeoffset"
+          case value do
+            %DateTime{microsecond: {_, s}} ->
+              "datetimeoffset(#{s})"
+
+            _ ->
+              "datetimeoffset"
+          end
 
         :date ->
           "date"
@@ -1428,7 +1434,16 @@ defmodule Tds.Types do
     if data == nil do
       <<0x00>>
     else
-      <<0x0A>> <> data
+      case value do
+        %DateTime{microsecond: {_, s}} when s < 3 ->
+          <<0x08, data::binary>>
+
+        %DateTime{microsecond: {_, s}} when s < 5 ->
+          <<0x09, data::binary>>
+
+        _ ->
+          <<0x0A, data::binary>>
+      end
     end
   end
 
@@ -1593,8 +1608,8 @@ defmodule Tds.Types do
 
   # Time
   def decode_time(scale, <<fsec::binary>>) do
+    # this is kind of rendudant, since "size" can be, and is, read from token
     parsed_fsec =
-      # this is kind of rendudant, since "size" can be, and is, read from token
       cond do
         scale in [0, 1, 2] ->
           <<parsed_fsec::little-unsigned-24>> = fsec
@@ -1672,13 +1687,13 @@ defmodule Tds.Types do
 
     bin =
       cond do
-        scale in [0, 1, 2] ->
+        scale < 3 ->
           <<fsec::little-unsigned-24>>
 
-        scale in [3, 4] ->
+        scale < 5 ->
           <<fsec::little-unsigned-32>>
 
-        scale in [5, 6, 7] ->
+        :else ->
           <<fsec::little-unsigned-40>>
       end
 
@@ -1778,6 +1793,7 @@ defmodule Tds.Types do
         datetime
     end
   end
+
   def encode_datetimeoffset(datetimetz, scale \\ @max_time_scale)
   def encode_datetimeoffset(nil, _), do: nil
 
@@ -1786,13 +1802,26 @@ defmodule Tds.Types do
     datetime <> <<offset_min::little-signed-16>>
   end
 
-  def encode_datetimeoffset(%DateTime{utc_offset: offset} = dt, scale) do
-    {datetime, _ignore_allways_10bytes} =
+  def encode_datetimeoffset(
+        %DateTime{utc_offset: offset} = dt,
+        scale
+      ) do
+    {datetime, s} =
       dt
       |> DateTime.to_naive()
       |> encode_datetime2(scale)
 
-    datetime <> <<offset::little-signed-16>>
+    cond do
+      s < 3 ->
+        datetime <> <<offset::little-signed-16>>
+
+      s < 5 ->
+        datetime <> <<offset::little-signed-16>>
+
+      :else ->
+        <<datetime::binary-8, offset::little-signed-16>>
+    end
+
   end
 
   def encode_datetime_type(%Parameter{}) do
@@ -1838,7 +1867,9 @@ defmodule Tds.Types do
     end
   end
 
-  def encode_datetime2_type(%Parameter{value: %NaiveDateTime{microsecond: {_, s}}}) do
+  def encode_datetime2_type(%Parameter{
+        value: %NaiveDateTime{microsecond: {_, s}}
+      }) do
     type = @tds_data_type_datetime2n
     data = <<type, s>>
     {type, data, scale: s}
@@ -1851,7 +1882,9 @@ defmodule Tds.Types do
     {type, data, scale: 7}
   end
 
-  def encode_datetimeoffset_type(%Parameter{value: %DateTime{microsecond: {_, s}}}) do
+  def encode_datetimeoffset_type(%Parameter{
+        value: %DateTime{microsecond: {_, s}}
+      }) do
     type = @tds_data_type_datetimeoffsetn
     data = <<type, s>>
     {type, data, scale: s}
