@@ -247,7 +247,7 @@ defmodule Tds.Protocol do
           | {DBConnection.status(), new_state :: t}
           | {:disconnect, Exception.t(), new_state :: t}
   def handle_begin(opts, %{env: env, transaction: tran} = s) do
-    isolation_level = Keyword.get(opts, :isolation_level, :no_change)
+    isolation_level = Keyword.get(opts, :isolation_level, :read_committed)
 
     case Keyword.get(opts, :mode, :transaction) do
       :transaction when tran == nil ->
@@ -293,7 +293,8 @@ defmodule Tds.Protocol do
       :transaction when transaction in [:started, :failed] ->
         env = %{env | savepoint: 0}
         s = %{s | transaction: nil, env: env}
-        send_transaction("TM_ROLLBACK_XACT", [name: 0], s)
+        payload = [name: 0, isolation_level: :read_committed]
+        send_transaction("TM_ROLLBACK_XACT", payload, s)
 
       :savepoint when transaction in [:started, :failed] ->
         payload = [name: env.savepoint]
