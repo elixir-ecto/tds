@@ -2,7 +2,7 @@ defmodule Tds.Mixfile do
   @moduledoc false
   use Mix.Project
 
-  @version "2.0.3"
+  @version "2.0.4"
   def project do
     [
       app: :tds,
