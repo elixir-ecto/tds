@@ -1488,7 +1488,6 @@ defmodule Tds.Types do
   @secs_in_hour 60 * @secs_in_min
   # @secs_in_day 24 * @secs_in_hour
   @max_time_scale 7
-  @usecs_in_sec 1_000_000
 
   # Date
   def decode_date(<<days::little-24>>) do
