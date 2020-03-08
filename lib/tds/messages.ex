@@ -38,7 +38,7 @@ defmodule Tds.Messages do
   # @tds_sp_cursorclose 9
   @tds_sp_executesql 10
   @tds_sp_prepare 11
-  # @tds_sp_execute 12
+  @tds_sp_execute 12
   # @tds_sp_prepexec 13
   # @tds_sp_prepexecrpc 14
   @tds_sp_unprepare 15
@@ -517,16 +517,30 @@ defmodule Tds.Messages do
   end
 
   defp encode_rpc(:sp_execute, params) do
-    # We can't use the RPC name's identifier here and no one rly knows why.
-    # This best explanation I can find is below from FreeTds docs:
-    # sp_execute seems to have some problems, even MS ODBC use name version
-    # instead of number.
+    param_data =
+      params
+      |> Enum.map(fn
+        %{name: "@handle"} = p ->
+          # WARNING: This is not documented in official MS-TDS documentation!!!
+          # if we use ProcIDSwitch == 0xFFFF and ProcID == 12 then
+          # @handle parameter name must be ommited from RPC ParameterMetadata
+          # for that parameter. Otherwise RPC will fail and we must use ProceName
+          # instead. But we want to avoid execution overhead with named approach
+          # hence ommiting @handle from parameter name
+          %{p| name: ""}
 
-    rpc_size = byte_size("sp_execute")
-    rpc_name = to_little_ucs2("sp_execute")
+        p ->
+          # other paramters should be named
+          p
+      end)
+      |> encode_rpc_params("")
 
-    <<rpc_size::little-size(16)>> <>
-      rpc_name <> <<0x00, 0x00>> <> encode_rpc_params(params, "")
+    <<
+      0xFFFF::size(2)-unit(8),
+      @tds_sp_execute::little-size(2)-unit(8),
+      0x00::size(2)-unit(8),
+      param_data::binary
+    >>
   end
 
   defp encode_rpc(:sp_unprepare, params) do
