@@ -184,7 +184,10 @@ installation instructions here:
 Make sure your SQL Server accepts the credentials defined in `config/test.exs`.
 
 You also will need to have the *sqlcmd* command line tools installed. Setup
-instructions can be found [here](https://docs.microsoft.com/en-us/sql/linux/sql-server-linux-setup-tools).
+instructions can be found here:
+
+* [Linux](https://docs.microsoft.com/en-us/sql/linux/sql-server-linux-setup-tools)
+* [macOS](https://docs.microsoft.com/en-us/sql/connect/odbc/linux-mac/install-microsoft-odbc-driver-sql-server-macos)
 
 ## Special Thanks
 
