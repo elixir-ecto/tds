@@ -108,4 +108,38 @@ defmodule Tds do
   def json_library() do
     Application.fetch_env!(:tds, :json_library)
   end
+
+  @doc """
+  Generates a version 4 (random) UUID in the MS uniqueidentifier binary format.
+  """
+  @spec generate_uuid :: <<_::128>>
+  def generate_uuid(), do: Tds.Types.UUID.bingenerate()
+
+  @doc """
+  Decodes MS uniqueidentifier binary to its string representation
+  """
+  def decode_uuid(uuid), do: Tds.Types.UUID.load(uuid)
+
+  @doc """
+  Same as `decode_uuid/1` but raises `ArgumentError` if value is invalid
+  """
+  def decode_uuid!(uuid) do
+    case Tds.Types.UUID.load(uuid) do
+      {:ok, value} -> value
+      :error ->
+        raise ArgumentError, "Invalid uuid binary #{inspect(uuid)}"
+    end
+  end
+
+  @doc """
+  Encodes uuid string into MS uniqueidentifier binary
+  """
+  @spec encode_uuid(any) :: :error | {:ok, <<_::128>>}
+  def encode_uuid(value), do: Tds.Types.UUID.dump(value)
+
+  @doc """
+  Same as `encode_uuid/1` but raises `ArgumentError` if value is invalid
+  """
+  @spec encode_uuid!(any) :: <<_::128>>
+  def encode_uuid!(value), do: Tds.Types.UUID.dump!(value)
 end

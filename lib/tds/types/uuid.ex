@@ -1,12 +1,5 @@
 defmodule Tds.Types.UUID do
-  @moduledoc """
-  An type for UUIDs strings.
-  """
-
-  @doc """
-  The Ecto type.
-  """
-  def type(), do: :uuid
+  @moduledoc false
 
   @doc """
   Casts to UUID.
