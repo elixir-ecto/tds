@@ -8,7 +8,7 @@
 fields if schema requires it.
 * `Tds.Type.UUID` is moved to `ecto_sql` please use `Tds.Ecto.UUID` instead if you are using ecto.
 * `Tds.generate_uuid/0` is added so users can generate valid binary MS UUIDS, 
-there is also `Tds.parse_uuid/1` that should help parsing MS UUID binary to its string representation
+there is also `Tds.decode_uuid/1` that should help parsing MS UUID binary to its string representation
 * `sp_execute` is now using **PROCID** in protocol so message size is reduced for few bytes
 * In explicit transactions (`Tds.transaction/2`) now you can tell transaction manager what isolation level you need. 
 You are encaruadged to use this instead of `SET TRANSACTION ISOLATION LEVEL ...` due:
