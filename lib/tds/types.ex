@@ -6,10 +6,9 @@ defmodule Tds.Types do
   alias Tds.Parameter
 
   @year_1900_days :calendar.date_to_gregorian_days({1900, 1, 1})
-  # @days_in_month 30
   @secs_in_min 60
   @secs_in_hour 60 * @secs_in_min
-  # @secs_in_day 24 * @secs_in_hour
+  @max_time_scale 7
 
   @tds_data_type_null 0x1F
   @tds_data_type_tinyint 0x30
@@ -307,14 +306,7 @@ defmodule Tds.Types do
         {type_info, rest}
 
       data_type_code == @tds_data_type_xml ->
-        <<schema::unsigned-8, rest::binary>> = tail
-
-        if schema == 1 do
-          # TODO should stick a raise in here??
-          # BVarChar dbname
-          # BVarChar owning schema
-          # USVarChar xml schema collection
-        end
+        {_schema_info, rest} = decode_schema_info(tail)
 
         type_info =
           def_type_info
@@ -394,14 +386,13 @@ defmodule Tds.Types do
         <<length::signed-32, numparts::signed-8, rest::binary>> = tail
 
         rest =
-          Enum.reduce(1..numparts, rest, fn _,
-                                            <<
-                                              size::unsigned-16,
-                                              _str::size(size)-unit(16),
-                                              next_rest::binary
-                                            >> ->
-            next_rest
-          end)
+          Enum.reduce(
+            1..numparts,
+            rest,
+            fn _, <<s::unsigned-16, _str::size(s)-unit(16), next::binary>> ->
+              next
+            end
+          )
 
         type_info =
           def_type_info
@@ -1476,18 +1467,9 @@ defmodule Tds.Types do
     do:
       raise(
         ArgumentError,
-        "Erlang integer value #{int} is too big (more than 64bits) to fit tds integer/bigint. Please consider using Decimal.new/1 to maintain precision."
+        "Erlang integer value #{int} is too big (more than 64bits) to fit tds" <>
+          " integer/bigint. Please consider using Decimal.new/1 to maintain precision."
       )
-
-  @doc """
-  Data Encoding DateTime Types
-  """
-  @year_1900_days :calendar.date_to_gregorian_days({1900, 1, 1})
-  # @days_in_month 30
-  @secs_in_min 60
-  @secs_in_hour 60 * @secs_in_min
-  # @secs_in_day 24 * @secs_in_hour
-  @max_time_scale 7
 
   # Date
   def decode_date(<<days::little-24>>) do
@@ -1556,15 +1538,6 @@ defmodule Tds.Types do
     {_, {h, m, s}} = :calendar.seconds_to_daystime(seconds)
 
     if use_elixir_calendar_types?() do
-      # precision =
-      #   case Integer.digits(usec) do
-      #     [0] -> 0
-      #     [_, 0] -> 2
-      #     [_, 0, 0] -> 1
-      #     [_, _, 0] -> 2
-      #     _ -> 3
-      #   end
-
       NaiveDateTime.from_erl!(
         {date, {h, m, s}},
         {usec * 1_000, 3},
@@ -1820,7 +1793,24 @@ defmodule Tds.Types do
       :else ->
         <<datetime::binary-8, offset::little-signed-16>>
     end
+  end
 
+  def decode_schema_info(<<0x00, tail::binary>>) do
+    {nil, tail}
+  end
+
+  def decode_schema_info(<<0x01, tail::binary>>) do
+    <<s::little-unsigned-8, str::binary-size(s)-unit(16), next::binary>> = tail
+    db = ucs2_to_utf(str)
+
+    <<s::little-unsigned-8, str::binary-size(s)-unit(16), next::binary>> = next
+    prefix = ucs2_to_utf(str)
+
+    <<s::little-unsigned-16, str::binary-size(s)-unit(16), next::binary>> = next
+    xml_schema = ucs2_to_utf(str)
+
+    schema_info = %{db: db, prefix: prefix, schema: xml_schema}
+    {schema_info, next}
   end
 
   def encode_datetime_type(%Parameter{}) do
