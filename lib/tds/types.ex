@@ -1800,17 +1800,23 @@ defmodule Tds.Types do
   end
 
   def decode_schema_info(<<0x01, tail::binary>>) do
-    <<s::little-unsigned-8, str::binary-size(s)-unit(16), next::binary>> = tail
-    db = ucs2_to_utf(str)
+    <<
+      dblen::little-unsigned-8,
+      db::binary-size(dblen)-unit(16),
+      prefixlen::little-unsigned-8,
+      prefix::binary-size(prefixlen)-unit(16),
+      schemalen::little-unsigned-16,
+      schema::binary-size(schemalen)-unit(16),
+      rest::binary
+    >> = tail
 
-    <<s::little-unsigned-8, str::binary-size(s)-unit(16), next::binary>> = next
-    prefix = ucs2_to_utf(str)
+    schema_info = %{
+      db: ucs2_to_utf(db),
+      prefix: ucs2_to_utf(prefix),
+      schema: ucs2_to_utf(schema)
+    }
 
-    <<s::little-unsigned-16, str::binary-size(s)-unit(16), next::binary>> = next
-    xml_schema = ucs2_to_utf(str)
-
-    schema_info = %{db: db, prefix: prefix, schema: xml_schema}
-    {schema_info, next}
+    {schema_info, rest}
   end
 
   def encode_datetime_type(%Parameter{}) do
