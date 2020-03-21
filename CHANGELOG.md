@@ -1,10 +1,10 @@
 # v2.1.0
 ### BugFix
-* Columns that uses XML schema now are properly parsed
+* ColMetadata token that contains XML schema_info now is parsed correctly.
 
 ### Improvements
 * Improved compatibiliy with `ecto_sql` TDS adapter
-* Removed `Tds.Types.VarChar`. From now `ecto_sql` implments `Tds.Ecto.VarChar` that should be used in
+* Removed `Tds.Types.VarChar`. From now `ecto_sql` implements `Tds.Ecto.VarChar` that should be used in
 fields if schema requires it.
 * `Tds.Type.UUID` is still available for driver only usage, if you are using `ecto_sql` please use `Tds.Ecto.UUID` instead
 * `sp_execute` is now using **PROCID** in protocol so message size is reduced for few bytes
