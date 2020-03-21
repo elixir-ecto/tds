@@ -1,3 +1,24 @@
+# v2.1.0
+### BugFix
+* Columns that uses XML schema now are properly parsed
+
+### Improvements
+* Improved compatibiliy with `ecto_sql` TDS adapter
+* Removed `Tds.Types.VarChar`. From now `ecto_sql` implments `Tds.Ecto.VarChar` that should be used in
+fields if schema requires it.
+* `Tds.Type.UUID` is still available for driver only usage, if you are using `ecto_sql` please use `Tds.Ecto.UUID` instead
+* `sp_execute` is now using **PROCID** in protocol so message size is reduced for few bytes
+* In explicit transactions (`Tds.transaction/2`) now you can tell transaction manager what isolation level you need. 
+You are encaruadged to use this instead of `SET TRANSACTION ISOLATION LEVEL ...` due:
+  - Less roundtrips to database (saving 3 RPC calls)
+  - Less bytes are sent over wire since all is in single transaction manager call
+  - snapshot isolation level works in combination with connection settings `set_allow_snapshot_isolation: :on`
+* Elixir calendar types are supported if connection is configured with `use_elixir_calendar_types: true`, 
+columns that are of sql types `SmallDateTime`, `DateTime`, `DateTime2`, `DateTimeOffset`, `Time` and `Date` will be 
+decoded into elixir `NaiveDateTime`, `DateTime`, `Time` and `Date`. If this falg is not set to connection tuples will be used.
+* Rustler dependency is not mandatory anymore. Requirements are muved to `tds_encoding` library. If you need non latin1 encoding 
+for your varchars please add this library to your dependency and add in configuration `config :tds, :text_encoder, Tds.Encoding`
+
 # v2.0.1-rc1
 ### Breaking changes
 In order to improve compatibility with `ecto_sql`, following breaking changes are introduced in this release:
