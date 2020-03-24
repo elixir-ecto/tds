@@ -1108,9 +1108,6 @@ defmodule Tds.Types do
     "#{name} #{desc}"
   end
 
-  @doc """
-  Implictly Selected Types
-  """
   # nil
   def encode_param_descriptor(param),
     do: param |> Parameter.fix_data_type() |> encode_param_descriptor()
@@ -1195,8 +1192,10 @@ defmodule Tds.Types do
   # def encode_binary_descriptor(value), do: "varbinary(#{byte_size(value)})"
 
   @doc """
-  Data Encoding Binary Types
+  Data encoding
   """
+
+  # binary
   def encode_data(@tds_data_type_bigvarbinary, value, attr)
       when is_integer(value),
       do: encode_data(@tds_data_type_bigvarbinary, <<value>>, attr)
@@ -1212,9 +1211,7 @@ defmodule Tds.Types do
     end
   end
 
-  @doc """
-  Data Encoding String Types
-  """
+  # string
   def encode_data(@tds_data_type_nvarchar, nil, _),
     do: <<@tds_plp_null::little-unsigned-64>>
 
@@ -1234,9 +1231,7 @@ defmodule Tds.Types do
     end
   end
 
-  @doc """
-  Data Encoding Positive Integers Types
-  """
+  # integers
   def encode_data(_, value, _) when is_integer(value) do
     size = int_type_size(value)
     <<size>> <> <<value::little-signed-size(size)-unit(8)>>
@@ -1250,9 +1245,7 @@ defmodule Tds.Types do
     <<0>>
   end
 
-  @doc """
-  Data Encoding Float Types
-  """
+  # float
   def encode_data(@tds_data_type_floatn, nil, _) do
     <<0>>
   end
@@ -1287,9 +1280,7 @@ defmodule Tds.Types do
     # end
   end
 
-  @doc """
-  Data Encoding Decimal Types
-  """
+  # decimal
   def encode_data(@tds_data_type_decimaln, %Decimal{} = value, attr) do
     d_ctx = Decimal.get_context()
     d_ctx = %{d_ctx | precision: 38}
@@ -1339,9 +1330,7 @@ defmodule Tds.Types do
     encode_data(data_type, Decimal.new(value), attr)
   end
 
-  @doc """
-  Data Encoding UUID Types
-  """
+  # uuid
   def encode_data(@tds_data_type_uniqueidentifier, value, _) do
     if value != nil do
       <<0x10>> <> encode_uuid(value)
@@ -1350,9 +1339,7 @@ defmodule Tds.Types do
     end
   end
 
-  @doc """
-  Data Encoding DateTime Types
-  """
+  # datetime
   def encode_data(@tds_data_type_daten, value, _attr) do
     data = encode_date(value)
 
