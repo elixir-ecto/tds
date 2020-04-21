@@ -100,7 +100,7 @@ defmodule Tds do
 
   To customize the JSON library, include the following in your `config/config.exs`:
 
-      config :myxql, json_library: SomeJSONModule
+      config :tds, json_library: SomeJSONModule
 
   Defaults to `Jason`.
   """
