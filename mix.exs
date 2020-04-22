@@ -18,6 +18,7 @@ defmodule Tds.Mixfile do
       ],
       description: description(),
       package: package(),
+      xref: [exclude: [:ssl]],
       rustler_crates: [
         tds_encoding: [
           mode: (if Mix.env() == :prod, do: :release, else: :debug)
