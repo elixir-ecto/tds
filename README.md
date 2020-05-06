@@ -67,7 +67,7 @@ Example configuration
 ```elixir
 import Mix.Config
 
-config :your_app, tds_conn,
+config :your_app, :tds_conn,
   hostname: "localhost", 
   username: "test_user", 
   password: "test_password", 
@@ -86,7 +86,7 @@ you can try switching how tds executes queries as below:
 ```elixir
 import Mix.Config
 
-config :your_app, tds_conn,
+config :your_app, :tds_conn,
   hostname: "localhost", 
   username: "test_user", 
   password: "test_password", 
