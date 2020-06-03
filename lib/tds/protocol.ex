@@ -43,7 +43,7 @@ defmodule Tds.Protocol do
           sock: nil | sock,
           usock: nil | pid,
           itcp: term,
-          opts: Keyword.t(),
+          opts: nil | Keyword.t(),
           state: state,
           result: nil | list(),
           query: nil | String.t(),
@@ -186,6 +186,7 @@ defmodule Tds.Protocol do
         %{sock: _sock} = s
       ) do
     params = opts[:parameters] || params
+    Process.put(:resultset, Keyword.get(opts, :resultset, false))
 
     if params != [] do
       send_param_query(query, params, s)
@@ -202,6 +203,8 @@ defmodule Tds.Protocol do
     other ->
       other
   after
+    Process.delete(:resultset)
+
     unless is_nil(handle) do
       handle_close(query, opts, %{s | state: :executing})
     end
@@ -565,7 +568,7 @@ defmodule Tds.Protocol do
     end
   end
 
-  def send_query(statement, s) do
+  defp send_query(statement, s) do
     msg = msg_sql(query: statement)
 
     case msg_send(msg, %{s | state: :executing}) do
@@ -632,11 +635,11 @@ defmodule Tds.Protocol do
           | {:disconnect, any(), %{env: any(), sock: {any(), any()}}}
           | {:error, Tds.Error.t(), %{pak_header: <<>>, tail: <<>>}}
           | {:ok, any(), %{result: any(), state: :ready}}
-  def send_param_query(
-        %Query{handle: handle, statement: statement} = _,
-        params,
-        %{transaction: :started} = s
-      ) do
+  defp send_param_query(
+         %Query{handle: handle, statement: statement} = _,
+         params,
+         %{transaction: :started} = s
+       ) do
     msg =
       case handle do
         nil ->
@@ -684,11 +687,11 @@ defmodule Tds.Protocol do
     end
   end
 
-  def send_param_query(
-        %Query{handle: handle, statement: statement} = _,
-        params,
-        s
-      ) do
+  defp send_param_query(
+         %Query{handle: handle, statement: statement} = _,
+         params,
+         s
+       ) do
     msg =
       case handle do
         nil ->
@@ -785,15 +788,14 @@ defmodule Tds.Protocol do
     |> send_query(state)
   end
 
-  def message(
-        :executing,
-        msg_result(set: set, status: _status, params: _params),
-        %{} = s
-      ) do
+  def message(:executing, msg_result(set: set), s) do
+    resultset? = Process.get(:resultset, false)
+
     result =
-      case set do
-        [] -> %Tds.Result{rows: nil}
-        [h | _t] -> h
+      case {set, resultset?} do
+        {r, true} -> r
+        {r, false} -> List.first(r) || %Tds.Result{rows: nil}
+        {[h | _t], _false} -> h
       end
 
     {:ok, mark_ready(%{s | result: result})}
@@ -853,11 +855,16 @@ defmodule Tds.Protocol do
     end
   end
 
-  defp msg_send(msg, %{sock: {mod, sock}, env: env, state: state, opts: opts} = s) do
+  defp msg_send(
+         msg,
+         %{sock: {mod, sock}, env: env, state: state, opts: opts} = s
+       ) do
     :inet.setopts(sock, active: false)
+
     opts
     |> Keyword.get(:use_elixir_calendar_types, false)
     |> use_elixir_calendar_types()
+
     {t_send, _} =
       :timer.tc(fn ->
         msg

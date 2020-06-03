@@ -19,6 +19,20 @@ defmodule Tds.TestHelper do
     end
   end
 
+  defmacro query_multi(statement, params \\ [], opts \\ []) do
+    quote do
+      case Tds.query_multi(
+             var!(context)[:pid],
+             unquote(statement),
+             unquote(params),
+             unquote(opts)
+           ) do
+        {:ok, resultset} -> resultset
+        {:error, %Tds.Error{} = err} -> err
+      end
+    end
+  end
+
   defmacro proc(proc, params, opts \\ []) do
     quote do
       case Connection.proc(

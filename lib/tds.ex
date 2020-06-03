@@ -29,6 +29,24 @@ defmodule Tds do
     end
   end
 
+  @doc """
+  Executes statement that can contain multiple sql batches, result will contain
+  all results that server yield for each batch.
+  """
+  def query_multi(pid, statemnt, params, opts \\ []) do
+    query = %Query{statement: statemnt}
+
+    opts =
+      opts
+      |> Keyword.put_new(:parameters, params)
+      |> Keyword.put_new(:resultset, true)
+
+    case DBConnection.prepare_execute(pid, query, params, opts) do
+      {:ok, _query, resultset} -> {:ok, resultset}
+      {:error, err} -> {:error, err}
+    end
+  end
+
   def prepare(pid, statement, opts \\ []) do
     query = %Query{statement: statement}
 
@@ -125,7 +143,9 @@ defmodule Tds do
   """
   def decode_uuid!(uuid) do
     case Tds.Types.UUID.load(uuid) do
-      {:ok, value} -> value
+      {:ok, value} ->
+        value
+
       :error ->
         raise ArgumentError, "Invalid uuid binary #{inspect(uuid)}"
     end
