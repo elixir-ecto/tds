@@ -1,3 +1,9 @@
+# v2.1.1
+### Improvements
+* As per discussion [here](https://github.com/livehelpnow/tds/issues/108) exposed 
+`Tds.query_multi/4` that should return complete resultset rather than single `%Tds.Result{}` 
+so one can run multiple batches in single statement
+
 # v2.1.0
 ### BugFix
 * ColMetadata token that contains XML schema_info now is parsed correctly.
