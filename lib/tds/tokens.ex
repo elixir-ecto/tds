@@ -355,9 +355,9 @@ defmodule Tds.Tokens do
 
         0x0D ->
           <<
-            0x00,
             new_value_size::unsigned-8,
             _new_value::binary(new_value_size, 16),
+            0x00,
             rest::binary
           >> = tail
 
