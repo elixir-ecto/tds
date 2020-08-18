@@ -1750,7 +1750,7 @@ defmodule Tds.Types do
 
         offset = offset_min * 60
         {:ok, datetime, ^offset} = DateTime.from_iso8601("#{str}+#{h}:#{m}")
-        datetime
+        DateTime.add(datetime, offset)
     end
   end
 
