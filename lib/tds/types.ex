@@ -1748,7 +1748,8 @@ defmodule Tds.Types do
           Integer.to_string(h)
           |> String.pad_leading(2, "0")
 
-        {:ok, datetime, ^offset_min} = DateTime.from_iso8601("#{str}+#{h}:#{m}")
+        offset = offset_min * 60
+        {:ok, datetime, ^offset} = DateTime.from_iso8601("#{str}+#{h}:#{m}")
         datetime
     end
   end
