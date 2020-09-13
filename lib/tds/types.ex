@@ -1406,7 +1406,7 @@ defmodule Tds.Types do
   end
 
   def encode_data(@tds_data_type_datetimeoffsetn, value, _attr) do
-    # Logger.debug "encode_data_datetimeoffsetn #{inspect value}"
+    # Logger.debug("encode_data_datetimeoffsetn #{inspect(value)}")
     data = encode_datetimeoffset(value)
 
     if data == nil do
@@ -1518,7 +1518,7 @@ defmodule Tds.Types do
     date = :calendar.gregorian_days_to_date(@year_1900_days + days)
 
     milliseconds = round(secs300 * 10 / 3)
-    usec = rem(milliseconds, 1_000)
+    us = rem(milliseconds, 1_000)
 
     seconds = div(milliseconds, 1_000)
 
@@ -1527,31 +1527,37 @@ defmodule Tds.Types do
     if use_elixir_calendar_types?() do
       NaiveDateTime.from_erl!(
         {date, {h, m, s}},
-        {usec * 1_000, 3},
+        {us * 1_000, 3},
         Calendar.ISO
       )
     else
-      {date, {h, m, s, usec}}
+      {date, {h, m, s, us}}
     end
   end
 
-  def encode_datetime(nil), do: nil
+  def encode_datetime(time), do: encode_datetime(time, 6)
+  def encode_datetime(nil, _), do: nil
 
-  def encode_datetime(%DateTime{} = dt),
-    do: encode_datetime(DateTime.to_naive(dt))
+  def encode_datetime(%DateTime{} = dt, scale),
+    do: encode_datetime(DateTime.to_naive(dt), scale)
 
-  def encode_datetime(%NaiveDateTime{} = dt) do
+  def encode_datetime(%NaiveDateTime{} = dt, _scale) do
     {date, {h, m, s}} = NaiveDateTime.to_erl(dt)
-    {msec, _} = dt.microsecond
-    encode_datetime({date, {h, m, s, msec}})
+    {us, scale} = dt.microsecond
+    fsec = microsecond_to_fsec(us, scale)
+
+    encode_datetime({date, {h, m, s, fsec}}, scale)
   end
 
-  def encode_datetime({date, {h, m, s}}),
-    do: encode_datetime({date, {h, m, s, 0}})
+  def encode_datetime({date, {h, m, s}}, scale),
+    do: encode_datetime({date, {h, m, s, 0}}, scale)
 
-  def encode_datetime({date, {h, m, s, us}}) do
+  def encode_datetime({date, {h, m, s, fsec}}, scale) do
     days = :calendar.date_to_gregorian_days(date) - @year_1900_days
-    milliseconds = ((h * 60 + m) * 60 + s) * 1_000 + us / 1_000
+
+    fsec_per_s = :math.pow(10, scale)
+
+    milliseconds = ((h * 60 + m) * 60 + s + fsec / fsec_per_s) * 1_000
 
     secs_300 = round(milliseconds / (10 / 3))
 
@@ -1621,16 +1627,10 @@ defmodule Tds.Types do
 
   def encode_time(%Time{} = t) do
     {h, m, s} = Time.to_erl(t)
-    {ms, scale} = t.microsecond
-    # fix ms
-    ms =
-      if scale != 6 do
-        trunc(ms / :math.pow(10, 6 - scale))
-      else
-        ms
-      end
+    {us, scale} = t.microsecond
+    fsec = microsecond_to_fsec(us, scale)
 
-    encode_time({h, m, s, ms}, scale)
+    encode_time({h, m, s, fsec}, scale)
   end
 
   def encode_time(time), do: encode_time(time, @max_time_scale)
@@ -1657,6 +1657,14 @@ defmodule Tds.Types do
       end
 
     {bin, scale}
+  end
+
+  def microsecond_to_fsec(us, scale) do
+    if scale != 6 do
+      trunc(us / :math.pow(10, 6 - scale))
+    else
+      us
+    end
   end
 
   # DateTime2
@@ -1738,6 +1746,9 @@ defmodule Tds.Types do
 
       %NaiveDateTime{} = dt ->
         str = NaiveDateTime.to_iso8601(dt)
+
+        sign = if offset_min >= 0, do: "+", else: "-"
+
         h = trunc(offset_min / 60)
 
         m =
@@ -1745,10 +1756,15 @@ defmodule Tds.Types do
           |> String.pad_leading(2, "0")
 
         h =
-          Integer.to_string(h)
+          abs(h)
+          |> Integer.to_string()
           |> String.pad_leading(2, "0")
 
-        {:ok, datetime, ^offset_min} = DateTime.from_iso8601("#{str}+#{h}:#{m}")
+        offset = offset_min * 60
+
+        {:ok, datetime, ^offset} =
+          DateTime.from_iso8601("#{str}#{sign}#{h}:#{m}")
+
         datetime
     end
   end
@@ -1757,7 +1773,7 @@ defmodule Tds.Types do
   def encode_datetimeoffset(nil, _), do: nil
 
   def encode_datetimeoffset({date, time, offset_min}, scale) do
-    {datetime, _ignore_allways_10bytes} = encode_datetime2({date, time}, scale)
+    {datetime, _ignore_always_10bytes} = encode_datetime2({date, time}, scale)
     datetime <> <<offset_min::little-signed-16>>
   end
 
@@ -1765,21 +1781,14 @@ defmodule Tds.Types do
         %DateTime{utc_offset: offset} = dt,
         scale
       ) do
-    {datetime, s} =
+    {datetime, _} =
       dt
       |> DateTime.to_naive()
       |> encode_datetime2(scale)
 
-    cond do
-      s < 3 ->
-        datetime <> <<offset::little-signed-16>>
+    offset_min = trunc(offset / 60)
 
-      s < 5 ->
-        datetime <> <<offset::little-signed-16>>
-
-      :else ->
-        <<datetime::binary-8, offset::little-signed-16>>
-    end
+    datetime <> <<offset_min::little-signed-16>>
   end
 
   def decode_schema_info(<<0x00, tail::binary>>) do

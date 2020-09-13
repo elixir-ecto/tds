@@ -187,6 +187,70 @@ defmodule ElixirCalendarTest do
     end)
   end
 
+  test "Elixir.DateTime with timezone to SQL DateTimeOffset", context do
+    type = :datetimeoffset
+
+    Calendar.put_time_zone_database(Tzdata.TimeZoneDatabase)
+
+    dts = [
+      %P{name: "@1", value: tza(~U[2020-02-28 13:59:59.000000Z]), type: type},
+      %P{name: "@1", value: tza(~U[2020-02-28 13:59:59.00000Z]), type: type},
+      %P{name: "@1", value: tza(~U[2020-02-28 13:59:59.0000Z]), type: type},
+      %P{name: "@1", value: tza(~U[2020-02-28 13:59:59.000Z]), type: type},
+      %P{name: "@1", value: tza(~U[2020-02-28 13:59:59.00Z]), type: type},
+      %P{name: "@1", value: tza(~U[2020-02-28 13:59:59.0Z]), type: type},
+      %P{name: "@1", value: tza(~U[2020-02-28 13:59:59Z]), type: type},
+      %P{name: "@1", value: tza(~U[2020-02-28 13:59:59.1Z]), type: type},
+      %P{name: "@1", value: tza(~U[2020-02-28 13:59:59.10Z]), type: type},
+      %P{name: "@1", value: tza(~U[2020-02-28 13:59:59.100Z]), type: type},
+      %P{name: "@1", value: tza(~U[2020-02-28 13:59:59.1000Z]), type: type},
+      %P{name: "@1", value: tza(~U[2020-02-28 13:59:59.10000Z]), type: type},
+      %P{name: "@1", value: tza(~U[2020-02-28 13:59:59.100000Z]), type: type},
+      %P{name: "@1", value: tza(~U[2020-02-28 13:59:59.12Z]), type: type},
+      %P{name: "@1", value: tza(~U[2020-02-28 13:59:59.123Z]), type: type},
+      %P{name: "@1", value: tza(~U[2020-02-28 13:59:59.1234Z]), type: type},
+      %P{name: "@1", value: tza(~U[2020-02-28 13:59:59.12345Z]), type: type},
+      %P{name: "@1", value: tza(~U[2020-02-28 13:59:59.123456Z]), type: type},
+      %P{name: "@1", value: tza(~U[2020-02-28 13:59:59.999999Z]), type: type},
+      %P{name: "@1", value: tzb(~U[2020-02-28 13:59:59.000000Z]), type: type},
+      %P{name: "@1", value: tzb(~U[2020-02-28 13:59:59.00000Z]), type: type},
+      %P{name: "@1", value: tzb(~U[2020-02-28 13:59:59.0000Z]), type: type},
+      %P{name: "@1", value: tzb(~U[2020-02-28 13:59:59.000Z]), type: type},
+      %P{name: "@1", value: tzb(~U[2020-02-28 13:59:59.00Z]), type: type},
+      %P{name: "@1", value: tzb(~U[2020-02-28 13:59:59.0Z]), type: type},
+      %P{name: "@1", value: tzb(~U[2020-02-28 13:59:59Z]), type: type},
+      %P{name: "@1", value: tzb(~U[2020-02-28 13:59:59.1Z]), type: type},
+      %P{name: "@1", value: tzb(~U[2020-02-28 13:59:59.10Z]), type: type},
+      %P{name: "@1", value: tzb(~U[2020-02-28 13:59:59.100Z]), type: type},
+      %P{name: "@1", value: tzb(~U[2020-02-28 13:59:59.1000Z]), type: type},
+      %P{name: "@1", value: tzb(~U[2020-02-28 13:59:59.10000Z]), type: type},
+      %P{name: "@1", value: tzb(~U[2020-02-28 13:59:59.100000Z]), type: type},
+      %P{name: "@1", value: tzb(~U[2020-02-28 13:59:59.12Z]), type: type},
+      %P{name: "@1", value: tzb(~U[2020-02-28 13:59:59.123Z]), type: type},
+      %P{name: "@1", value: tzb(~U[2020-02-28 13:59:59.1234Z]), type: type},
+      %P{name: "@1", value: tzb(~U[2020-02-28 13:59:59.12345Z]), type: type},
+      %P{name: "@1", value: tzb(~U[2020-02-28 13:59:59.123456Z]), type: type},
+      %P{name: "@1", value: tzb(~U[2020-02-28 13:59:59.999999Z]), type: type}
+    ]
+
+    Enum.each(dts, fn %{value: %{microsecond: {_, s}} = dt} = p ->
+      token = Types.encode_datetimeoffset(dt, s)
+      utc_dt = DateTime.shift_zone!(dt, "Etc/UTC")
+      assert utc_dt == Types.decode_datetimeoffset(s, token)
+      assert [[^utc_dt]] = query("SELECT @1 ", [p])
+    end)
+  end
+
+  # shift into a timezone with a positive offset
+  defp tza(datetime) do
+    DateTime.shift_zone!(datetime, "Australia/Brisbane")
+  end
+
+  # shift into a timezone with a negative offset
+  defp tzb(datetime) do
+    DateTime.shift_zone!(datetime, "America/Chicago")
+  end
+
   test "should truncate datetimeoffset(7) to Elixir.DateTime with precision 6",
        context do
     dts = [

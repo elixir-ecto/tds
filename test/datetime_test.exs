@@ -17,8 +17,10 @@ defmodule DatetimeTest do
 
   @date {2015, 4, 8}
   @time {15, 16, 23}
-  @time_fsec {15, 16, 23, 123_456}
+  @time_us {15, 16, 23, 123_456}
+  @time_fsec {15, 16, 23, 1_234_567}
   @datetime {@date, @time}
+  @datetime_us {@date, @time_us}
   @datetime_fsec {@date, @time_fsec}
   @offset -240
   @datetimeoffset {@date, @time, @offset}
@@ -46,7 +48,7 @@ defmodule DatetimeTest do
              |> Types.decode_datetime()
 
     assert {@date, {15, 16, 23, 123}} ==
-             @datetime_fsec
+             @datetime_us
              |> Types.encode_datetime()
              |> Types.decode_datetime()
 
@@ -71,7 +73,7 @@ defmodule DatetimeTest do
     assert [[{{2015, 4, 8}, {15, 16, 23, 123}}]] ==
              "SELECT @n1"
              |> query([
-               %Parameter{name: "@n1", value: @datetime_fsec, type: :datetime}
+               %Parameter{name: "@n1", value: @datetime_us, type: :datetime}
              ])
 
     assert :ok =
@@ -149,9 +151,9 @@ defmodule DatetimeTest do
     assert {15, 16, 23, 0} == Types.decode_time(scale, bin)
 
     {bin, scale} = Types.encode_time(@time_fsec, 7)
-    assert {15, 16, 23, 123_456} == Types.decode_time(scale, bin)
+    assert {15, 16, 23, 1_234_567} == Types.decode_time(scale, bin)
 
-    {bin, scale} = Types.encode_time(@time_fsec, 6)
+    {bin, scale} = Types.encode_time(@time_us, 6)
     assert {15, 16, 23, 123_456} == Types.decode_time(scale, bin)
 
     assert [[nil]] == query("SELECT CAST(NULL AS time)", [])
@@ -188,7 +190,7 @@ defmodule DatetimeTest do
                %Parameter{name: "@n1", value: {15, 16, 23, 123}, type: :time}
              ])
 
-    assert [[{15, 16, 23, 123_456}]] ==
+    assert [[{15, 16, 23, 1_234_567}]] ==
              query("SELECT @n1", [
                %Parameter{name: "@n1", value: @time_fsec, type: :time}
              ])
@@ -238,71 +240,9 @@ defmodule DatetimeTest do
                %Parameter{name: "@n1", value: @datetime, type: :datetime2}
              ])
 
-    assert [[{{2015, 4, 8}, {15, 16, 23, 123_456}}]] ==
+    assert [[{{2015, 4, 8}, {15, 16, 23, 1_234_567}}]] ==
              query("SELECT @n1", [
                %Parameter{name: "@n1", value: @datetime_fsec, type: :datetime2}
-             ])
-  end
-
-  test "datetime offset", context do
-    assert nil == Types.encode_datetimeoffset(nil)
-    enc = Types.encode_datetimeoffset(@datetimeoffset)
-
-    assert {@date, {15, 16, 23, 0}, @offset} ==
-             Types.decode_datetimeoffset(7, enc)
-
-    assert @datetimeoffset_fsec ==
-             Types.decode_datetimeoffset(
-               7,
-               Types.encode_datetimeoffset(@datetimeoffset_fsec)
-             )
-
-    assert [[nil]] == query("SELECT CAST(NULL AS datetimeoffset)", [])
-    assert [[nil]] == query("SELECT CAST(NULL AS datetimeoffset(0))", [])
-    assert [[nil]] == query("SELECT CAST(NULL AS datetimeoffset(6))", [])
-
-    assert [[{{2015, 4, 8}, {15, 16, 23, 4_200_000}}]] ==
-             query("SELECT CAST('20150408 15:16:23.42' AS datetime2)", [])
-
-    assert [[{{2015, 4, 8}, {15, 16, 23, 4_200_000}, 0}]] ==
-             query(
-               "SELECT CAST('2015-4-8 15:16:23.42 +0:00' as datetimeoffset(7))",
-               []
-             )
-
-    assert [[{{2015, 4, 8}, {7, 1, 23, 4_200_000}, 495}]] ==
-             query(
-               "SELECT CAST('2015-4-8 15:16:23.42 +8:15' as datetimeoffset(7))",
-               []
-             )
-
-    assert [[{{2015, 4, 8}, {23, 31, 23, 4_200_000}, -495}]] ==
-             query(
-               "SELECT CAST('2015-4-8 15:16:23.42 -8:15' as datetimeoffset(7))",
-               []
-             )
-
-    assert [[nil]] ==
-             query("SELECT @n1", [
-               %Parameter{name: "@n1", value: nil, type: :datetimeoffset}
-             ])
-
-    assert [[{{2015, 4, 8}, {15, 16, 23, 123_456}, -240}]] ==
-             query("SELECT @n1", [
-               %Parameter{
-                 name: "@n1",
-                 value: @datetimeoffset_fsec,
-                 type: :datetimeoffset
-               }
-             ])
-
-    assert [[{{2015, 4, 8}, {15, 16, 23, 0}, -240}]] ==
-             query("SELECT @n1", [
-               %Parameter{
-                 name: "@n1",
-                 value: @datetimeoffset,
-                 type: :datetimeoffset
-               }
              ])
   end
 
@@ -310,10 +250,10 @@ defmodule DatetimeTest do
     assert [[{{2015, 4, 8}, {15, 16, 23, 0}}]] ==
              query("SELECT @n1", [%Parameter{name: "@n1", value: @datetime}])
 
-    # #datetime_fsec {_,_,_,}, {_,_,_,_}
+    # #datetime_us {_,_,_,}, {_,_,_,_}
     assert [[{{2015, 4, 8}, {15, 16, 23, 123_456}}]] ==
              query("SELECT @n1", [
-               %Parameter{name: "@n1", value: @datetime_fsec}
+               %Parameter{name: "@n1", value: @datetime_us}
              ])
 
     # datetime_fsec {_,_,_,}, {_,_,_}, _
@@ -323,7 +263,7 @@ defmodule DatetimeTest do
              ])
 
     # datetime_fsec {_,_,_,}, {_,_,_,_}, _
-    assert [[{{2015, 4, 8}, {15, 16, 23, 123_456}, -240}]] ==
+    assert [[{{2015, 4, 8}, {15, 16, 23, 1_234_567}, -240}]] ==
              query("SELECT @n1", [
                %Parameter{name: "@n1", value: @datetimeoffset_fsec}
              ])
