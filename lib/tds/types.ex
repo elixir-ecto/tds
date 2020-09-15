@@ -1535,29 +1535,23 @@ defmodule Tds.Types do
     end
   end
 
-  def encode_datetime(time), do: encode_datetime(time, 6)
-  def encode_datetime(nil, _), do: nil
+  def encode_datetime(nil), do: nil
 
-  def encode_datetime(%DateTime{} = dt, scale),
-    do: encode_datetime(DateTime.to_naive(dt), scale)
+  def encode_datetime(%DateTime{} = dt),
+    do: encode_datetime(DateTime.to_naive(dt))
 
-  def encode_datetime(%NaiveDateTime{} = dt, _scale) do
+  def encode_datetime(%NaiveDateTime{} = dt) do
     {date, {h, m, s}} = NaiveDateTime.to_erl(dt)
-    {us, scale} = dt.microsecond
-    fsec = microsecond_to_fsec(us, scale)
-
-    encode_datetime({date, {h, m, s, fsec}}, scale)
+    {us, _} = dt.microsecond
+    encode_datetime({date, {h, m, s, us}})
   end
 
-  def encode_datetime({date, {h, m, s}}, scale),
-    do: encode_datetime({date, {h, m, s, 0}}, scale)
+  def encode_datetime({date, {h, m, s}}),
+    do: encode_datetime({date, {h, m, s, 0}})
 
-  def encode_datetime({date, {h, m, s, fsec}}, scale) do
+  def encode_datetime({date, {h, m, s, us}}) do
     days = :calendar.date_to_gregorian_days(date) - @year_1900_days
-
-    fsec_per_s = :math.pow(10, scale)
-
-    milliseconds = ((h * 60 + m) * 60 + s + fsec / fsec_per_s) * 1_000
+    milliseconds = ((h * 60 + m) * 60 + s) * 1_000 + us / 1_000
 
     secs_300 = round(milliseconds / (10 / 3))
 
@@ -1602,14 +1596,14 @@ defmodule Tds.Types do
     parsed_fsec = trunc(parsed_fsec - sec * fs_per_sec)
 
     if use_elixir_calendar_types?() do
-      {parsed_fsec, scale} =
+      {us, scale} =
         if scale > 6 do
           {trunc(parsed_fsec / 10), 6}
         else
           {trunc(parsed_fsec * :math.pow(10, 6 - scale)), scale}
         end
 
-      Time.from_erl!({hour, min, sec}, {parsed_fsec, scale})
+      Time.from_erl!({hour, min, sec}, {us, scale})
     else
       {hour, min, sec, parsed_fsec}
     end
@@ -1627,8 +1621,8 @@ defmodule Tds.Types do
 
   def encode_time(%Time{} = t) do
     {h, m, s} = Time.to_erl(t)
-    {us, scale} = t.microsecond
-    fsec = microsecond_to_fsec(us, scale)
+    {_, scale} = t.microsecond
+    fsec = microsecond_to_fsec(t.microsecond)
 
     encode_time({h, m, s, fsec}, scale)
   end
@@ -1659,13 +1653,11 @@ defmodule Tds.Types do
     {bin, scale}
   end
 
-  def microsecond_to_fsec(us, scale) do
-    if scale != 6 do
-      trunc(us / :math.pow(10, 6 - scale))
-    else
-      us
-    end
-  end
+  def microsecond_to_fsec({us, 6}),
+    do: us
+
+  def microsecond_to_fsec({us, scale}),
+    do: trunc(us / :math.pow(10, 6 - scale))
 
   # DateTime2
   def decode_datetime2(scale, <<data::binary>>) do

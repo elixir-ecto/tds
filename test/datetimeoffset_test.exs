@@ -5,6 +5,7 @@ defmodule DatetimeOffsetTest do
 
   alias Tds.Types
   alias Tds.Parameter
+  import Tds.Types.DateTimeOffset
 
   @tag timeout: 50000
 
@@ -22,11 +23,7 @@ defmodule DatetimeOffsetTest do
   @datetimeoffset {@date, @time, @offset}
   @datetimeoffset_fsec {@date, @time_fsec, @offset}
 
-  test "datetimeoffsets with offsets", context do
-    Tds.Utils.use_elixir_calendar_types(false)
-    # scale is hard-coded as 7 when using the {date, time, offset_min} tuple
-    scale = 7
-
+  test "datetimeoffset", context do
     dts = [
       {{2020, 2, 28}, {13, 59, 59, 0}, 600},
       {{2020, 2, 28}, {13, 59, 59, 0}, 600},
@@ -45,7 +42,9 @@ defmodule DatetimeOffsetTest do
       {{2020, 2, 28}, {13, 59, 59, 1234}, -600},
       {{2020, 2, 28}, {13, 59, 59, 12345}, -600},
       {{2020, 2, 28}, {13, 59, 59, 123_456}, -600},
-      {{2020, 2, 28}, {13, 59, 59, 1_234_567}, -600}
+      {{2020, 2, 28}, {13, 59, 59, 1_234_567}, -600},
+      {{2020, 2, 28}, {13, 59, 59, 1_234_567}, 0},
+      {{2020, 2, 28}, {13, 59, 59, 1_234_567}, 0}
     ]
 
     strs = [
@@ -66,35 +65,15 @@ defmodule DatetimeOffsetTest do
       "'2020-02-28 03:59:59.0001234 -10:00'",
       "'2020-02-28 03:59:59.0012345 -10:00'",
       "'2020-02-28 03:59:59.0123456 -10:00'",
-      "'2020-02-28 03:59:59.1234567 -10:00'"
+      "'2020-02-28 03:59:59.1234567 -10:00'",
+      "'2020-02-28 13:59:59.1234567 +00:00'",
+      "'2020-02-28 13:59:59.1234567Z'"
     ]
 
     Enum.zip(dts, strs)
     |> Enum.each(fn {dt, str} ->
       assert [[^dt]] = query("SELECT CAST(#{str} AS datetimeoffset(7))", [])
     end)
-  end
-
-  test "datetimeoffset", context do
-    query("DROP TABLE datetimeoffset_test", [])
-
-    :ok =
-      query(
-        """
-          CREATE TABLE datetimeoffset_test (
-            zero datetimeoffset(0) NULL,
-            one datetimeoffset(1) NULL,
-            two datetimeoffset(2) NULL,
-            three datetimeoffset(3) NULL,
-            four datetimeoffset(4) NULL,
-            five datetimeoffset(5) NULL,
-            six datetimeoffset(6) NULL,
-            seven datetimeoffset(7) NULL,
-            ver int NOT NULL
-            )
-        """,
-        []
-      )
 
     assert nil == Types.encode_datetimeoffset(nil)
 
@@ -145,6 +124,28 @@ defmodule DatetimeOffsetTest do
                  type: :datetimeoffset
                }
              ])
+  end
+
+  test "database", context do
+    query("DROP TABLE datetimeoffset_test", [])
+
+    :ok =
+      query(
+        """
+          CREATE TABLE datetimeoffset_test (
+            zero datetimeoffset(0) NULL,
+            one datetimeoffset(1) NULL,
+            two datetimeoffset(2) NULL,
+            three datetimeoffset(3) NULL,
+            four datetimeoffset(4) NULL,
+            five datetimeoffset(5) NULL,
+            six datetimeoffset(6) NULL,
+            seven datetimeoffset(7) NULL,
+            ver int NOT NULL
+            )
+        """,
+        []
+      )
 
     assert :ok =
              "INSERT INTO datetimeoffset_test VALUES (@1, @2, @3, @4, @5, @6, @7, @8, @9)"
@@ -235,80 +236,102 @@ defmodule DatetimeOffsetTest do
 
     query("DROP TABLE datetimeoffset_test", [])
   end
+
+  describe "datetimeoffset ecto type:" do
+    test "cast/1" do
+      [
+        {~U[2020-02-28 23:59:59.000000Z], "2020-02-28 23:59:59.000000Z"},
+        {~U[2020-02-28 23:59:59.00000Z], "2020-02-28 23:59:59.00000Z"},
+        {~U[2020-02-28 23:59:59.0000Z], "2020-02-28 23:59:59.0000Z"},
+        {~U[2020-02-28 23:59:59.000Z], "2020-02-28 23:59:59.000Z"},
+        {~U[2020-02-28 23:59:59.00Z], "2020-02-28 23:59:59.00Z"},
+        {~U[2020-02-28 23:59:59.0Z], "2020-02-28 23:59:59.0Z"},
+        {~U[2020-02-28 23:59:59Z], "2020-02-28 23:59:59Z"},
+        {~U[2020-02-28 23:59:59.1Z], "2020-02-28 23:59:59.1Z"},
+        {~U[2020-02-28 23:59:59.10Z], "2020-02-28 23:59:59.10Z"},
+        {~U[2020-02-28 23:59:59.100Z], "2020-02-28 23:59:59.100Z"},
+        {~U[2020-02-28 23:59:59.1000Z], "2020-02-28 23:59:59.1000Z"},
+        {~U[2020-02-28 23:59:59.10000Z], "2020-02-28 23:59:59.10000Z"},
+        {~U[2020-02-28 23:59:59.100000Z], "2020-02-28 23:59:59.100000Z"},
+        {~U[2020-02-28 23:59:59.12Z], "2020-02-28 23:59:59.12Z"},
+        {~U[2020-02-28 23:59:59.123Z], "2020-02-28 23:59:59.123Z"},
+        {~U[2020-02-28 23:59:59.1234Z], "2020-02-28 23:59:59.1234Z"},
+        {~U[2020-02-28 23:59:59.12345Z], "2020-02-28 23:59:59.12345Z"},
+        {~U[2020-02-28 23:59:59.123456Z], "2020-02-28 23:59:59.123456Z"},
+        {~U[2020-02-28 23:59:59.999999Z], "2020-02-28 23:59:59.999999Z"}
+      ]
+      |> Enum.each(fn {dt, str} ->
+        assert {:ok, dt} == cast(dt)
+        assert {:ok, dt} == cast(str)
+      end)
+
+      # NaiveDateTime unsupported
+      assert :error == cast(~N[2020-02-28 13:59:59.123456])
+    end
+
+    test "load/1" do
+      [
+        {~U[2020-02-28 23:59:59Z], {{2020, 2, 28}, {23, 59, 59}, 600}},
+        {~U[2020-02-28 23:59:59.1Z], {{2020, 2, 28}, {23, 59, 59, 1}, 600}},
+        {~U[2020-02-28 23:59:59.12Z], {{2020, 2, 28}, {23, 59, 59, 12}, 600}},
+        {~U[2020-02-28 23:59:59.123Z], {{2020, 2, 28}, {23, 59, 59, 123}, 600}},
+        {~U[2020-02-28 23:59:59.1234Z],
+         {{2020, 2, 28}, {23, 59, 59, 1234}, 600}},
+        {~U[2020-02-28 23:59:59.12345Z],
+         {{2020, 2, 28}, {23, 59, 59, 12345}, 600}},
+        {~U[2020-02-28 23:59:59.123456Z],
+         {{2020, 2, 28}, {23, 59, 59, 123_456}, 600}},
+        {~U[2020-02-28 23:59:59.123456Z],
+         {{2020, 2, 28}, {23, 59, 59, 1_234_567}, 600}},
+        {~U[2020-02-28 23:59:59Z], {{2020, 2, 28}, {23, 59, 59}, -600}},
+        {~U[2020-02-28 23:59:59.1Z], {{2020, 2, 28}, {23, 59, 59, 1}, -600}},
+        {~U[2020-02-28 23:59:59.12Z], {{2020, 2, 28}, {23, 59, 59, 12}, -600}},
+        {~U[2020-02-28 23:59:59.123Z],
+         {{2020, 2, 28}, {23, 59, 59, 123}, -600}},
+        {~U[2020-02-28 23:59:59.1234Z],
+         {{2020, 2, 28}, {23, 59, 59, 1234}, -600}},
+        {~U[2020-02-28 23:59:59.12345Z],
+         {{2020, 2, 28}, {23, 59, 59, 12345}, -600}},
+        {~U[2020-02-28 23:59:59.123456Z],
+         {{2020, 2, 28}, {23, 59, 59, 123_456}, -600}},
+        {~U[2020-02-28 23:59:59.123456Z],
+         {{2020, 2, 28}, {23, 59, 59, 1_234_567}, -600}},
+        {~U[2020-02-28 23:59:59Z], {{2020, 2, 28}, {23, 59, 59}, 0}},
+        {~U[2020-02-28 23:59:59.1Z], {{2020, 2, 28}, {23, 59, 59, 1}, 0}},
+        {~U[2020-02-28 23:59:59.12Z], {{2020, 2, 28}, {23, 59, 59, 12}, 0}},
+        {~U[2020-02-28 23:59:59.123Z], {{2020, 2, 28}, {23, 59, 59, 123}, 0}},
+        {~U[2020-02-28 23:59:59.1234Z], {{2020, 2, 28}, {23, 59, 59, 1234}, 0}},
+        {~U[2020-02-28 23:59:59.12345Z],
+         {{2020, 2, 28}, {23, 59, 59, 12345}, 0}},
+        {~U[2020-02-28 23:59:59.123456Z],
+         {{2020, 2, 28}, {23, 59, 59, 123_456}, 0}},
+        {~U[2020-02-28 23:59:59.123456Z],
+         {{2020, 2, 28}, {23, 59, 59, 1_234_567}, 0}}
+      ]
+      |> Enum.each(fn {dt, tuple} ->
+        assert {:ok, dt} == load(tuple)
+      end)
+    end
+
+    test "dump/1" do
+      [
+        ~U[2020-02-28 23:59:59Z],
+        ~U[2020-02-28 23:59:59.1Z],
+        ~U[2020-02-28 23:59:59.12Z],
+        ~U[2020-02-28 23:59:59.123Z],
+        ~U[2020-02-28 23:59:59.1234Z],
+        ~U[2020-02-28 23:59:59.12345Z],
+        ~U[2020-02-28 23:59:59.123456Z],
+        ~U[2020-02-28 23:59:59.10Z],
+        ~U[2020-02-28 23:59:59.100Z],
+        ~U[2020-02-28 23:59:59.1000Z],
+        ~U[2020-02-28 23:59:59.10000Z],
+        ~U[2020-02-28 23:59:59.100000Z]
+      ]
+      |> Enum.each(fn dt ->
+        {:ok, dumped} = dump(dt)
+        assert {:ok, dt} == load(dumped)
+      end)
+    end
+  end
 end
-
-# Tds.query!(
-#   pid,
-#   "INSERT INTO [datetimeoffset_test] ([zero], one, two, three, four, five, six, seven, [ver]) VALUES (@zero, @one, @two, @three, @four, @five, @six, @seven, @ver)",
-#   [
-#     %Tds.Parameter{
-#       name: "@zero",
-#       value: {{2015, 4, 8}, {15, 16, 23, 123_4567}, -240}
-#     },
-#     %Tds.Parameter{
-#       name: "@one",
-#       value: {{2015, 4, 8}, {15, 16, 23, 123_4567}, -240}
-#     },
-#     %Tds.Parameter{
-#       name: "@two",
-#       value: {{2015, 4, 8}, {15, 16, 23, 123_4567}, -240}
-#     },
-#     %Tds.Parameter{
-#       name: "@three",
-#       value: {{2015, 4, 8}, {15, 16, 23, 123_4567}, -240}
-#     },
-#     %Tds.Parameter{
-#       name: "@four",
-#       value: {{2015, 4, 8}, {15, 16, 23, 123_4567}, -240}
-#     },
-#     %Tds.Parameter{
-#       name: "@five",
-#       value: {{2015, 4, 8}, {15, 16, 23, 123_4567}, -240}
-#     },
-#     %Tds.Parameter{
-#       name: "@six",
-#       value: {{2015, 4, 8}, {15, 16, 23, 123_4567}, -240}
-#     },
-#     %Tds.Parameter{
-#       name: "@seven",
-#       value: {{2015, 4, 8}, {15, 16, 23, 123_4567}, -240}
-#     },
-#     %Tds.Parameter{name: "@ver", value: 2}
-#   ]
-# )
-
-# Tds.query!(
-#   pid,
-#   "INSERT INTO [datetimeoffset_test] ([zero], one, two, three, four, five, six, seven, [ver]) VALUES (@zero, @one, @two, @three, @four, @five, @six, @seven, @ver)",
-#   [
-#     %Tds.Parameter{name: "@zero", value: "2020-09-08 14:00:19.3814577 +10:00"},
-#     %Tds.Parameter{name: "@one", value: "2020-09-08 14:00:19.3814577 +10:00"},
-#     %Tds.Parameter{name: "@two", value: "2020-09-08 14:00:19.3814577 +10:00"},
-#     %Tds.Parameter{name: "@three", value: "2020-09-08 14:00:19.3814577 +10:00"},
-#     %Tds.Parameter{name: "@four", value: "2020-09-08 14:00:19.3814577 +10:00"},
-#     %Tds.Parameter{name: "@five", value: "2020-09-08 14:00:19.3814577 +10:00"},
-#     %Tds.Parameter{name: "@six", value: "2020-09-08 14:00:19.3814577 +10:00"},
-#     %Tds.Parameter{name: "@seven", value: "2020-09-08 14:00:19.3814577 +10:00"},
-#     %Tds.Parameter{name: "@ver", value: 1}
-#   ]
-# )
-
-# {:ok, pid} =
-#   Tds.start_link(
-#     hostname: "localhost",
-#     username: "sa",
-#     password: "some!Password",
-#     database: "test"
-#   )
-
-# Tds.query(
-#   pid,
-#   "SELECT zero, one, two, three, four, five, six, seven from datetimeoffset_test WHERE ver = 1",
-#   []
-# )
-
-# Tds.query(
-#   pid,
-#   "SELECT zero, one, two, three, four, five, six, seven from datetimeoffset_test WHERE ver = 2",
-#   []
-# )
