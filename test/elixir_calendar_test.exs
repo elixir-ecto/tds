@@ -5,6 +5,7 @@ defmodule ElixirCalendarTest do
 
   alias Tds.Types
   alias Tds.Parameter, as: P
+  import Tds.Types.DateTimeOffset
 
   setup do
     {:ok, pid} =
@@ -187,6 +188,70 @@ defmodule ElixirCalendarTest do
     end)
   end
 
+  test "Elixir.DateTime with timezone to SQL DateTimeOffset", context do
+    type = :datetimeoffset
+
+    Calendar.put_time_zone_database(Tzdata.TimeZoneDatabase)
+
+    dts = [
+      %P{name: "@1", value: tza(~U[2020-02-28 13:59:59.000000Z]), type: type},
+      %P{name: "@1", value: tza(~U[2020-02-28 13:59:59.00000Z]), type: type},
+      %P{name: "@1", value: tza(~U[2020-02-28 13:59:59.0000Z]), type: type},
+      %P{name: "@1", value: tza(~U[2020-02-28 13:59:59.000Z]), type: type},
+      %P{name: "@1", value: tza(~U[2020-02-28 13:59:59.00Z]), type: type},
+      %P{name: "@1", value: tza(~U[2020-02-28 13:59:59.0Z]), type: type},
+      %P{name: "@1", value: tza(~U[2020-02-28 13:59:59Z]), type: type},
+      %P{name: "@1", value: tza(~U[2020-02-28 13:59:59.1Z]), type: type},
+      %P{name: "@1", value: tza(~U[2020-02-28 13:59:59.10Z]), type: type},
+      %P{name: "@1", value: tza(~U[2020-02-28 13:59:59.100Z]), type: type},
+      %P{name: "@1", value: tza(~U[2020-02-28 13:59:59.1000Z]), type: type},
+      %P{name: "@1", value: tza(~U[2020-02-28 13:59:59.10000Z]), type: type},
+      %P{name: "@1", value: tza(~U[2020-02-28 13:59:59.100000Z]), type: type},
+      %P{name: "@1", value: tza(~U[2020-02-28 13:59:59.12Z]), type: type},
+      %P{name: "@1", value: tza(~U[2020-02-28 13:59:59.123Z]), type: type},
+      %P{name: "@1", value: tza(~U[2020-02-28 13:59:59.1234Z]), type: type},
+      %P{name: "@1", value: tza(~U[2020-02-28 13:59:59.12345Z]), type: type},
+      %P{name: "@1", value: tza(~U[2020-02-28 13:59:59.123456Z]), type: type},
+      %P{name: "@1", value: tza(~U[2020-02-28 13:59:59.999999Z]), type: type},
+      %P{name: "@1", value: tzb(~U[2020-02-28 13:59:59.000000Z]), type: type},
+      %P{name: "@1", value: tzb(~U[2020-02-28 13:59:59.00000Z]), type: type},
+      %P{name: "@1", value: tzb(~U[2020-02-28 13:59:59.0000Z]), type: type},
+      %P{name: "@1", value: tzb(~U[2020-02-28 13:59:59.000Z]), type: type},
+      %P{name: "@1", value: tzb(~U[2020-02-28 13:59:59.00Z]), type: type},
+      %P{name: "@1", value: tzb(~U[2020-02-28 13:59:59.0Z]), type: type},
+      %P{name: "@1", value: tzb(~U[2020-02-28 13:59:59Z]), type: type},
+      %P{name: "@1", value: tzb(~U[2020-02-28 13:59:59.1Z]), type: type},
+      %P{name: "@1", value: tzb(~U[2020-02-28 13:59:59.10Z]), type: type},
+      %P{name: "@1", value: tzb(~U[2020-02-28 13:59:59.100Z]), type: type},
+      %P{name: "@1", value: tzb(~U[2020-02-28 13:59:59.1000Z]), type: type},
+      %P{name: "@1", value: tzb(~U[2020-02-28 13:59:59.10000Z]), type: type},
+      %P{name: "@1", value: tzb(~U[2020-02-28 13:59:59.100000Z]), type: type},
+      %P{name: "@1", value: tzb(~U[2020-02-28 13:59:59.12Z]), type: type},
+      %P{name: "@1", value: tzb(~U[2020-02-28 13:59:59.123Z]), type: type},
+      %P{name: "@1", value: tzb(~U[2020-02-28 13:59:59.1234Z]), type: type},
+      %P{name: "@1", value: tzb(~U[2020-02-28 13:59:59.12345Z]), type: type},
+      %P{name: "@1", value: tzb(~U[2020-02-28 13:59:59.123456Z]), type: type},
+      %P{name: "@1", value: tzb(~U[2020-02-28 13:59:59.999999Z]), type: type}
+    ]
+
+    Enum.each(dts, fn %{value: %{microsecond: {_, s}} = dt} = p ->
+      token = Types.encode_datetimeoffset(dt, s)
+      utc_dt = DateTime.shift_zone!(dt, "Etc/UTC")
+      assert utc_dt == Types.decode_datetimeoffset(s, token)
+      assert [[^utc_dt]] = query("SELECT @1 ", [p])
+    end)
+  end
+
+  # shift into a timezone with a positive offset
+  defp tza(datetime) do
+    DateTime.shift_zone!(datetime, "Australia/Brisbane")
+  end
+
+  # shift into a timezone with a negative offset
+  defp tzb(datetime) do
+    DateTime.shift_zone!(datetime, "America/Chicago")
+  end
+
   test "should truncate datetimeoffset(7) to Elixir.DateTime with precision 6",
        context do
     dts = [
@@ -200,5 +265,147 @@ defmodule ElixirCalendarTest do
       query = "SELECT CAST(@1 as datetimeoffset(7))"
       assert [[dto]] == query(query, P.prepare_params([p]))
     end)
+  end
+
+  describe "datetimeoffset ecto type:" do
+    test "fsec_to_microsecond/1", context do
+      assert {000_000, 0} == fsec_to_microsecond(0)
+      assert {100_000, 1} == fsec_to_microsecond(1)
+      assert {120_000, 2} == fsec_to_microsecond(12)
+      assert {123_000, 3} == fsec_to_microsecond(123)
+      assert {123_400, 4} == fsec_to_microsecond(1234)
+      assert {123_450, 5} == fsec_to_microsecond(12345)
+      assert {123_456, 6} == fsec_to_microsecond(123_456)
+      assert {123_456, 6} == fsec_to_microsecond(1_234_567)
+    end
+
+    test "datetimeoffset_tuple/1", context do
+      dt = %DateTime{
+        year: 2020,
+        month: 2,
+        day: 28,
+        hour: 23,
+        minute: 59,
+        second: 59,
+        microsecond: {0, 6},
+        time_zone: "Etc/UTC",
+        zone_abbr: "UTC",
+        utc_offset: 0,
+        std_offset: 0
+      }
+
+      assert {{2020, 2, 28}, {23, 59, 59}, 0} ==
+               datetimeoffset_tuple(%DateTime{dt | microsecond: {0, 0}})
+
+      assert {{2020, 2, 28}, {23, 59, 59, 1}, 0} ==
+               datetimeoffset_tuple(%DateTime{dt | microsecond: {100_000, 1}})
+
+      assert {{2020, 2, 28}, {23, 59, 59, 12}, 0} ==
+               datetimeoffset_tuple(%DateTime{dt | microsecond: {120_000, 2}})
+
+      assert {{2020, 2, 28}, {23, 59, 59, 123}, 0} ==
+               datetimeoffset_tuple(%DateTime{dt | microsecond: {123_000, 3}})
+
+      assert {{2020, 2, 28}, {23, 59, 59, 1234}, 0} ==
+               datetimeoffset_tuple(%DateTime{dt | microsecond: {123_400, 4}})
+
+      assert {{2020, 2, 28}, {23, 59, 59, 12345}, 0} ==
+               datetimeoffset_tuple(%DateTime{dt | microsecond: {123_450, 5}})
+
+      assert {{2020, 2, 28}, {23, 59, 59, 123_456}, 0} ==
+               datetimeoffset_tuple(%DateTime{dt | microsecond: {123_456, 6}})
+
+      dta =
+        DateTime.shift_zone!(dt, "Australia/Brisbane", Tzdata.TimeZoneDatabase)
+
+      assert {{2020, 2, 28}, {23, 59, 59}, 600} ==
+               datetimeoffset_tuple(%DateTime{dta | microsecond: {0, 0}})
+
+      assert {{2020, 2, 28}, {23, 59, 59, 1}, 600} ==
+               datetimeoffset_tuple(%DateTime{dta | microsecond: {100_000, 1}})
+
+      assert {{2020, 2, 28}, {23, 59, 59, 12}, 600} ==
+               datetimeoffset_tuple(%DateTime{dta | microsecond: {120_000, 2}})
+
+      assert {{2020, 2, 28}, {23, 59, 59, 123}, 600} ==
+               datetimeoffset_tuple(%DateTime{dta | microsecond: {123_000, 3}})
+
+      assert {{2020, 2, 28}, {23, 59, 59, 1234}, 600} ==
+               datetimeoffset_tuple(%DateTime{dta | microsecond: {123_400, 4}})
+
+      assert {{2020, 2, 28}, {23, 59, 59, 12345}, 600} ==
+               datetimeoffset_tuple(%DateTime{dta | microsecond: {123_450, 5}})
+
+      assert {{2020, 2, 28}, {23, 59, 59, 123_456}, 600} ==
+               datetimeoffset_tuple(%DateTime{dta | microsecond: {123_456, 6}})
+
+      dtb =
+        DateTime.shift_zone!(dt, "Pacific/Honolulu", Tzdata.TimeZoneDatabase)
+
+      assert {{2020, 2, 28}, {23, 59, 59}, -600} ==
+               datetimeoffset_tuple(%DateTime{dtb | microsecond: {0, 0}})
+
+      assert {{2020, 2, 28}, {23, 59, 59, 0}, -600} ==
+               datetimeoffset_tuple(%DateTime{dtb | microsecond: {0, 6}})
+
+      assert {{2020, 2, 28}, {23, 59, 59, 1}, -600} ==
+               datetimeoffset_tuple(%DateTime{dtb | microsecond: {100_000, 1}})
+
+      assert {{2020, 2, 28}, {23, 59, 59, 12}, -600} ==
+               datetimeoffset_tuple(%DateTime{dtb | microsecond: {120_000, 2}})
+
+      assert {{2020, 2, 28}, {23, 59, 59, 123}, -600} ==
+               datetimeoffset_tuple(%DateTime{dtb | microsecond: {123_000, 3}})
+
+      assert {{2020, 2, 28}, {23, 59, 59, 1234}, -600} ==
+               datetimeoffset_tuple(%DateTime{dtb | microsecond: {123_400, 4}})
+
+      assert {{2020, 2, 28}, {23, 59, 59, 12345}, -600} ==
+               datetimeoffset_tuple(%DateTime{dtb | microsecond: {123_450, 5}})
+
+      assert {{2020, 2, 28}, {23, 59, 59, 123_456}, -600} ==
+               datetimeoffset_tuple(%DateTime{dtb | microsecond: {123_456, 6}})
+    end
+
+    test "load/1", context do
+      [
+        ~U[2020-02-28 23:59:59Z],
+        ~U[2020-02-28 23:59:59.1Z],
+        ~U[2020-02-28 23:59:59.12Z],
+        ~U[2020-02-28 23:59:59.123Z],
+        ~U[2020-02-28 23:59:59.1234Z],
+        ~U[2020-02-28 23:59:59.12345Z],
+        ~U[2020-02-28 23:59:59.123456Z],
+        ~U[2020-02-28 23:59:59.10Z],
+        ~U[2020-02-28 23:59:59.100Z],
+        ~U[2020-02-28 23:59:59.1000Z],
+        ~U[2020-02-28 23:59:59.10000Z],
+        ~U[2020-02-28 23:59:59.100000Z]
+      ]
+      |> Enum.each(fn dt ->
+        assert {:ok, dt} == load(dt)
+      end)
+    end
+
+    test "dump/1" do
+      [
+        ~U[2020-02-28 23:59:59Z],
+        ~U[2020-02-28 23:59:59.1Z],
+        ~U[2020-02-28 23:59:59.12Z],
+        ~U[2020-02-28 23:59:59.123Z],
+        ~U[2020-02-28 23:59:59.1234Z],
+        ~U[2020-02-28 23:59:59.12345Z],
+        ~U[2020-02-28 23:59:59.123456Z],
+        ~U[2020-02-28 23:59:59.10Z],
+        ~U[2020-02-28 23:59:59.100Z],
+        ~U[2020-02-28 23:59:59.1000Z],
+        ~U[2020-02-28 23:59:59.10000Z],
+        ~U[2020-02-28 23:59:59.100000Z]
+      ]
+      |> Enum.each(fn dt ->
+        {:ok, dumped} = dump(dt)
+        assert {:ok, dt} == load(dumped)
+      end)
+    end
   end
 end
