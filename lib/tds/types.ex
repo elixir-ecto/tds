@@ -1753,16 +1753,11 @@ defmodule Tds.Types do
           |> String.pad_leading(2, "0")
 
         offset = offset_min * 60
-<<<<<<< HEAD
-        {:ok, datetime, ^offset} = DateTime.from_iso8601("#{str}+#{h}:#{m}")
-        DateTime.add(datetime, offset)
-=======
 
         {:ok, datetime, ^offset} =
           DateTime.from_iso8601("#{str}#{sign}#{h}:#{m}")
 
         datetime
->>>>>>> master
     end
   end
 
