@@ -1,7 +1,74 @@
 defmodule Tds.Types.DateTimeOffset do
-  @moduledoc false
+  @moduledoc """
+  Support for [`datetimeoffset(n)`](https://docs.microsoft.com/en-us/sql/t-sql/data-types/datetimeoffset-transact-sql).atom()
 
-  import Tds.Utils, only: [use_elixir_calendar_types?: 0]
+  Columns can be defined as a `datetimeoffset(n)` in an Ecto migration.
+
+      create table(:datetimeoffsets) do
+        add :dto,   :"datetimeoffset"
+        add :zero,  :"datetimeoffset(0)"
+        add :one,   :"datetimeoffset(1)"
+        add :two,   :"datetimeoffset(2)"
+        ...
+        add :seven, :"datetimeoffset(7)"
+      end
+
+  And referenced in an Ecto schema.
+
+      schema "datetimeoffsets" do
+        field :dto,   Tds.Types.DateTimeOffset
+        field :zero,  Tds.Types.DateTimeOffset
+        field :one,   Tds.Types.DateTimeOffset
+        field :two,   Tds.Types.DateTimeOffset
+        ...
+        field :seven, Tds.Types.DateTimeOffset
+
+        timestamps type: Tds.Types.DateTimeOffset
+      end
+
+  This will store the `inserted_at` and `updated_at` [timestamps](https://hexdocs.pm/ecto/Ecto.Schema.html#timestamps/1) in UTC.
+  If you prefer to store them in local time you can specify the autogenerate MFA in the Ecto schema definition.
+
+  Configure the application to use a timezone aware time zone database in `config.exs`:
+
+      config :elixir, :time_zone_database, Tzdata.TimeZoneDatabase
+
+  Create a module to generate local timestamps.
+
+      defmodule LocalTimestamps do
+
+        def local_now do
+          case Timex.local() do
+            {:error, _} ->
+              :error
+
+            %DateTime{} = dt ->
+              dt
+
+            %Timex.AmbiguousDateTime{after: dt} ->
+              dt
+          end
+        end
+      end
+
+  And a schema that uses the local timestamps.
+
+      defmodule Something do
+        schema "something" do
+          ...
+          timestamps(type: :utc_datetime_usec, autogenerate: {LocalTimestamps, :local_now, []})
+        end
+      end
+
+  or with `@timestamps_opts` schema attribute.
+
+      @timestamps_opts [type: :utc_datetime_usec, autogenerate: {LocalTimestamps, :local_now, []}]
+      schema "something" do
+        ...
+      end
+
+
+  """
 
   @type t :: {date, time | time_us, offset}
   @type date :: {non_neg_integer, non_neg_integer, non_neg_integer}
@@ -13,7 +80,7 @@ defmodule Tds.Types.DateTimeOffset do
   def type, do: :datetimeoffset
 
   @doc """
-  Cast to DateTime
+  Cast to DateTime.
   """
   def cast(%DateTime{} = dt) do
     {:ok, dt}
@@ -29,37 +96,30 @@ defmodule Tds.Types.DateTimeOffset do
   def cast(_), do: :error
 
   @doc """
+  Handle casting to DateTime without returning a tuple.
+  """
+  def cast!(input) do
+    case cast(input) do
+      {:ok, dt} -> dt
+      :error -> :error
+    end
+  end
+
+  @doc """
   Load from the native representation to a `DateTime`.
 
   If the connection is configured with `use_elixir_calendar_types: true`, `load()` will receive a DateTime.
   Otherwise, a `{date, time, offset_min}` tuple is returned.
   """
 
-  # def load(nil), do: {:ok, nil}
-
   def load(%DateTime{} = dt) do
     {:ok, dt}
   end
 
-  def load({{y, mth, d}, {h, min, s}, _offset_mins}) do
-    dt = %DateTime{
-      :year => y,
-      :month => mth,
-      :day => d,
-      :hour => h,
-      :minute => min,
-      :second => s,
-      :microsecond => {0, 0},
-      :time_zone => "Etc/UTC",
-      :zone_abbr => "UTC",
-      :utc_offset => 0,
-      :std_offset => 0
-    }
-
-    {:ok, dt}
+  def load({{y, mth, d}, {h, min, s}, offset_mins}) do
+    load({{y, mth, d}, {h, min, s, 0}, offset_mins})
   end
 
-  # we don't know the scale of the column at this juncture, so we guess the scale of the fsec...  Use Elixir calendar types or the parameterized type.
   def load({{y, mth, d}, {h, min, s, fsec}, _offset_mins}) do
     dt = %DateTime{
       :year => y,
@@ -81,19 +141,21 @@ defmodule Tds.Types.DateTimeOffset do
   def load(_), do: :error
 
   @doc """
-  Dump the data to the Ecto native type.  If using Elixir calendary types, this will be the DateTime, otherwise
-  we convert to the datetimeoffset tuple of `{{year, month, day}, {hr, min, sec, fsec}, offset_in_minutes}`
-  or `{{year, month, day}, {hr, min, sec}, offset_in_minutes}`.
-
-  Note that the date and time are in UTC and the offset is in minutes.
+  Dump the data to the Ecto native type.
   """
   def dump(%DateTime{} = dt) do
-    if use_elixir_calendar_types?() do
-      {:ok, dt}
-    else
-      {:ok, datetimeoffset_tuple(dt)}
-    end
+    {:ok, datetimeoffset_tuple(dt)}
   end
+
+  def dump({{_, _, _}, {_, _, _}, _} = dtt) do
+    {:ok, dtt}
+  end
+
+  def dump({{_, _, _}, {_, _, _, _}, _} = dtt) do
+    {:ok, dtt}
+  end
+
+  def dump(_), do: :error
 
   def equal?(a, b) do
     a == b
@@ -102,35 +164,6 @@ defmodule Tds.Types.DateTimeOffset do
   @spec autogenerate :: t | :error
   @doc """
   Generates a datetimeoffset tuple for a timestamp() column.
-
-  If you prefer to store the [timestamp](https://hexdocs.pm/ecto/Ecto.Schema.html#timestamps/1) in the local time
-  you can specify the autogenerate MFA in the Ecto schema definition.
-
-      defmodule MyTimestamps do
-        def local_now do
-          case Timex.local() do
-            {:error, _} ->
-              :error
-
-            %DateTime{} = dt ->
-              datetimeoffset_tuple(dt)
-
-            %AmbiguousDateTime{after: dt} ->
-              datetimeoffset_tuple(dt)
-          end
-
-      schema "something" do
-        ...
-        timestamps(type: :utc_datetime, autogenerate: {MyTimestamps, local_now, []})
-      end
-
-  or with `@timestamps_opts` schema attribute.
-
-      @timestamps_opts [type: :utc_datetime, autogenerate: {MyTimestamps, local_now, []}]
-      schema "something" do
-        ...
-      end
-
   """
   def autogenerate do
     DateTime.utc_now()
@@ -165,11 +198,6 @@ defmodule Tds.Types.DateTimeOffset do
         fsec = Tds.Types.microsecond_to_fsec({us, scale})
         {{y, mth, d}, {h, min, s, fsec}, offset_mins}
     end
-
-    # case Tds.Types.microsecond_to_fsec({us, scale}) do
-    #   0 -> {{y, mth, d}, {h, min, s}, offset_mins}
-    #   fsec -> {{y, mth, d}, {h, min, s, fsec}, offset_mins}
-    # end
   end
 
   def fsec_to_microsecond(0), do: {0, 0}

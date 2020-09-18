@@ -1,3 +1,11 @@
+# v2.1.2
+### BugFix
+* Values in `datetimeoffset(n)` columns were failing to decode on match error due to offset unit mismatch (seconds != minutes).
+* Values in `datetimeoffset(n)` columns of non-UTC timezones were not encoded/decoded correctly.
+
+### Improvements
+* Added `Tds.Types.DateTimeOffset`.
+
 # v2.1.1
 ### Improvements
 * As per discussion [here](https://github.com/livehelpnow/tds/issues/108) exposed 

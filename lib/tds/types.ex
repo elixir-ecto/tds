@@ -1737,7 +1737,12 @@ defmodule Tds.Types do
         {date, time, offset_min}
 
       %NaiveDateTime{} = dt ->
-        str = NaiveDateTime.to_iso8601(dt)
+        offset = offset_min * 60
+
+        str =
+          dt
+          |> NaiveDateTime.add(offset)
+          |> NaiveDateTime.to_iso8601()
 
         sign = if offset_min >= 0, do: "+", else: "-"
 
@@ -1751,8 +1756,6 @@ defmodule Tds.Types do
           abs(h)
           |> Integer.to_string()
           |> String.pad_leading(2, "0")
-
-        offset = offset_min * 60
 
         {:ok, datetime, ^offset} =
           DateTime.from_iso8601("#{str}#{sign}#{h}:#{m}")
@@ -1775,6 +1778,7 @@ defmodule Tds.Types do
       ) do
     {datetime, _} =
       dt
+      |> DateTime.add(-offset)
       |> DateTime.to_naive()
       |> encode_datetime2(scale)
 
