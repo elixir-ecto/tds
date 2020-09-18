@@ -261,12 +261,15 @@ defmodule DatetimeOffsetTest do
         {~U[2020-02-28 23:59:59.999999Z], "2020-02-28 23:59:59.999999Z"}
       ]
       |> Enum.each(fn {dt, str} ->
-        assert {:ok, dt} == cast(dt)
-        assert {:ok, dt} == cast(str)
+        assert cast(dt) == {:ok, dt}
+        assert cast(str) == {:ok, dt}
+        assert cast!(dt) == dt
+        assert cast!(str) == dt
       end)
 
       # NaiveDateTime unsupported
-      assert :error == cast(~N[2020-02-28 13:59:59.123456])
+      assert cast(~N[2020-02-28 13:59:59.123456]) == :error
+      assert cast!(~N[2020-02-28 13:59:59.123456]) == :error
     end
 
     test "load/1" do
@@ -333,5 +336,14 @@ defmodule DatetimeOffsetTest do
         assert {:ok, dt} == load(dumped)
       end)
     end
+
+    test "autogenerate/0" do
+      assert {{_, _, _}, {_, _, _, _}, 0} = autogenerate()
+    end
+
+    test "from_unix!/2" do
+      assert from_unix!(0, :second) == ~U[1970-01-01 00:00:00Z]
+    end
+
   end
 end
