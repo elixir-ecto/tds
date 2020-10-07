@@ -57,6 +57,7 @@ defmodule Tds.Mixfile do
       {:excoveralls, "~> 0.7", only: :test},
       {:ex_doc, "~> 0.19", only: :dev},
       {:tds_encoding, "~> 1.0", optional: true, only: :test},
+      {:tzdata, "~> 1.0", only: [:dev, :test]}
     ]
   end
 
