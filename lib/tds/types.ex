@@ -1654,10 +1654,10 @@ defmodule Tds.Types do
     {bin, scale}
   end
 
-  def microsecond_to_fsec({us, 6}),
+  defp microsecond_to_fsec({us, 6}),
     do: us
 
-  def microsecond_to_fsec({us, scale}),
+  defp microsecond_to_fsec({us, scale}),
     do: trunc(us / :math.pow(10, 6 - scale))
 
   # DateTime2
