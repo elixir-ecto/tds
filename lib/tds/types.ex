@@ -733,7 +733,7 @@ defmodule Tds.Types do
   end
 
   def decode_xml(_data_info, <<data::binary>>) do
-    ucs2_to_utf(data)
+    :unicode.characters_to_binary(data, {:utf16, :little}, :utf8)
   end
 
   def decode_udt(%{}, <<data::binary>>) do
