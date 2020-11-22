@@ -23,7 +23,7 @@ defmodule Tds.Protocol do
     :serializable
   ]
 
-  @type sock :: {:gen_tcp | :ssl, pid}
+  @type sock :: {:gen_tcp | :ssl, port()}
   @type env :: %{
           trans: <<_::8>>,
           savepoint: non_neg_integer,
@@ -42,7 +42,7 @@ defmodule Tds.Protocol do
   @type t :: %__MODULE__{
           sock: nil | sock,
           usock: nil | pid,
-          itcp: term,
+          itcp: non_neg_integer() | String.t(),
           opts: nil | Keyword.t(),
           state: state,
           result: nil | list(),
@@ -53,6 +53,7 @@ defmodule Tds.Protocol do
 
   defstruct sock: nil,
             usock: nil,
+            # instance port
             itcp: nil,
             opts: nil,
             # Tells if connection is ready or executing command
@@ -236,7 +237,7 @@ defmodule Tds.Protocol do
   end
 
   @impl DBConnection
-  @spec handle_close(Tds.Query.t(), nil | keyword | map, t()) ::
+  @spec handle_close(Tds.Query.t(), nil | maybe_improper_list() | map(), t()) ::
           {:ok, Tds.Result.t(), new_state :: t()}
           | {:error | :disconnect, Exception.t(), new_state :: t()}
   def handle_close(query, opts, s) do
@@ -405,13 +406,13 @@ defmodule Tds.Protocol do
 
         :ok = :inet.setopts(sock, buffer: buffer)
 
-        case login(%{s | sock: {:gen_tcp, sock}}) do
+        case prelogin(%{s | sock: {:gen_tcp, sock}}) do
           {:error, error, _state} ->
             :gen_tcp.close(sock)
             {:error, error}
 
-          r ->
-            r
+          other ->
+            other
         end
 
       {:error, error} ->
@@ -459,6 +460,29 @@ defmodule Tds.Protocol do
       serv ->
         {port, _} = Integer.parse(serv[:tcp])
         {:ok, %{s | opts: opts, itcp: port, usock: nil}}
+    end
+  end
+
+   ## ssl
+
+  defp ssl_connect(%{sock: {:gen_tcp, sock}, opts: opts} = s) do
+    timeout = opts[:timeout] || @timeout
+    ssl_opts = opts[:ssl_opts] || []
+    :inet.setopts(sock, active: :once)
+
+    case :ssl.connect(sock, [{:active, :once}, {:mode, :binary}|ssl_opts], timeout) do
+      {:ok, ssl_sock} ->
+        login(%{s | sock: {:ssl, ssl_sock}})
+
+      {:error, reason} ->
+        error =
+          Tds.Error.exception(
+            "Unable to establish secure connection to server due #{
+              inspect(reason)
+            }"
+          )
+        :gen_tcp.close(sock)
+        {:error, error, s}
     end
   end
 
@@ -544,22 +568,16 @@ defmodule Tds.Protocol do
   def prelogin(%{opts: opts} = s) do
     msg = msg_prelogin(params: opts)
 
-    case msg_send(msg, s) do
-      {:ok, s} ->
-        {:noreply, %{s | state: :prelogin}}
-
-      {:error, reason, s} ->
-        error(%Tds.Error{message: "tcp send: #{reason}"}, s)
-
-      any ->
-        any
+    case msg_send(msg, %{s | state: :prelogin}) do
+      {:ok, s} -> login(s)
+      any -> any
     end
   end
 
   def login(%{opts: opts} = s) do
     msg = msg_login(params: opts)
 
-    case login_send(msg, s) do
+    case login_send(msg, %{s | state: :login}) do
       {:ok, s} ->
         {:ok, %{s | state: :ready}}
 
@@ -764,6 +782,24 @@ defmodule Tds.Protocol do
   end
 
   def message(
+        :prelogin,
+        msg_preloginack(response: response),
+        %{sock: {mod, port}} = s
+      ) do
+    case response do
+      {:login, s} ->
+        {:ok, s}
+
+      {:encrypt, s} ->
+        ssl_connect(s)
+
+      {:disconnect, error, s} ->
+        :gen_tcp.close(port)
+        {:error, error, s}
+    end
+  end
+
+  def message(
         :login,
         msg_loginack(redirect: %{hostname: host, port: port}),
         %{opts: opts} = s
@@ -857,51 +893,33 @@ defmodule Tds.Protocol do
 
   defp msg_send(
          msg,
-         %{sock: {mod, sock}, env: env, state: state, opts: opts} = s
+         %{sock: {mod, port}, env: env, opts: opts} = s
        ) do
-    :inet.setopts(sock, active: false)
+    :inet.setopts(port, active: false)
 
     opts
     |> Keyword.get(:use_elixir_calendar_types, false)
     |> use_elixir_calendar_types()
 
-    {t_send, _} =
-      :timer.tc(fn ->
-        msg
-        |> encode_msg(env)
-        |> Enum.each(&mod.send(sock, &1))
-      end)
-
-    {t_recv, {t_decode, result}} =
-      :timer.tc(fn ->
-        case msg_recv(s) do
-          {:disconnect, _ex, _s} = res ->
-            {0, res}
-
-          buffer ->
-            :timer.tc(fn ->
-              buffer
-              |> IO.iodata_to_binary()
-              |> decode(s)
-            end)
+    send_result =
+      msg
+      |> encode_msg(env)
+      |> Enum.reduce_while(:ok, fn chunk, _ ->
+        case mod.send(port, chunk) do
+          {:error, reason} -> {:halt, {:error, reason}}
+          :ok -> {:cont, :ok}
         end
       end)
 
-    stm = Map.get(s, :query)
-
-    if Keyword.get(s.opts, :trace, false) == true do
-      Logger.debug(fn ->
-        "[trace] [Tds.Protocod.msg_send/2] " <>
-          "state=#{inspect(state)} " <>
-          "send=#{Tds.Perf.to_string(t_send)} " <>
-          "receive=#{Tds.Perf.to_string(t_recv - t_decode)} " <>
-          "decode=#{Tds.Perf.to_string(t_decode)}" <>
-          "\n" <>
-          "#{inspect(stm)}"
-      end)
+    with :ok <- send_result,
+         buffer when is_list(buffer) <- msg_recv(s) do
+      buffer
+      |> IO.iodata_to_binary()
+      |> decode(s)
+    else
+      {:disconnect, _ex, _s} = res -> {0, res}
+      other -> other
     end
-
-    result
   end
 
   defp msg_recv(%{sock: {mod, pid}} = s) do
