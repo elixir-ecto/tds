@@ -301,7 +301,7 @@ defmodule Tds.Messages do
     # to by IbPassword, the client SHOULD first swap the four high bits with the
     # four low bits and then do a bit-XOR with 0xA5 (10100101).
 
-    clt_int_name = "ODBC"
+    clt_int_name = "tdsx"
     clt_int_name_ucs = to_little_ucs2(clt_int_name)
     database = params[:database] || ""
     database_ucs = to_little_ucs2(database)

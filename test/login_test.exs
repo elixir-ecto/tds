@@ -29,10 +29,16 @@ defmodule LoginTest do
            end) =~ ~r"\*\* \(Tds.Error\) tcp connect: econnrefused"
   end
 
-  @tag :manual
   @tag :login
-  test "ssl", context do
-    opts = Application.fetch_env!(:tds, :opts) ++ [ssl: true, timeout: 10_000]
+  @tag :tsl
+  test "tsl", context do
+    opts = Application.fetch_env!(:tds, :opts) ++ [
+      ssl: true,
+      ssl_opts: [
+        certfile: "/Users/mjaric/prj/github/tds/mssql.pem",
+        keyfile: "/Users/mjaric/prj/github/tds/mssql.key"
+      ]
+    ]
     assert {:ok, pid} = Tds.start_link(opts ++ context[:options])
     assert {:ok, %Tds.Result{}} = Tds.query(pid, "SELECT 1", [])
   end

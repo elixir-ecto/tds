@@ -43,7 +43,8 @@ defmodule Tds.Protocol.Prelogin do
     stream = [
       encode_version(opts),
       encode_encryption(opts),
-      encode_instance(opts),
+      # when instance id check is sent, encryption is not negotiated
+      # encode_instance(opts),
       encode_threadid(opts),
       encode_mars(opts),
       encode_fedauth(opts)
@@ -95,8 +96,8 @@ defmodule Tds.Protocol.Prelogin do
   defp encode_encryption(opts) do
     data =
       if Keyword.get(opts, :ssl, false),
-        do: <<0x01>>,
-        else: <<0x02>>
+        do: <<0x01::byte>>,
+        else: <<0x02::byte>>
 
     {@encryption_token, data}
   end
@@ -143,32 +144,28 @@ defmodule Tds.Protocol.Prelogin do
     {:ok, %{encryption: encryption, instance: instance}} =
       packet_data
       |> IO.iodata_to_binary()
+      |> IO.inspect(label: "PRELOGIN RESPONSE", binary: :hex)
       |> decode_tokens([], s)
 
     case {ecrypt, encryption, instance} do
       {_, _, false} ->
-        ex = Tds.Error.exception("Connected instance name mismatched")
-        {:disconnect, ex, s}
+        msg = "Connection terminated, connected instance is not '#{instance}'!"
+        disconnect(msg, s)
 
-      {false, r, _} when r in [<<0>>, <<4>>] ->
+      {false, enc, _} when enc in [<<0x00>>, <<0x02>>] ->
         {:login, s}
 
-      {false, _, _} ->
-        {:encrypt, s}
+      {false, <<0x03>>, _} ->
+        disconnect("Server does not allow the requested encryption level.", s)
 
-      {true, <<0>>, _} ->
-        ex = Tds.Error.exception("Disconnected! Server encryption is OFF")
-        {:disconnect, ex, s}
+      {true, <<0x00>>, _} ->
+        disconnect("Server does not allow the requested encryption level.", s)
 
-      {true, <<4>>, _} ->
-        ex =
-          Tds.Error.exception(
-            "Disconnected! server respond encryption is NOT_SUP"
-          )
+      {true, <<0x03>>, _} ->
+        disconnect("Server does not allow the requested encryption level.", s)
 
-        {:disconnect, ex, s}
-
-      {true, _, _} ->
+      {_, _, _} ->
+        Logger.debug("Upgrading connection to SSL/TSL.")
         {:encrypt, s}
     end
   end
@@ -280,5 +277,9 @@ defmodule Tds.Protocol.Prelogin do
       _ ->
         decode_data(tokens, tail, m)
     end
+  end
+
+  defp disconnect(message, s) do
+    {:disconnect, Tds.Error.exception(message), s}
   end
 end

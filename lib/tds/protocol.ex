@@ -466,12 +466,22 @@ defmodule Tds.Protocol do
    ## ssl
 
   defp ssl_connect(%{sock: {:gen_tcp, sock}, opts: opts} = s) do
-    timeout = opts[:timeout] || @timeout
-    ssl_opts = opts[:ssl_opts] || []
-    :inet.setopts(sock, active: :once)
+    {:ok, _} = Application.ensure_all_started(:ssl)
+    # timeout = opts[:timeout] || @timeout
+    :inet.setopts(sock, active: false)
+    ssl_payload_size = 267 + 8
+    :gen_tcp.send(sock, <<0x12, 0x01, ssl_payload_size::unsigned-size(2)-unit(8), 0x00, 0x00, 0x00, 0x00>>)
 
-    case :ssl.connect(sock, [{:active, :once}, {:mode, :binary}|ssl_opts], timeout) do
+    ssl_opts = (opts[:ssl_opts] || []) ++ [
+      active: :false,
+      handshake: :hello,
+      # log_level: :debug,
+      # header: 8
+    ]
+    # port = s.itcp || opts[:port] || System.get_env("MSSQLPORT") || 1433
+    case :ssl.connect(sock, ssl_opts, :infinity) do
       {:ok, ssl_sock} ->
+        Logger.debug("OK, NO EXT")
         login(%{s | sock: {:ssl, ssl_sock}})
 
       {:error, reason} ->
@@ -781,11 +791,7 @@ defmodule Tds.Protocol do
     end
   end
 
-  def message(
-        :prelogin,
-        msg_preloginack(response: response),
-        %{sock: {mod, port}} = s
-      ) do
+  def message(:prelogin, msg_preloginack(response: response), %{sock: {_, sock}}) do
     case response do
       {:login, s} ->
         {:ok, s}
@@ -794,7 +800,7 @@ defmodule Tds.Protocol do
         ssl_connect(s)
 
       {:disconnect, error, s} ->
-        :gen_tcp.close(port)
+        :gen_tcp.close(sock)
         {:error, error, s}
     end
   end
