@@ -35,8 +35,9 @@ defmodule LoginTest do
     opts = Application.fetch_env!(:tds, :opts) ++ [
       ssl: true,
       ssl_opts: [
-        certfile: "/Users/mjaric/prj/github/tds/mssql.pem",
-        keyfile: "/Users/mjaric/prj/github/tds/mssql.key"
+        # certfile: "/Users/mjaric/prj/github/tds/mssql.pem",
+        # keyfile: "/Users/mjaric/prj/github/tds/mssql.key"
+        log_debug: true
       ]
     ]
     assert {:ok, pid} = Tds.start_link(opts ++ context[:options])
