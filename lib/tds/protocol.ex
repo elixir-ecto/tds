@@ -471,7 +471,7 @@ defmodule Tds.Protocol do
     :inet.setopts(sock, active: false)
     # ssl_payload_size = 267 + 8
     # :gen_tcp.send(sock, <<0x12, 0x01, ssl_payload_size::unsigned-size(2)-unit(8), 0x00, 0x00, 0x00, 0x00>>)
-
+    Logger.debug("TDS PID: #{inspect(self())}")
     ssl_opts = (opts[:ssl_opts] || []) ++ [
       active: :false,
       log_level: :debug,

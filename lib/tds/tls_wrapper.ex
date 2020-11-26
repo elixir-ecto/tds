@@ -1,24 +1,44 @@
 defmodule Tds.TlsWrapper do
-  def send(sock, packet) do
-    IO.inspect(self(), label: "SEND IN PROCESS")
-    size = IO.iodata_length(packet) |> IO.inspect(label: "SSL_PAYLOAD SIZE")
-    header = <<0x12, 0x01, size::unsigned-size(2)-unit(8), 0x00, 0x00, 0x00, 0x00>>
-    with :ok <- :gen_tcp.send(sock, header) do
-      :gen_tcp.send(sock, packet)
-    else
-      any -> any
-    end
+  require Logger
 
+  def send(sock, packet) do
+    unless handshake_complete() do
+      size = IO.iodata_length(packet) + 8
+      Process.put(:handshake_complete, true)
+      Logger.debug(
+        "SSL_PAYLOAD SIZE: #{size - 8} plus 8 bytes for header in PID #{
+          inspect(self())
+        }"
+      )
+
+      header =
+        <<0x12, 0x01, size::unsigned-size(2)-unit(8), 0x00, 0x00, 0x00, 0x00>>
+
+      :gen_tcp.send(sock, [header, packet])
+    else
+      :gen_tcp.send(sock, packet)
+    end
   end
 
   def recv(sock, length, timeout \\ :infinity) do
-    IO.inspect(self(), label: "IN PROCESS")
-    case :gen_tcp.recv(sock, length, timeout) do
-      {:ok, <<0x12, 0x01, size::unsigned-16, _::32 ,tail::binary>>} ->
-        remaining = size - 8 + byte_size(tail)
-        if remaining == 0, do: {:ok, tail}, else: recv_more(sock, remaining, tail, timeout)
+    unless handshake_complete() do
+      Logger.debug("RECEIVE #{inspect(self())}")
 
-      any -> any
+      result = case :gen_tcp.recv(sock, length, timeout) do
+        {:ok, <<0x12, 0x01, size::unsigned-16, _::32, tail::binary>>} ->
+          remaining = size - 8 + byte_size(tail)
+
+          if remaining == 0,
+            do: {:ok, tail},
+            else: recv_more(sock, remaining, tail, timeout)
+
+        any ->
+          any
+      end
+      Process.put(:handshake_complete, true)
+      result
+    else
+      :gen_tcp.recv(sock, length, timeout)
     end
   end
 
@@ -27,8 +47,13 @@ defmodule Tds.TlsWrapper do
       {:ok, tail} ->
         {:ok, [payload, tail] |> IO.iodata_to_binary()}
 
-      any -> any
+      any ->
+        any
     end
+  end
+
+  defp handshake_complete() do
+    Process.get(:handshake_complete, false)
   end
 
   defdelegate getopts(port, options), to: :inet
@@ -55,5 +80,4 @@ defmodule Tds.TlsWrapper do
     {name, 4} ->
       defdelegate unquote(name)(arg1, arg2, arg3, arg4), to: :gen_tcp
   end)
-
 end
