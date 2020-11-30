@@ -891,7 +891,10 @@ defmodule Tds.Protocol do
          msg,
          %{sock: {mod, port}, env: env, opts: opts} = s
        ) do
-    :inet.setopts(port, active: false)
+    :ok = case mod do
+      :ssl -> :ssl.setopts(port, active: false)
+      _ -> :inet.setopts(port, active: false)
+    end
 
     opts
     |> Keyword.get(:use_elixir_calendar_types, false)

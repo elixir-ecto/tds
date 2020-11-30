@@ -18,7 +18,9 @@ defmodule Tds.Tls do
     :inet.setopts(socket, active: false)
     with {:ok, pid} <- GenServer.start_link(__MODULE__, {socket, ssl_opts}, []),
          :ok <- :gen_tcp.controlling_process(socket, pid) do
-      :ssl.connect(socket, ssl_opts, :infinity)
+      res = :ssl.connect(socket, ssl_opts, :infinity)
+      GenServer.cast(pid, :handshake_complete)
+      res
     else
       error -> error
     end
@@ -119,6 +121,10 @@ defmodule Tds.Tls do
     {:reply, res, s}
   end
 
+  def handle_cast(:handshake_complete, s) do
+    {:noreply, %{s | handshake: false} }
+  end
+
   def handle_info(
         {:tcp, _,
          <<0x12, 0x01, size::unsigned-16, _::32, ssl_payload::binary>>},
@@ -129,7 +135,7 @@ defmodule Tds.Tls do
     )
 
     Kernel.send(pid, {:tcp, socket, ssl_payload})
-    {:noreply, %{s | handshake: false}}
+    {:noreply, s}
   end
 
   def handle_info({:tcp, _, _} = msg, %{owner_pid: pid} = s) do
