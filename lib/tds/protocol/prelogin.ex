@@ -144,7 +144,6 @@ defmodule Tds.Protocol.Prelogin do
     {:ok, %{encryption: encryption, instance: instance}} =
       packet_data
       |> IO.iodata_to_binary()
-      |> IO.inspect(label: "PRELOGIN RESPONSE", binary: :hex)
       |> decode_tokens([], s)
 
     case {ecrypt, encryption, instance} do

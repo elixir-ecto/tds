@@ -7,12 +7,9 @@ defmodule Tds.Tls do
   defstruct [:socket, :ssl_opts, :owner_pid, :handshake]
 
   def connect(socket, ssl_opts) do
-    Logger.debug("starting TLS upgrade")
+    # Logger.debug("starting TLS upgrade")
     ssl_opts = ssl_opts ++ [
       active: false,
-      log_level: :debug,
-      log_alert: true,
-      handshake: :full,
       cb_info: {Tds.Tls, :tcp, :tcp_closed, :tcp_error, :tcp_passive}
     ]
     :inet.setopts(socket, active: false)
@@ -127,19 +124,19 @@ defmodule Tds.Tls do
 
   def handle_info(
         {:tcp, _,
-         <<0x12, 0x01, size::unsigned-16, _::32, ssl_payload::binary>>},
+         <<0x12, 0x01, _::unsigned-16, _::32, ssl_payload::binary>>},
         %{socket: socket, owner_pid: pid} = s
       ) do
-    Logger.debug(
-      "received #{size} bytes from server in prelogin message as SSL_PAYLOAD"
-    )
+    # Logger.debug(
+    #   "received #{size} bytes from server in prelogin message as SSL_PAYLOAD"
+    # )
 
     Kernel.send(pid, {:tcp, socket, ssl_payload})
     {:noreply, s}
   end
 
   def handle_info({:tcp, _, _} = msg, %{owner_pid: pid} = s) do
-    Logger.debug("received SSL_PAYLOAD from server, NON PreLogin message")
+    # Logger.debug("received SSL_PAYLOAD from server, NON PreLogin message")
 
     Kernel.send(pid, msg)
     {:noreply, s}

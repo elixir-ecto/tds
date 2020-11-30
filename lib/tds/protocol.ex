@@ -144,7 +144,7 @@ defmodule Tds.Protocol do
   def checkout(%{sock: {mod, sock}} = s) do
     sock_mod = inspect(mod)
 
-    case :inet.setopts(sock, active: false) do
+    case setopts(s.sock, active: false) do
       :ok ->
         {:ok, s}
 
@@ -166,7 +166,7 @@ defmodule Tds.Protocol do
   def checkin(%{sock: {mod, sock}} = s) do
     sock_mod = inspect(mod)
 
-    case :inet.setopts(sock, active: :once) do
+    case setopts(s.sock, active: :once) do
       :ok ->
         {:ok, s}
 
@@ -408,7 +408,6 @@ defmodule Tds.Protocol do
 
         case prelogin(%{s | sock: {:gen_tcp, sock}}) do
           {:error, error, _state} ->
-            :gen_tcp.close(sock)
             {:error, error}
 
           other ->
@@ -471,8 +470,8 @@ defmodule Tds.Protocol do
 
     case Tds.Tls.connect(sock, opts[:ssl_opts] || []) do
       {:ok, ssl_sock} ->
-        Logger.debug("OK, NO EXT")
-        login(%{s | sock: {:ssl, ssl_sock}})
+        state = %{s | sock: {:ssl, ssl_sock} }
+        {:ok, state}
 
       {:error, reason} ->
         error =
@@ -498,10 +497,7 @@ defmodule Tds.Protocol do
         {:tcp, _, _data},
         %{sock: {mod, sock}, opts: opts, state: :prelogin} = s
       ) do
-    case mod do
-      :gen_tcp -> :inet.setopts(sock, active: false)
-      :ssl -> :ssl.setopts(sock, active: false)
-    end
+    setopts(s.sock, active: false)
 
     login(%{s | opts: opts, sock: {mod, sock}})
   end
@@ -811,9 +807,7 @@ defmodule Tds.Protocol do
     connect(new_opts)
   end
 
-  def message(:login, msg_loginack(), %{opts: opts} = s) do
-    state = %{s | opts: clean_opts(opts)}
-
+  def message(:login, msg_loginack(), %{opts: opts} = state) do
     opts
     |> conn_opts()
     |> IO.iodata_to_binary()
@@ -869,8 +863,9 @@ defmodule Tds.Protocol do
   end
 
   # Send Command To Sql Server
-  defp login_send(msg, %{sock: {mod, sock}, env: env} = s) do
+  defp login_send(msg, %{sock: {mod, sock}, env: env, opts: opts} = s) do
     paks = encode_msg(msg, env)
+    s = %{s | opts: clean_opts(opts)}
 
     Enum.each(paks, fn pak ->
       mod.send(sock, pak)
@@ -891,10 +886,7 @@ defmodule Tds.Protocol do
          msg,
          %{sock: {mod, port}, env: env, opts: opts} = s
        ) do
-    :ok = case mod do
-      :ssl -> :ssl.setopts(port, active: false)
-      _ -> :inet.setopts(port, active: false)
-    end
+    setopts(s.sock, active: false)
 
     opts
     |> Keyword.get(:use_elixir_calendar_types, false)
@@ -1190,6 +1182,13 @@ defmodule Tds.Protocol do
           "set_allow_snapshot_isolation: #{inspect(val)} is an invalid value, " <>
             "should be either :on, :off, nil"
         )
+    end
+  end
+
+  defp setopts({mod, sock}, options) do
+    case mod do
+      :gen_tcp -> :inet.setopts(sock, options)
+      :ssl -> :ssl.setopts(sock, options)
     end
   end
 end
