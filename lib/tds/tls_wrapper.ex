@@ -1,6 +1,5 @@
 defmodule Tds.TlsWrapper do
   require Logger
-
   def send(sock, packet) do
     unless handshake_complete() do
       size = IO.iodata_length(packet) + 8
@@ -15,31 +14,29 @@ defmodule Tds.TlsWrapper do
         <<0x12, 0x01, size::unsigned-size(2)-unit(8), 0x00, 0x00, 0x00, 0x00>>
 
       :gen_tcp.send(sock, [header, packet])
+
     else
       :gen_tcp.send(sock, packet)
     end
   end
 
   def recv(sock, length, timeout \\ :infinity) do
-    unless handshake_complete() do
-      Logger.debug("RECEIVE #{inspect(self())}")
+    Logger.debug("RECEIVE #{inspect(self())}")
 
-      result = case :gen_tcp.recv(sock, length, timeout) do
-        {:ok, <<0x12, 0x01, size::unsigned-16, _::32, tail::binary>>} ->
-          remaining = size - 8 + byte_size(tail)
+    result = case :gen_tcp.recv(sock, length, timeout) do
+      {:ok, <<0x12, 0x01, size::unsigned-16, _::32, tail::binary>>} ->
+        remaining = size - 8 + byte_size(tail)
 
-          if remaining == 0,
-            do: {:ok, tail},
-            else: recv_more(sock, remaining, tail, timeout)
+        if remaining == 0,
+          do: {:ok, tail},
+          else: recv_more(sock, remaining, tail, timeout)
 
-        any ->
-          any
-      end
-      Process.put(:handshake_complete, true)
-      result
-    else
-      :gen_tcp.recv(sock, length, timeout)
+      any ->
+        handshake_complete()
+        any
     end
+    result
+
   end
 
   def recv_more(sock, length, payload, timeout) do
@@ -58,7 +55,11 @@ defmodule Tds.TlsWrapper do
 
   defdelegate getopts(port, options), to: :inet
 
-  defdelegate setopts(socket, options), to: :inet
+  # defdelegate setopts(socket, options), to: :inet
+  def setopts(socket, options) do
+    if [active: 100] == options, do: raise "STOP"
+    :inet.setopts(socket, options)
+  end
 
   defdelegate peername(socket), to: :inet
 

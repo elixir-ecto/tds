@@ -467,20 +467,9 @@ defmodule Tds.Protocol do
 
   defp ssl_connect(%{sock: {:gen_tcp, sock}, opts: opts} = s) do
     {:ok, _} = Application.ensure_all_started(:ssl)
-    # timeout = opts[:timeout] || @timeout
     :inet.setopts(sock, active: false)
-    # ssl_payload_size = 267 + 8
-    # :gen_tcp.send(sock, <<0x12, 0x01, ssl_payload_size::unsigned-size(2)-unit(8), 0x00, 0x00, 0x00, 0x00>>)
-    Logger.debug("TDS PID: #{inspect(self())}")
-    ssl_opts = (opts[:ssl_opts] || []) ++ [
-      active: :false,
-      log_level: :debug,
-      log_alert: true,
-      handshake: :hello,
-      cb_info: {Tds.TlsWrapper, :tcp, :tcp_closed, :tcp_error, :tcp_passive}
-    ]
-    # port = s.itcp || opts[:port] || System.get_env("MSSQLPORT") || 1433
-    case :ssl.connect(sock, ssl_opts, :infinity) do
+
+    case Tds.Tls.connect(sock, opts[:ssl_opts] || []) do
       {:ok, ssl_sock} ->
         Logger.debug("OK, NO EXT")
         login(%{s | sock: {:ssl, ssl_sock}})
