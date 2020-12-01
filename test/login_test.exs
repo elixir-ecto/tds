@@ -26,7 +26,7 @@ defmodule LoginTest do
     assert capture_log(fn ->
              opts = [username: "sa", password: "wrong"]
              assert_start_and_killed(opts ++ context[:options])
-           end) =~ "(Tds.Error) Line 1 (Error 18456): Login failed for user 'sa'"
+           end) =~ ~r"\*\* \(Tds.Error\) tcp connect: econnrefused"
   end
 
   @tag :login
