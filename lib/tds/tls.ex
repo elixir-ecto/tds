@@ -10,7 +10,7 @@ defmodule Tds.Tls do
     # Logger.debug("starting TLS upgrade")
     ssl_opts = ssl_opts ++ [
       active: false,
-      cb_info: {Tds.Tls, :tcp, :tcp_closed, :tcp_error, :tcp_passive}
+      cb_info: {Tds.Tls, :tcp, :tcp_closed, :tcp_error}
     ]
     :inet.setopts(socket, active: false)
     with {:ok, pid} <- GenServer.start_link(__MODULE__, {socket, ssl_opts}, []),
