@@ -601,7 +601,7 @@ defmodule Tds.Messages do
   end
 
   def encode_packets(type, data, id) do
-    header = encode_header(type, data, id: id + 1, status: 1)
+    header = encode_header(type, data, id: id, status: 1)
     [header <> data]
   end
 
