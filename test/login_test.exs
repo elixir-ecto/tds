@@ -3,9 +3,14 @@ defmodule LoginTest do
   import ExUnit.CaptureLog
 
   setup do
+    hostname =
+      Application.fetch_env!(:tds, :opts)
+      |> Keyword.get(:hostname)
+
     {:ok,
      [
        options: [
+         hostname: hostname,
          database: "test",
          backoff_type: :stop,
          max_restarts: 0,
@@ -24,21 +29,33 @@ defmodule LoginTest do
   @tag :login
   test "login with non existing sql server authentication", context do
     assert capture_log(fn ->
-             opts = [username: "sa", password: "wrong"]
-             assert_start_and_killed(opts ++ context[:options])
-           end) =~ ~r"\*\* \(Tds.Error\) tcp connect: econnrefused"
+             opts = [username: "sa", password: "wrong"] ++ context[:options]
+             assert_start_and_killed(opts)
+           end) =~
+             "(Tds.Error) Line 1 (Error 18456): Login failed for user 'sa'"
   end
 
   @tag :login
-  test "login with tsl", context do
-    opts = Application.fetch_env!(:tds, :opts) ++ [
-      ssl: true,
-      ssl_opts: [
-        log_debug: true
-      ]
-    ]
+  test "login with valid sql login over tsl", context do
+    opts =
+      Application.fetch_env!(:tds, :opts) ++
+        [ssl: true, ssl_opts: [log_debug: true]]
+
     assert {:ok, pid} = Tds.start_link(opts ++ context[:options])
     assert {:ok, %Tds.Result{}} = Tds.query(pid, "SELECT 1", [])
+  end
+
+  @tag :login
+  test "login with non existing sql server authentication over tls", context do
+    assert capture_log(fn ->
+             opts =
+               [username: "sa", password: "wrong"] ++
+                 context[:options] ++
+                 [ssl: true, ssl_opts: [log_debug: true]]
+
+             assert_start_and_killed(opts)
+           end) =~
+             "(Tds.Error) Line 1 (Error 18456): Login failed for user 'sa'"
   end
 
   defp assert_start_and_killed(opts) do

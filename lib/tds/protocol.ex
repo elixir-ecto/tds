@@ -777,17 +777,11 @@ defmodule Tds.Protocol do
     end
   end
 
-  def message(:prelogin, msg_preloginack(response: response), %{sock: {_, sock}}) do
+  def message(:prelogin, msg_preloginack(response: response), _) do
     case response do
-      {:login, s} ->
-        {:ok, s}
-
-      {:encrypt, s} ->
-        ssl_connect(s)
-
-      {:disconnect, error, s} ->
-        :gen_tcp.close(sock)
-        {:error, error, s}
+      {:login, s} -> {:ok, s}
+      {:encrypt, s} -> ssl_connect(s)
+      other -> other
     end
   end
 
@@ -873,7 +867,7 @@ defmodule Tds.Protocol do
 
     case msg_recv(s) do
       {:disconnect, ex, s} ->
-        {:error, ex, s}
+        {:disconnect, ex, s}
 
       buffer ->
         buffer
