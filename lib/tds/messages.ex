@@ -389,13 +389,10 @@ defmodule Tds.Messages do
     login7_len = byte_size(login7) + 4
     data = <<login7_len::little-size(32)>> <> login7
     encode_packets(0x10, data)
-    # header = encode_header(0x10, data)
-
-    # header <> data
   end
 
   defp encode(msg_attn(), _s) do
-    [encode_header(@tds_pack_cancel, <<>>)]
+    encode_packets(@tds_pack_cancel, <<>>)
   end
 
   defp encode(msg_sql(query: q), %{trans: trans}) do
@@ -420,8 +417,6 @@ defmodule Tds.Messages do
     all_headers = <<total_length::little-size(32)>> <> headers
     data = all_headers <> q_ucs
     encode_packets(0x01, data)
-    # header = encode_header(0x01, data)
-    # header <> data
   end
 
   defp encode(msg_rpc(proc: proc, params: params), %{trans: trans}) do
@@ -445,9 +440,6 @@ defmodule Tds.Messages do
     data = all_headers <> encode_rpc(proc, params)
     # layout Data
     encode_packets(0x03, data)
-    # header = encode_header(0x03, data)
-    # pak = header <> data
-    # pak
   end
 
   defp encode(msg_transmgr(command: "TM_BEGIN_XACT", isolation_level: isolation_level), %{trans: trans}) do
@@ -566,21 +558,10 @@ defmodule Tds.Messages do
     p_meta_data <> Types.encode_data(type_code, param.value, type_attr)
   end
 
-  def encode_header(type, data, opts \\ []) do
-    status = opts[:status] || 1
-
-    id = opts[:id] || 1
-
+  def encode_header(type, data, id, status) do
     length = byte_size(data) + 8
-
-    <<
-      type,
-      status,
-      length::size(16),
-      0::size(16),
-      id,
-      0
-    >>
+    # id::unsigned-size(8) below basicaly deals overflow e.g. rem(id, 255)
+    <<type, status, length::size(16), 0::size(16), id::unsigned-size(8), 0>>
   end
 
   @spec encode_packets(integer, binary, non_neg_integer) :: [binary, ...]
@@ -596,12 +577,12 @@ defmodule Tds.Messages do
         id
       ) do
     status = if byte_size(tail) > 0, do: 0, else: 1
-    header = encode_header(type, data, id: rem(id, 255), status: status)
-    [[header, data] | encode_packets(type, tail, id + 1)]
+    packet = [encode_header(type, data, id, status), data]
+    [packet | encode_packets(type, tail, id + 1)]
   end
 
   def encode_packets(type, data, id) do
-    header = encode_header(type, data, id: id, status: 1)
+    header = encode_header(type, data, id, 1)
     [header <> data]
   end
 
