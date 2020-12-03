@@ -273,6 +273,4 @@ defmodule BinaryTest do
     assert @pangrams == query("select [lang], [pangram] from pangrams", [])
     Application.delete_env(:tds, :text_encoder)
   end
-
-
 end
