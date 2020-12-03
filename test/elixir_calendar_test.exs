@@ -16,7 +16,6 @@ defmodule ElixirCalendarTest do
     # required for direct encoder/decoder testing
     Tds.Utils.use_elixir_calendar_types(true)
 
-    Calendar.put_time_zone_database(Tzdata.TimeZoneDatabase)
     {:ok, [pid: pid]}
   end
 

@@ -2,6 +2,8 @@ use Mix.Config
 
 config :logger, level: :debug
 
+config :elixir, :time_zone_database, Tzdata.TimeZoneDatabase
+
 config :tds,
   opts: [
     hostname: System.get_env("SQL_HOSTNAME") || "127.0.0.1",

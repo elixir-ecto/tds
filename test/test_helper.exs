@@ -1,3 +1,5 @@
+Application.ensure_all_started(:tzdata)
+
 defmodule Tds.TestHelper do
   alias Tds.Connection
 
