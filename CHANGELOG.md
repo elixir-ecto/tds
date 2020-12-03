@@ -1,3 +1,8 @@
+# v2.1.2
+### BugFix
+* Resolves [PR #115](https://github.com/livehelpnow/tds/pull/115). Thank you, [Chris Martin](https://github.com/trbngr)
+* Fix double incrementing of the packet number [PR #117](https://github.com/livehelpnow/tds/pull/117). Thank you, [DJ Jani](https://github.com/deepankar-j)
+
 # v2.1.1
 ### Improvements
 * As per discussion [here](https://github.com/livehelpnow/tds/issues/108) exposed 
