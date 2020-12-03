@@ -90,16 +90,16 @@ defmodule PLPTest do
       [%Tds.Parameter{value: "EmployeeSchema", type: :string, name: "@1"}]
     )
 
-    xml_value = """
-    <Employee>
-      <Name>
-        <First>Jacob</First>
-        <Middle>V</Middle>
-        <Last>Sebastian</Last>
-      </Name>
-      <!-- Deleted other information for brevity -->
-    </Employee>
-    """
+    xml_value = [
+      "<Employee>",
+      "<Name>",
+      "<First>Jacob</First>",
+      "<Middle>V</Middle>",
+      "<Last>Sebastian</Last>",
+      "</Name>",
+      "<!-- Deleted other information for brevity -->",
+      "</Employee>",
+    ] |> Enum.join("")
 
     :ok =
       query(
@@ -113,6 +113,6 @@ defmodule PLPTest do
       )
 
     :ok = query("INSERT INTO dbo.xml_data_with_schema VALUES (N'#{xml_value}')", [])
-    assert [[xml_value]] = query("select employee from dbo.xml_data_with_schema", [])
+    assert [[xml_value]] == query("select employee from dbo.xml_data_with_schema", [])
   end
 end
