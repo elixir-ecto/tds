@@ -6,7 +6,7 @@ defmodule Tds.Result do
 
   * `columns`: The column names.
   * `rows`: The result set as a list of tuples. Each tuple corresponds to a
-            row, while each element in the tuple corresponds to a column.
+    row, while each element in the tuple corresponds to a column.
   * `num_rows`: The number of fetched or affected rows.
   """
 

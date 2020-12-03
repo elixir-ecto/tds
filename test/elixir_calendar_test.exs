@@ -15,6 +15,8 @@ defmodule ElixirCalendarTest do
 
     # required for direct encoder/decoder testing
     Tds.Utils.use_elixir_calendar_types(true)
+
+    Calendar.put_time_zone_database(Tzdata.TimeZoneDatabase)
     {:ok, [pid: pid]}
   end
 
@@ -185,6 +187,295 @@ defmodule ElixirCalendarTest do
       assert dt == Types.decode_datetimeoffset(s, token)
       assert [[^dt]] = query("SELECT @1 ", [p])
     end)
+  end
+
+  test "Elixir.DateTime with timezone to SQL DateTimeOffset", context do
+    type = :datetimeoffset
+
+    dts = [
+      %P{name: "@1", value: tza(~U[2020-02-28 13:59:59.000000Z]), type: type},
+      %P{name: "@1", value: tza(~U[2020-02-28 13:59:59.00000Z]), type: type},
+      %P{name: "@1", value: tza(~U[2020-02-28 13:59:59.0000Z]), type: type},
+      %P{name: "@1", value: tza(~U[2020-02-28 13:59:59.000Z]), type: type},
+      %P{name: "@1", value: tza(~U[2020-02-28 13:59:59.00Z]), type: type},
+      %P{name: "@1", value: tza(~U[2020-02-28 13:59:59.0Z]), type: type},
+      %P{name: "@1", value: tza(~U[2020-02-28 13:59:59Z]), type: type},
+      %P{name: "@1", value: tza(~U[2020-02-28 13:59:59.1Z]), type: type},
+      %P{name: "@1", value: tza(~U[2020-02-28 13:59:59.10Z]), type: type},
+      %P{name: "@1", value: tza(~U[2020-02-28 13:59:59.100Z]), type: type},
+      %P{name: "@1", value: tza(~U[2020-02-28 13:59:59.1000Z]), type: type},
+      %P{name: "@1", value: tza(~U[2020-02-28 13:59:59.10000Z]), type: type},
+      %P{name: "@1", value: tza(~U[2020-02-28 13:59:59.100000Z]), type: type},
+      %P{name: "@1", value: tza(~U[2020-02-28 13:59:59.12Z]), type: type},
+      %P{name: "@1", value: tza(~U[2020-02-28 13:59:59.123Z]), type: type},
+      %P{name: "@1", value: tza(~U[2020-02-28 13:59:59.1234Z]), type: type},
+      %P{name: "@1", value: tza(~U[2020-02-28 13:59:59.12345Z]), type: type},
+      %P{name: "@1", value: tza(~U[2020-02-28 13:59:59.123456Z]), type: type},
+      %P{name: "@1", value: tza(~U[2020-02-28 13:59:59.999999Z]), type: type},
+      %P{name: "@1", value: tzb(~U[2020-02-28 13:59:59.000000Z]), type: type},
+      %P{name: "@1", value: tzb(~U[2020-02-28 13:59:59.00000Z]), type: type},
+      %P{name: "@1", value: tzb(~U[2020-02-28 13:59:59.0000Z]), type: type},
+      %P{name: "@1", value: tzb(~U[2020-02-28 13:59:59.000Z]), type: type},
+      %P{name: "@1", value: tzb(~U[2020-02-28 13:59:59.00Z]), type: type},
+      %P{name: "@1", value: tzb(~U[2020-02-28 13:59:59.0Z]), type: type},
+      %P{name: "@1", value: tzb(~U[2020-02-28 13:59:59Z]), type: type},
+      %P{name: "@1", value: tzb(~U[2020-02-28 13:59:59.1Z]), type: type},
+      %P{name: "@1", value: tzb(~U[2020-02-28 13:59:59.10Z]), type: type},
+      %P{name: "@1", value: tzb(~U[2020-02-28 13:59:59.100Z]), type: type},
+      %P{name: "@1", value: tzb(~U[2020-02-28 13:59:59.1000Z]), type: type},
+      %P{name: "@1", value: tzb(~U[2020-02-28 13:59:59.10000Z]), type: type},
+      %P{name: "@1", value: tzb(~U[2020-02-28 13:59:59.100000Z]), type: type},
+      %P{name: "@1", value: tzb(~U[2020-02-28 13:59:59.12Z]), type: type},
+      %P{name: "@1", value: tzb(~U[2020-02-28 13:59:59.123Z]), type: type},
+      %P{name: "@1", value: tzb(~U[2020-02-28 13:59:59.1234Z]), type: type},
+      %P{name: "@1", value: tzb(~U[2020-02-28 13:59:59.12345Z]), type: type},
+      %P{name: "@1", value: tzb(~U[2020-02-28 13:59:59.123456Z]), type: type},
+      %P{name: "@1", value: tzb(~U[2020-02-28 13:59:59.999999Z]), type: type}
+    ]
+
+    Enum.each(dts, fn %{value: %{microsecond: {_, s}} = dt} = p ->
+      token = Types.encode_datetimeoffset(dt, s)
+      {:ok, utc_dt} = DateTime.shift_zone(dt, "Etc/UTC")
+      assert utc_dt == Types.decode_datetimeoffset(s, token)
+      assert [[^utc_dt]] = query("SELECT @1 ", [p])
+    end)
+  end
+
+  test "Elixix.DateTime with timezone in & out of database", context do
+    query("DROP TABLE datetimeoffset_calendar_test", [])
+
+    :ok =
+      query(
+        """
+          CREATE TABLE datetimeoffset_calendar_test (
+            zero datetimeoffset(0) NULL,
+            one datetimeoffset(1) NULL,
+            two datetimeoffset(2) NULL,
+            three datetimeoffset(3) NULL,
+            four datetimeoffset(4) NULL,
+            five datetimeoffset(5) NULL,
+            six datetimeoffset(6) NULL,
+            seven datetimeoffset(7) NULL,
+            ver int NOT NULL
+            )
+        """,
+        []
+      )
+
+    assert :ok =
+             "INSERT INTO datetimeoffset_calendar_test VALUES (@1, @2, @3, @4, @5, @6, @7, @8, @9)"
+             |> query([
+               %P{name: "@1", value: nil, type: :datetimeoffset},
+               %P{name: "@2", value: nil, type: :datetimeoffset},
+               %P{name: "@3", value: nil, type: :datetimeoffset},
+               %P{name: "@4", value: nil, type: :datetimeoffset},
+               %P{name: "@5", value: nil, type: :datetimeoffset},
+               %P{name: "@6", value: nil, type: :datetimeoffset},
+               %P{name: "@7", value: nil, type: :datetimeoffset},
+               %P{name: "@8", value: nil, type: :datetimeoffset},
+               %P{name: "@9", value: 0, type: :integer}
+             ])
+
+    # UTC
+    assert :ok =
+             "INSERT INTO datetimeoffset_calendar_test VALUES (@1, @2, @3, @4, @5, @6, @7, @8, @9)"
+             |> query([
+               %P{
+                 name: "@1",
+                 value: ~U[2020-02-28 13:59:59Z],
+                 type: :datetimeoffset
+               },
+               %P{
+                 name: "@2",
+                 value: ~U[2020-02-28 13:59:59.1Z],
+                 type: :datetimeoffset
+               },
+               %P{
+                 name: "@3",
+                 value: ~U[2020-02-28 13:59:59.12Z],
+                 type: :datetimeoffset
+               },
+               %P{
+                 name: "@4",
+                 value: ~U[2020-02-28 13:59:59.123Z],
+                 type: :datetimeoffset
+               },
+               %P{
+                 name: "@5",
+                 value: ~U[2020-02-28 13:59:59.1234Z],
+                 type: :datetimeoffset
+               },
+               %P{
+                 name: "@6",
+                 value: ~U[2020-02-28 13:59:59.12345Z],
+                 type: :datetimeoffset
+               },
+               %P{
+                 name: "@7",
+                 value: ~U[2020-02-28 13:59:59.123456Z],
+                 type: :datetimeoffset
+               },
+               %P{
+                 name: "@8",
+                 value: ~U[2020-02-28 13:59:59.123456Z],
+                 type: :datetimeoffset
+               },
+               %P{name: "@9", value: 1, type: :integer}
+             ])
+
+    assert [
+             [
+               ~U[2020-02-28 13:59:59Z],
+               ~U[2020-02-28 13:59:59.1Z],
+               ~U[2020-02-28 13:59:59.12Z],
+               ~U[2020-02-28 13:59:59.123Z],
+               ~U[2020-02-28 13:59:59.1234Z],
+               ~U[2020-02-28 13:59:59.12345Z],
+               ~U[2020-02-28 13:59:59.123456Z],
+               ~U[2020-02-28 13:59:59.123456Z]
+             ]
+           ] ==
+             query(
+               "SELECT zero, one, two, three, four, five, six, seven from datetimeoffset_calendar_test WHERE ver = 1"
+             )
+
+    # positive offset
+    assert :ok =
+             "INSERT INTO datetimeoffset_calendar_test VALUES (@1, @2, @3, @4, @5, @6, @7, @8, @9)"
+             |> query([
+               %P{
+                 name: "@1",
+                 value: tza(~U[2020-02-28 13:59:59Z]),
+                 type: :datetimeoffset
+               },
+               %P{
+                 name: "@2",
+                 value: tza(~U[2020-02-28 13:59:59.1Z]),
+                 type: :datetimeoffset
+               },
+               %P{
+                 name: "@3",
+                 value: tza(~U[2020-02-28 13:59:59.12Z]),
+                 type: :datetimeoffset
+               },
+               %P{
+                 name: "@4",
+                 value: tza(~U[2020-02-28 13:59:59.123Z]),
+                 type: :datetimeoffset
+               },
+               %P{
+                 name: "@5",
+                 value: tza(~U[2020-02-28 13:59:59.1234Z]),
+                 type: :datetimeoffset
+               },
+               %P{
+                 name: "@6",
+                 value: tza(~U[2020-02-28 13:59:59.12345Z]),
+                 type: :datetimeoffset
+               },
+               %P{
+                 name: "@7",
+                 value: tza(~U[2020-02-28 13:59:59.123456Z]),
+                 type: :datetimeoffset
+               },
+               %P{
+                 name: "@8",
+                 value: tza(~U[2020-02-28 13:59:59.123456Z]),
+                 type: :datetimeoffset
+               },
+               %P{name: "@9", value: 2, type: :integer}
+             ])
+
+    assert [
+             [
+               ~U[2020-02-28 13:59:59Z],
+               ~U[2020-02-28 13:59:59.1Z],
+               ~U[2020-02-28 13:59:59.12Z],
+               ~U[2020-02-28 13:59:59.123Z],
+               ~U[2020-02-28 13:59:59.1234Z],
+               ~U[2020-02-28 13:59:59.12345Z],
+               ~U[2020-02-28 13:59:59.123456Z],
+               ~U[2020-02-28 13:59:59.123456Z]
+             ]
+           ] ==
+             query(
+               "SELECT zero, one, two, three, four, five, six, seven from datetimeoffset_calendar_test WHERE ver = 2"
+             )
+
+    # negative offset
+    assert :ok =
+             "INSERT INTO datetimeoffset_calendar_test VALUES (@1, @2, @3, @4, @5, @6, @7, @8, @9)"
+             |> query([
+               %P{
+                 name: "@1",
+                 value: tzb(~U[2020-02-28 13:59:59Z]),
+                 type: :datetimeoffset
+               },
+               %P{
+                 name: "@2",
+                 value: tzb(~U[2020-02-28 13:59:59.1Z]),
+                 type: :datetimeoffset
+               },
+               %P{
+                 name: "@3",
+                 value: tzb(~U[2020-02-28 13:59:59.12Z]),
+                 type: :datetimeoffset
+               },
+               %P{
+                 name: "@4",
+                 value: tzb(~U[2020-02-28 13:59:59.123Z]),
+                 type: :datetimeoffset
+               },
+               %P{
+                 name: "@5",
+                 value: tzb(~U[2020-02-28 13:59:59.1234Z]),
+                 type: :datetimeoffset
+               },
+               %P{
+                 name: "@6",
+                 value: tzb(~U[2020-02-28 13:59:59.12345Z]),
+                 type: :datetimeoffset
+               },
+               %P{
+                 name: "@7",
+                 value: tzb(~U[2020-02-28 13:59:59.123456Z]),
+                 type: :datetimeoffset
+               },
+               %P{
+                 name: "@8",
+                 value: tzb(~U[2020-02-28 13:59:59.123456Z]),
+                 type: :datetimeoffset
+               },
+               %P{name: "@9", value: 3, type: :integer}
+             ])
+
+    assert [
+             [
+               ~U[2020-02-28 13:59:59Z],
+               ~U[2020-02-28 13:59:59.1Z],
+               ~U[2020-02-28 13:59:59.12Z],
+               ~U[2020-02-28 13:59:59.123Z],
+               ~U[2020-02-28 13:59:59.1234Z],
+               ~U[2020-02-28 13:59:59.12345Z],
+               ~U[2020-02-28 13:59:59.123456Z],
+               ~U[2020-02-28 13:59:59.123456Z]
+             ]
+           ] ==
+             query(
+               "SELECT zero, one, two, three, four, five, six, seven from datetimeoffset_calendar_test WHERE ver = 3"
+             )
+
+    query("DROP TABLE datetimeoffset_calendar_test", [])
+  end
+
+  # shift into a timezone with a positive offset
+  defp tza(datetime) do
+    DateTime.shift_zone(datetime, "Australia/Brisbane") |> elem(1)
+  end
+
+  # shift into a timezone with a negative offset
+  defp tzb(datetime) do
+    DateTime.shift_zone(datetime, "America/Chicago") |> elem(1)
   end
 
   test "should truncate datetimeoffset(7) to Elixir.DateTime with precision 6",

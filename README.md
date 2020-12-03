@@ -119,22 +119,40 @@ More info [here](https://docs.microsoft.com/en-us/dotnet/framework/data/adonet/s
 
 ## Data representation
 
-| TDS      | Elixir                                                         |
-| -------- | -------------------------------------------------------------- |
-| NULL     | nil                                                            |
-| bool     | true / false                                                   |
-| char     | "é"                                                            |
-| int      | 42                                                             |
-| float    | 42.0                                                           |
-| text     | "text"                                                         |
-| binary   | <<42>>                                                         |
-| numeric  | #Decimal<42.0> *                                               |
-| date     | {2013, 10, 12}                                                 |
-| time     | {0, 37, 14}                                                    |
-| datetime | {{2013, 10, 12}, {0, 37, 14}}                                  |
-| uuid     | <<160,238,188,153,156,11,78,248,187,109,107,185,189,56,10,17>> |
+| TDS               | Elixir                                                                                     |
+| ----------------- | ------------------------------------------------------------------------------------------ |
+| NULL              | nil                                                                                        |
+| bool              | true / false                                                                               |
+| char              | "é"                                                                                        |
+| int               | 42                                                                                         |
+| float             | 42.0                                                                                       |
+| text              | "text"                                                                                     |
+| binary            | <<42>>                                                                                     |
+| numeric           | #Decimal<42.0>                                                                             |
+| date              | {2013, 10, 12} or %Date{}                                                                  |
+| time              | {0, 37, 14} or {0, 37, 14, 123456} or %Time{}                                              |
+| smalldatetime     | {{2013, 10, 12}, {0, 37, 14}} or {{2013, 10, 12}, {0, 37, 14, 123456}}                     |
+| datetime          | {{2013, 10, 12}, {0, 37, 14}} or {{2013, 10, 12}, {0, 37, 14, 123456}} or %NaiveDateTime{} |
+| datetime2         | {{2013, 10, 12}, {0, 37, 14}} or {{2013, 10, 12}, {0, 37, 14, 123456}} or %NaiveDateTime{} |
+| datetimeoffset(n) | {{2013, 10, 12}, {0, 37, 14}} or {{2013, 10, 12}, {0, 37, 14, 123456}} or %DateTime{}      |
+| uuid              | <<160,238,188,153,156,11,78,248,187,109,107,185,189,56,10,17>>                             |
 
 Currently unsupported: [User-Defined Types](https://docs.microsoft.com/en-us/sql/relational-databases/clr-integration-database-objects-user-defined-types/working-with-user-defined-types-in-sql-server), XML
+
+### Dates and Times
+
+Tds can work with dates and times in either a tuple format or as Elixir calendar types. Calendar types can be enabled in the config with `config :tds, opts: [use_elixir_calendar_types: true]`.
+
+**Tuple forms:**
+
+- Date: `{yr, mth, day}`
+- Time: `{hr, min, sec}` or `{hr, min, sec, fractional_seconds}`
+- DateTime: `{date, time}`
+- DateTimeOffset: `{utc_date, utc_time, offset_mins}`
+
+In SQL Server, the `fractional_seconds` of a `time`, `datetime2` or `datetimeoffset(n)` column can have a precision of 0-7, where the `microsecond` field of a `%Time{}` or `%DateTime{}` struct can have a precision of 0-6.
+
+Note that the DateTimeOffset tuple expects the date and time in UTC and the offset in minutes. For example, `{{2020, 4, 5}, {5, 30, 59}, 600}` is equal to `'2020-04-05 15:30:59+10:00'`.
 
 ### UUIDs
 
