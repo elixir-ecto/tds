@@ -997,7 +997,6 @@ defmodule Tds.Protocol do
     [
       "SET ANSI_NULLS ON; ",
       "SET QUOTED_IDENTIFIER ON; ",
-      "SET CURSOR_CLOSE_ON_COMMIT OFF; ",
       "SET ANSI_NULL_DFLT_ON ON; ",
       "SET ANSI_PADDING ON; ",
       "SET ANSI_WARNINGS ON; ",
@@ -1013,6 +1012,7 @@ defmodule Tds.Protocol do
     |> append_opts(opts, :set_implicit_transactions)
     |> append_opts(opts, :set_transaction_isolation_level)
     |> append_opts(opts, :set_allow_snapshot_isolation)
+    |> append_opts(opts, :set_cursor_close_on_commit)
   end
 
   defp append_opts(conn, opts, :set_language) do
@@ -1172,6 +1172,26 @@ defmodule Tds.Protocol do
           ArgumentError,
           "set_allow_snapshot_isolation: #{inspect(val)} is an invalid value, " <>
             "should be either :on, :off, nil"
+        )
+    end
+  end
+
+  defp append_opts(conn, opts, :set_cursor_close_on_commit) do
+    case Keyword.get(opts, :set_cursor_close_on_commit) do
+      val when val in [nil, :off] ->
+        conn ++ ["SET CURSOR_CLOSE_ON_COMMIT OFF; "]
+
+      :on ->
+        conn ++ ["SET TRANSACTION ISOLATION LEVEL ON; "]
+
+      :exclude ->
+        conn
+
+      val ->
+        raise(
+          ArgumentError,
+          "set_cursor_close_on_commit: #{inspect(val)} is an invalid value, " <>
+            "should be one of should be either :on, :off, :exclude or nil"
         )
     end
   end
