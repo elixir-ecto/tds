@@ -141,7 +141,7 @@ defmodule Tds.Protocol do
     {:disconnect, err, s}
   end
 
-  def checkout(%{sock: {mod, sock}} = s) do
+  def checkout(%{sock: {mod, _sock}} = s) do
     sock_mod = inspect(mod)
 
     case setopts(s.sock, active: false) do
@@ -163,7 +163,7 @@ defmodule Tds.Protocol do
     {:disconnect, err, s}
   end
 
-  def checkin(%{sock: {mod, sock}} = s) do
+  def checkin(%{sock: {mod, _sock}} = s) do
     sock_mod = inspect(mod)
 
     case setopts(s.sock, active: :once) do
