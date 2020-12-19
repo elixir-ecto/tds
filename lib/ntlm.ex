@@ -113,11 +113,10 @@ defmodule Ntlm do
     nt_idx = l2_idx + lmv2_len
     client_nonce = client_nonce()
 
-    {:ok, gen_time} =
+    gen_time =
       NaiveDateTime.utc_now()
-      |> DateTime.from_naive("Etc/UTC")
-
-    gen_time = DateTime.to_unix(gen_time)
+      |> DateTime.from_naive!("Etc/UTC")
+      |> DateTime.to_unix()
 
     fixed =
       <<"NTLMSSP", 0, 0x03::little-unsigned-32, lmv2_len::little-unsigned-16,
@@ -173,15 +172,16 @@ defmodule Ntlm do
        ) do
     timestamp = as_timestamp(gen_time)
     hash = ntv2_hash(domain, username, password)
-
+    target_info_len = byte_size(server_data)
     data = <<
-      server_nonce::binary-64,
+      server_nonce::binary-size(8)-unit(8),
       0x0101::little-unsigned-32,
       0x0000::little-unsigned-32,
-      timestamp::binary-64,
-      client_nonce::binary-64,
+      timestamp::binary-size(8)-unit(8),
+      client_nonce::binary-size(8)-unit(8),
       0x0000::unsigned-32,
-      server_data::binary
+      server_data::binary-size(target_info_len)-unit(8),
+      0x0000::little-unsigned-32
     >>
 
     hmac_md5(data, hash)
