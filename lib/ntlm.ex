@@ -38,6 +38,12 @@ defmodule Ntlm do
   @ntlm_NegotiateKeyExchange 0x40000000
   @ntlm_Negotiate56 0x80000000
 
+  @type domain :: String.t()
+  @type username :: String.t()
+  @type password :: String.t()
+  @type negotiation_option :: {:domain, domain()} | {:workstation, String.t()}
+  @type negotiation_options :: [negotiation_option()]
+
   @doc """
   Builds NTLM negotiation message `<<"NTLMSSP", 0x00, 0x01 ...>>`
 
@@ -45,14 +51,21 @@ defmodule Ntlm do
   optinal `:workstation` string. Both values can only contain valid ASCII
   characters
   """
-  @spec negotiate(keyword) :: <<_::64, _::_*8>>
-  def negotiate(opts \\ []) do
+  @spec negotiate(negotiation_options) :: binary()
+  def negotiate(negotiation_options) do
     fixed_data_len = 40
-    domain = :unicode.characters_to_binary(opts[:domain], :unicode, :latin1)
-    domain_length = String.length(opts[:domain])
+
+    domain =
+      :unicode.characters_to_binary(
+        negotiation_options[:domain],
+        :unicode,
+        :latin1
+      )
+
+    domain_length = String.length(negotiation_options[:domain])
 
     workstation =
-      opts
+      negotiation_options
       |> Keyword.get(:workstation)
       |> Kernel.||("")
 
@@ -64,17 +77,17 @@ defmodule Ntlm do
     <<
       "NTLMSSP",
       0x00,
-      0x01::little-unsigned-size(4)-unit(8),
-      type1_flags::little-unsigned-size(4)-unit(8),
-      domain_length::little-unsigned-size(2)-unit(8),
-      domain_length::little-unsigned-size(2)-unit(8),
-      fixed_data_len + workstation_length::little-unsigned-size(4)-unit(8),
-      workstation_length::little-unsigned-size(2)-unit(8),
-      workstation_length::little-unsigned-size(2)-unit(8),
-      fixed_data_len::little-unsigned-size(4)-unit(8),
+      0x01::little-unsigned-32,
+      type1_flags::little-unsigned-32,
+      domain_length::little-unsigned-16,
+      domain_length::little-unsigned-16,
+      fixed_data_len + workstation_length::little-unsigned-32,
+      workstation_length::little-unsigned-16,
+      workstation_length::little-unsigned-16,
+      fixed_data_len::little-unsigned-32,
       5,
       0,
-      2195::little-unsigned-size(2)-unit(8),
+      2195::little-unsigned-16,
       0,
       0,
       0,
@@ -84,7 +97,100 @@ defmodule Ntlm do
     >>
   end
 
-  def authenticate() do
+  @spec authenticate(domain(), username(), password(), binary(), binary()) ::
+          binary()
+  def authenticate(domain, username, password, server_data, server_nonce) do
+    domain = ucs2(domain)
+    domain_len = byte_size(domain)
+    username = ucs2(username)
+    username_len = byte_size(username)
+    lmv2_len = 24
+    ntlmv2_len = 16
+    base_idx = 64
+    dn_idx = base_idx
+    un_idx = dn_idx + domain_len
+    l2_idx = un_idx + username_len * 2
+    nt_idx = l2_idx + lmv2_len
+    client_nonce = client_nonce()
+
+    {:ok, gen_time} =
+      NaiveDateTime.utc_now()
+      |> DateTime.from_naive("Etc/UTC")
+
+    gen_time = DateTime.to_unix(gen_time)
+
+    fixed =
+      <<"NTLMSSP", 0, 0x03::little-unsigned-32, lmv2_len::little-unsigned-16,
+        l2_idx::little-unsigned-32, ntlmv2_len::little-unsigned-16,
+        ntlmv2_len::little-unsigned-16, nt_idx::little-unsigned-32,
+        domain_len::little-unsigned-16, domain_len::little-unsigned-16,
+        dn_idx::little-unsigned-32, username_len::little-unsigned-16,
+        username_len::little-unsigned-16, un_idx::little-unsigned-32,
+        0x00::little-unsigned-16, 0x00::little-unsigned-16,
+        base_idx::little-unsigned-32, 0x00::little-unsigned-16,
+        0x00::little-unsigned-16, base_idx::little-unsigned-32,
+        0x8201::little-unsigned-16, 0x00::little-unsigned-16>>
+
+    [
+      fixed,
+      domain,
+      username,
+      lvm2_response(domain, username, password, server_nonce, client_nonce),
+      ntlmv2_response(
+        domain,
+        username,
+        password,
+        server_nonce,
+        server_data,
+        client_nonce,
+        gen_time
+      ),
+      [0x01, 0x01, 0x00, 0x00],
+      as_timestamp(gen_time),
+      client_nonce,
+      [0x00, 0x00],
+      server_data,
+      [0x00, 0x00]
+    ]
+    |> IO.iodata_to_binary()
+  end
+
+  defp lvm2_response(domain, username, password, server_nonce, client_nonce) do
+    hash = ntv2_hash(domain, username, password)
+    data = server_nonce <> client_nonce
+    new_hash = hmac_md5(data, hash)
+    [new_hash, client_nonce]
+  end
+
+  defp ntlmv2_response(
+         domain,
+         username,
+         password,
+         server_nonce,
+         server_data,
+         client_nonce,
+         gen_time
+       ) do
+    timestamp = as_timestamp(gen_time)
+    hash = ntv2_hash(domain, username, password)
+
+    data = <<
+      server_nonce::binary-64,
+      0x0101::little-unsigned-32,
+      0x0000::little-unsigned-32,
+      timestamp::binary-64,
+      client_nonce::binary-64,
+      0x0000::unsigned-32,
+      server_data::binary
+    >>
+
+    hmac_md5(data, hash)
+  end
+
+  defp client_nonce() do
+    1..8
+    |> Enum.map(fn _ -> :rand.uniform(255) end)
+    |> IO.iodata_to_binary()
   end
 
   defp type1_flags(workstation?) do
@@ -126,5 +232,36 @@ defmodule Ntlm do
     |> Bitwise.bor(@ntlm_Negotiate128)
     |> Bitwise.bor(@ntlm_NegotiateKeyExchange)
     |> Bitwise.bor(@ntlm_Negotiate56)
+  end
+
+  defp as_timestamp(unix) do
+    tenth_of_usec = (unix + 11_644_473_600) * 10_000_000
+    lo = Bitwise.band(tenth_of_usec, 0xFFFFFFFF)
+
+    hi =
+      tenth_of_usec
+      |> Bitwise.>>>(32)
+      |> Bitwise.band(0xFFFFFFFF)
+
+    <<lo::little-unsigned-32, hi::little-unsigned-32>>
+  end
+
+  defp ntv2_hash(domain, user, password) do
+    hash = nt_hash(password)
+    identity = ucs2(String.upcase(user) <> String.upcase(domain))
+    hmac_md5(identity, hash)
+  end
+
+  defp nt_hash(text) do
+    text = ucs2(text)
+    :crypto.hash(:md4, text)
+  end
+
+  defp hmac_md5(data, key) do
+    :crypto.hmac(:md5, key, data)
+  end
+
+  defp ucs2(str) do
+    :unicode.characters_to_binary(str, :unicode, {:utf16, :little})
   end
 end
