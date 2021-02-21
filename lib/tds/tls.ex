@@ -3,19 +3,24 @@ defmodule Tds.Tls do
   require Logger
   use GenServer
   import Kernel, except: [send: 2]
+  import Tds.BinaryUtils
 
-  defstruct [:socket, :ssl_opts, :owner_pid, :handshake]
+  defstruct [:socket, :ssl_opts, :owner_pid, :handshake, :buffer]
 
   def connect(socket, ssl_opts) do
-    # Logger.debug("starting TLS upgrade")
-    ssl_opts = ssl_opts ++ [
-      active: false,
-      cb_info: {Tds.Tls, :tcp, :tcp_closed, :tcp_error}
-    ]
+    ssl_opts =
+      ssl_opts ++
+        [
+          active: false,
+          cb_info: {Tds.Tls, :tcp, :tcp_closed, :tcp_error}
+        ]
+
     :inet.setopts(socket, active: false)
+
     with {:ok, pid} <- GenServer.start_link(__MODULE__, {socket, ssl_opts}, []),
          :ok <- :gen_tcp.controlling_process(socket, pid) do
       res = :ssl.connect(socket, ssl_opts, :infinity)
+      # todo: remove this line and handle it when server respond with 0x12 message with status 0x01
       GenServer.cast(pid, :handshake_complete)
       res
     else
@@ -79,7 +84,11 @@ defmodule Tds.Tls do
     {:reply, :ok, %{s | owner_pid: tls_conn_pid}}
   end
 
-  def handle_call({:setopts, options}, _from, %{socket: socket, handshake: hs} = s) do
+  def handle_call(
+        {:setopts, options},
+        _from,
+        %{socket: socket, handshake: hs} = s
+      ) do
     tds_header_size = if hs == true, do: 8, else: 0
 
     opts =
@@ -94,6 +103,7 @@ defmodule Tds.Tls do
 
   def handle_call({:send, data}, _from, %{socket: socket, handshake: true} = s) do
     size = IO.iodata_length(data) + 8
+
     header =
       <<0x12, 0x01, size::unsigned-size(2)-unit(8), 0x00, 0x00, 0x00, 0x00>>
 
@@ -101,7 +111,7 @@ defmodule Tds.Tls do
     {:reply, resp, s}
   end
 
-  def handle_call({:send, data}, _from,  %{socket: socket, handshake: false} = s) do
+  def handle_call({:send, data}, _from, %{socket: socket, handshake: false} = s) do
     resp = :gen_tcp.send(socket, data)
     {:reply, resp, s}
   end
@@ -119,25 +129,75 @@ defmodule Tds.Tls do
   end
 
   def handle_cast(:handshake_complete, s) do
-    {:noreply, %{s | handshake: false} }
+    {:noreply, %{s | handshake: false}}
   end
 
   def handle_info(
-        {:tcp, _,
-         <<0x12, 0x01, _::unsigned-16, _::32, ssl_payload::binary>>},
-        %{socket: socket, owner_pid: pid} = s
+        {:tcp, _, _} = msg,
+        %{owner_pid: pid, handshake: false, buffer: nil} = s
       ) do
-    # Logger.debug(
-    #   "received #{size} bytes from server in prelogin message as SSL_PAYLOAD"
-    # )
-
-    Kernel.send(pid, {:tcp, socket, ssl_payload})
+    Kernel.send(pid, msg)
     {:noreply, s}
   end
 
-  def handle_info({:tcp, _, _} = msg, %{owner_pid: pid} = s) do
-    # Logger.debug("received SSL_PAYLOAD from server, NON PreLogin message")
+  def handle_info(
+        {:tcp, port, <<0x12, 0, size::unsigned-16, _::32, tail::binary>>},
+        %{socket: socket, owner_pid: pid, buffer: nil, handshake: true} = s
+      ) do
+    expecting = size - 8
 
+    case tail do
+      <<ssl_payload::binary(expecting), next_packet::binary>> ->
+        Kernel.send(pid, {:tcp, socket, ssl_payload})
+        handle_info({:tcp, port, next_packet}, %{s | buffer: nil})
+
+      next_slice ->
+        state = %{s | buffer: {next_slice, expecting}}
+        {:noreply, state}
+    end
+  end
+
+  def handle_info(
+        {:tcp, port, <<0x12, 1, size::unsigned-16, _::32, tail::binary>>},
+        %{socket: socket, owner_pid: pid, buffer: nil, handshake: true} = s
+      ) do
+    expecting = size - 8
+
+    case tail do
+      <<ssl_payload::binary(expecting), next_packet::binary>> ->
+        Kernel.send(pid, {:tcp, socket, ssl_payload})
+        handle_info({:tcp, port, next_packet}, %{s | buffer: nil})
+
+      next_slice ->
+        state = %{s | buffer: {next_slice, expecting}}
+        {:noreply, state}
+    end
+  end
+
+  def handle_info(
+        {:tcp, port, bin},
+        %{
+          socket: socket,
+          owner_pid: pid,
+          buffer: {slice, expecting},
+          handshake: true
+        } = s
+      ) do
+    case IO.iodata_to_binary([slice, bin]) do
+      <<ssl_payload::binary(expecting), next_packet::binary>> ->
+        Kernel.send(pid, {:tcp, socket, ssl_payload})
+        handle_info({:tcp, port, next_packet}, %{s | buffer: nil})
+
+      next_slice ->
+        state = %{s | buffer: {next_slice, expecting}}
+        {:noreply, state}
+    end
+  end
+
+  def handle_info(
+        {:tcp, _, _} = msg,
+        %{owner_pid: pid, handshake: true, buffer: nil} = s
+      ) do
     Kernel.send(pid, msg)
     {:noreply, s}
   end
