@@ -19,6 +19,7 @@ defmodule Tds.Messages do
   defrecord :msg_attn, []
 
   # responses
+  defrecord :msg_preloginack, [:response]
   defrecord :msg_loginack, [:redirect]
   defrecord :msg_prepared, [:params]
   defrecord :msg_sql_result, [:columns, :rows, :row_count]
@@ -60,6 +61,14 @@ defmodule Tds.Messages do
   # @tds_pack_prelogin    18
 
   ## Parsers
+
+  def parse(:prelogin, packet_data, s) do
+    response =
+      packet_data
+      |> Tds.Protocol.Prelogin.decode(s)
+
+    {msg_preloginack(response: response), s}
+  end
 
   def parse(:login, packet_data, s) do
     packet_data
@@ -236,16 +245,16 @@ defmodule Tds.Messages do
     encode(msg, env)
   end
 
-  defp encode(msg_prelogin(params: _params), _env) do
-    version_data = <<11, 0, 12, 56, 0, 0>>
-    version_length = byte_size(version_data)
-    version_offset = 0x06
-    version = <<0x00, version_offset::size(16), version_length::size(16)>>
-    terminator = <<0xFF>>
-    prelogin_data = version_data
-    data = version <> terminator <> prelogin_data
-    encode_packets(0x12, data)
-    # encode_header(0x12, data) <> data
+  defp encode(msg_prelogin(params: opts), _env) do
+    # version_data = <<11, 0, 12, 56, 0, 0>>
+    # version_length = byte_size(version_data)
+    # version_offset = 0x06
+    # version = <<0x00, version_offset::size(16), version_length::size(16)>>
+    # terminator = <<0xFF>>
+    # prelogin_data = version_data
+    # data = version <> terminator <> prelogin_data
+    # encode_packets(0x12, data)
+    Tds.Protocol.Prelogin.encode(opts)
   end
 
   defp encode(msg_login(params: params), _env) do
@@ -292,7 +301,7 @@ defmodule Tds.Messages do
     # to by IbPassword, the client SHOULD first swap the four high bits with the
     # four low bits and then do a bit-XOR with 0xA5 (10100101).
 
-    clt_int_name = "ODBC"
+    clt_int_name = "tdsx"
     clt_int_name_ucs = to_little_ucs2(clt_int_name)
     database = params[:database] || ""
     database_ucs = to_little_ucs2(database)
@@ -442,7 +451,13 @@ defmodule Tds.Messages do
     encode_packets(0x03, data)
   end
 
-  defp encode(msg_transmgr(command: "TM_BEGIN_XACT", isolation_level: isolation_level), %{trans: trans}) do
+  defp encode(
+         msg_transmgr(
+           command: "TM_BEGIN_XACT",
+           isolation_level: isolation_level
+         ),
+         %{trans: trans}
+       ) do
     isolation = encode_isolation_level(isolation_level)
     encode_trans(5, trans, <<isolation::size(1)-unit(8), 0x0::size(1)-unit(8)>>)
   end
@@ -451,15 +466,21 @@ defmodule Tds.Messages do
     encode_trans(7, trans, <<0, 0>>)
   end
 
-  defp encode(msg_transmgr(command: "TM_ROLLBACK_XACT", name: name), %{trans: trans}) do
-    payload = unless name > 0,
-      do: <<0x00::size(2)-unit(8)>>,
-      else: <<2::unsigned-8, name::little-size(2)-unit(8), 0x0::size(1)-unit(8)>>
+  defp encode(msg_transmgr(command: "TM_ROLLBACK_XACT", name: name), %{
+         trans: trans
+       }) do
+    payload =
+      unless name > 0,
+        do: <<0x00::size(2)-unit(8)>>,
+        else:
+          <<2::unsigned-8, name::little-size(2)-unit(8), 0x0::size(1)-unit(8)>>
 
     encode_trans(8, trans, payload)
   end
 
-  defp encode(msg_transmgr(command: "TM_SAVE_XACT", name: savepoint), %{trans: trans}) do
+  defp encode(msg_transmgr(command: "TM_SAVE_XACT", name: savepoint), %{
+         trans: trans
+       }) do
     encode_trans(9, trans, <<2::unsigned-8, savepoint::little-size(2)-unit(8)>>)
   end
 
@@ -493,7 +514,8 @@ defmodule Tds.Messages do
     all_headers = <<total_length::little-size(32)>> <> headers
 
     data =
-      all_headers <> <<request_type::little-size(2)-unit(8), request_payload::binary>>
+      all_headers <>
+        <<request_type::little-size(2)-unit(8), request_payload::binary>>
 
     encode_packets(0x0E, data)
   end
@@ -519,7 +541,7 @@ defmodule Tds.Messages do
           # for that parameter. Otherwise RPC will fail and we must use ProceName
           # instead. But we want to avoid execution overhead with named approach
           # hence ommiting @handle from parameter name
-          %{p| name: ""}
+          %{p | name: ""}
 
         p ->
           # other paramters should be named

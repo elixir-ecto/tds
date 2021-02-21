@@ -75,6 +75,22 @@ config :your_app, :tds_conn,
   port: 1433
 ```
 
+or with ssl
+
+```elixir
+import Mix.Config
+
+config :your_app, :tds_conn,
+  hostname: "localhost", 
+  username: "test_user", 
+  password: "test_password", 
+  database: "test_db", 
+  port: 1433,
+  ssl: true,
+  ssl_opts: [] # add key or leave empty for selfsigned certs, accepts :ssl.client_option()
+
+```
+
 Then using `Application.get_env(:your_app, :tds_conn)` use this as first parameter in `Tds.start_link/1` function.
 
 There is additional parameter that can be used in configuration and 
