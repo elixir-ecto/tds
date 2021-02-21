@@ -12,4 +12,5 @@ config :tds,
     database: "test",
     trace: false,
     set_allow_snapshot_isolation: :on
+    # show_sensitive_data_on_connection_error: true
   ]

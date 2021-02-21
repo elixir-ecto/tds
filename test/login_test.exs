@@ -36,16 +36,19 @@ defmodule LoginTest do
   end
 
   @tag :login
+  @tag :tls
   test "login with valid sql login over tsl", context do
     opts =
       Application.fetch_env!(:tds, :opts) ++
-        [ssl: true, ssl_opts: [log_debug: true]]
+        [ssl: true, ssl_opts: []]
+        # [ssl: true, ssl_opts: [log_debug: true, log_level: :debug]]
 
     assert {:ok, pid} = Tds.start_link(opts ++ context[:options])
     assert {:ok, %Tds.Result{}} = Tds.query(pid, "SELECT 1", [])
   end
 
   @tag :login
+  @tag :tls
   test "login with non existing sql server authentication over tls", context do
     assert capture_log(fn ->
              opts =
@@ -62,7 +65,7 @@ defmodule LoginTest do
     Process.flag(:trap_exit, true)
 
     case Tds.start_link(opts) do
-      {:ok, pid} -> assert_receive {:EXIT, ^pid, :killed}
+      {:ok, pid} -> assert_receive {:EXIT, ^pid, :killed}, 1_000
       {:error, :killed} -> :ok
     end
   end
