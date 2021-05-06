@@ -1178,20 +1178,18 @@ defmodule Tds.Protocol do
 
   defp append_opts(conn, opts, :set_cursor_close_on_commit) do
     case Keyword.get(opts, :set_cursor_close_on_commit) do
-      val when val in [nil, :off] ->
-        conn ++ ["SET CURSOR_CLOSE_ON_COMMIT OFF; "]
+      val when val in [:on, :off] ->
+        val = val |> Atom.to_string() |> String.upcase()
+        conn ++ ["SET CURSOR_CLOSE_ON_COMMIT #{val}; "]
 
-      :on ->
-        conn ++ ["SET TRANSACTION ISOLATION LEVEL ON; "]
-
-      :exclude ->
+      nil ->
         conn
 
       val ->
         raise(
           ArgumentError,
           "set_cursor_close_on_commit: #{inspect(val)} is an invalid value, " <>
-            "should be one of should be either :on, :off, :exclude or nil"
+            "should be one of should be either :on, :off or nil"
         )
     end
   end
