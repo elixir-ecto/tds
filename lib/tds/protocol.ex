@@ -1,6 +1,6 @@
 defmodule Tds.Protocol do
   @moduledoc """
-  Implements DBConnection behaviour for TDS protocol
+  Implements DBConnection behaviour for TDS protocol.
   """
   alias Tds.{Parameter, Query}
   import Tds.{BinaryUtils, Messages, Utils}
