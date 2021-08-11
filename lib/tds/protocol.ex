@@ -186,13 +186,15 @@ defmodule Tds.Protocol do
         %{sock: _sock} = s
       ) do
     params = opts[:parameters] || params
+    proc = opts[:proc] || nil
     Process.put(:resultset, Keyword.get(opts, :resultset, false))
 
-    if params != [] do
-      send_param_query(query, params, s)
-    else
-      send_query(statement, s)
+    cond do
+      params != [] and is_nil(proc) -> send_param_query(query, params, s)
+      not is_nil(proc) -> send_proc(proc, params, s)
+      true -> send_query(statement, s)
     end
+
   rescue
     exception ->
       {:error, exception, s}
@@ -628,6 +630,21 @@ defmodule Tds.Protocol do
         {:disconnect, err, s}
     end
   end
+
+  def send_proc(proc, params, s) do
+    params = Tds.Parameter.prepare_params(params)
+    msg = msg_rpc(proc: proc, params: params)
+
+    case msg_send(msg, s) do
+      {:ok, %{result: result} = s} ->
+        {:ok, result, %{s | state: :ready}}
+      {:error, err, %{transaction: :started} = s} ->
+        {:error, err, %{s | transaction: :failed}}
+      err ->
+        err
+    end
+  end
+
 
   @spec send_param_query(Tds.Query.t(), list(), t) ::
           {:error, any()}
