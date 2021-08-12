@@ -716,9 +716,9 @@ defmodule Tds.Types do
     size = byte_size(value)
     <<value::little-size(size)-unit(8)>> = value
 
-    Decimal.get_context()
+    Decimal.Context.get()
     |> Map.put(:precision, precision)
-    |> Decimal.set_context()
+    |> Decimal.Context.set()
 
     case sign do
       0 -> Decimal.new(-1, value, -scale)
@@ -896,9 +896,9 @@ defmodule Tds.Types do
   end
 
   def encode_decimal_type(%Parameter{value: value}) do
-    d_ctx = Decimal.get_context()
+    d_ctx = Decimal.Context.get()
     d_ctx = %{d_ctx | precision: 38}
-    Decimal.set_context(d_ctx)
+    Decimal.Context.set(d_ctx)
 
     value_list =
       value
@@ -951,9 +951,9 @@ defmodule Tds.Types do
   end
 
   def encode_float_type(%Parameter{value: %Decimal{} = value}) do
-    d_ctx = Decimal.get_context()
+    d_ctx = Decimal.Context.get()
     d_ctx = %{d_ctx | precision: 38}
-    Decimal.set_context(d_ctx)
+    Decimal.Context.set(d_ctx)
 
     value_list =
       value
@@ -1140,9 +1140,9 @@ defmodule Tds.Types do
   end
 
   def encode_decimal_descriptor(%Parameter{value: %Decimal{} = dec}) do
-    d_ctx = Decimal.get_context()
+    d_ctx = Decimal.Context.get()
     d_ctx = %{d_ctx | precision: 38}
-    Decimal.set_context(d_ctx)
+    Decimal.Context.set(d_ctx)
 
     value_list =
       dec
@@ -1205,6 +1205,42 @@ defmodule Tds.Types do
   @doc """
   Data encoding
   """
+  def encode_column_type(%Column{type: type} = col) when type != nil do
+    case type do
+      :varchar -> encode_bigvarchar_col_type(col)
+      :boolean -> encode_binary_type(%Parameter{type: :boolean, value: nil})
+      :varbinary -> encode_varbinary_col_type(col)
+      :int -> encode_integer_type(%Parameter{type: :integer, value: nil})
+      :decimal -> encode_decimal_type(%Parameter{type: :decimal, value: nil})
+      :float -> encode_float_type(%Parameter{type: :float, value: nil})
+      :datetime -> encode_datetime_type(%Parameter{type: :datetime, value: nil})
+      :smalldatetime -> encode_smalldatetime_type(%Parameter{type: :smalldatetime, value: nil})
+      :datetime2 -> encode_datetime2_type(%Parameter{type: :datetime2, value: nil})
+      :datetimeoffset -> encode_datetimeoffset_type(%Parameter{type: :datetimeoffset, value: nil})
+      :date -> encode_date_type(%Parameter{type: :datetimeoffset, value: nil})
+      :time -> encode_time_type(%Parameter{type: :time, value: nil})
+      :uuid -> encode_uuid_type(%Parameter{type: :uuid, value: nil})
+    end
+  end
+
+  def encode_bigvarchar_col_type(%Column{opts: opts} = _col) do
+    type = @tds_data_type_bigvarchar
+    length = Keyword.get(opts, :length, 0)
+    collation = <<0x00, 0x00, 0x00, 0x00, 0x00>>
+    bin_length = if length <= 8000, do: <<8000::little-unsigned-16>>, else: <<0xFF, 0xFF>>
+    data = <<type>> <> bin_length <> collation
+
+    {type, data, length: length}
+  end
+
+  def encode_varbinary_col_type(%Column{opts: opts} = _col) do
+    type = @tds_data_type_bigvarbinary
+    length = Keyword.get(opts, :length, 0)
+    bin_length = if length <= 8000, do: <<8000::little-unsigned-16>>, else: <<0xFF, 0xFF>>
+    data = <<type>> <> bin_length
+
+    {type, data, length: length}
+  end
 
   # binary
   def encode_data(@tds_data_type_bigvarbinary, value, attr)
@@ -1249,43 +1285,6 @@ defmodule Tds.Types do
     column_length <> column_meta <> <<0x00>> <> row_data <> <<0x00>>
   end
 
-  def encode_column_type(%Column{type: type} = col) when type != nil do
-    case type do
-      :varchar -> encode_bigvarchar_col_type(col)
-      :boolean -> encode_binary_type(%Parameter{type: :boolean, value: nil})
-      :varbinary -> encode_varbinary_col_type(col)
-      :int -> encode_integer_type(%Parameter{type: :integer, value: nil})
-      :decimal -> encode_decimal_type(%Parameter{type: :decimal, value: nil})
-      :float -> encode_float_type(%Parameter{type: :float, value: nil})
-      :datetime -> encode_datetime_type(%Parameter{type: :datetime, value: nil})
-      :smalldatetime -> encode_smalldatetime_type(%Parameter{type: :smalldatetime, value: nil})
-      :datetime2 -> encode_datetime2_type(%Parameter{type: :datetime2, value: nil})
-      :datetimeoffset -> encode_datetimeoffset_type(%Parameter{type: :datetimeoffset, value: nil})
-      :date -> encode_date_type(%Parameter{type: :datetimeoffset, value: nil})
-      :time -> encode_time_type(%Parameter{type: :time, value: nil})
-      :uuid -> encode_uuid_type(%Parameter{type: :uuid, value: nil})
-    end
-  end
-
-  def encode_bigvarchar_col_type(%Column{opts: opts} = col) do
-    type = @tds_data_type_bigvarchar
-    length = Keyword.get(opts, :length, 0)
-    collation = <<0x00, 0x00, 0x00, 0x00, 0x00>>
-    bin_length = if length <= 8000, do: <<8000::little-unsigned-16>>, else: <<0xFF, 0xFF>>
-    data = <<type>> <> bin_length <> collation
-
-    {type, data, length: length}
-  end
-
-  def encode_varbinary_col_type(%Column{opts: opts} = col) do
-    type = @tds_data_type_bigvarbinary
-    length = Keyword.get(opts, :length, 0)
-    bin_length = if length <= 8000, do: <<8000::little-unsigned-16>>, else: <<0xFF, 0xFF>>
-    data = <<type>> <> bin_length
-
-    {type, data, length: length}
-  end
-
   # string
   def encode_data(@tds_data_type_bigvarchar, nil, opts) do
     length = Keyword.get(opts, :length, 0)
@@ -1294,7 +1293,7 @@ defmodule Tds.Types do
       else: <<@tds_plp_null::little-unsigned-64>>
   end
 
-  def encode_data(@tds_data_type_bigvarchar, value, opts) do
+  def encode_data(@tds_data_type_bigvarchar, value, _opts) do
     value_size = byte_size(value)
     cond do
       value_size <= 0 ->
@@ -1377,9 +1376,9 @@ defmodule Tds.Types do
 
   # decimal
   def encode_data(@tds_data_type_decimaln, %Decimal{} = value, attr) do
-    d_ctx = Decimal.get_context()
+    d_ctx = Decimal.Context.get()
     d_ctx = %{d_ctx | precision: 38}
-    Decimal.set_context(d_ctx)
+    Decimal.Context.set(d_ctx)
     precision = attr[:precision]
 
     d =
