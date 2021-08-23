@@ -23,7 +23,7 @@ defmodule Tds.Protocol do
     :serializable
   ]
 
-  @type sock :: {:gen_tcp | :ssl, pid}
+  @type sock :: {:gen_tcp | :ssl, :gen_tcp.socket() | :ssl.sslsocket()}
   @type env :: %{
           trans: <<_::8>>,
           savepoint: non_neg_integer,
