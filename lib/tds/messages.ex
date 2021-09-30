@@ -260,7 +260,14 @@ defmodule Tds.Messages do
     connection_id = <<0x00::size(32)>>
     option_flags_1 = <<0x00>>
     option_flags_2 = <<0x00>>
-    type_flags = <<0x00>>
+
+    fSQLType = 0b00000000
+    fOLEDB = 0b00000000
+    fReadOnlyIntent = get_readonly_intent(params)
+    fReservedBits = 0b00000000
+    type_flags_str = fReservedBits + fReadOnlyIntent + fOLEDB + fSQLType
+    type_flags = << type_flags_str >>
+
     option_flags_3 = <<0x00>>
     client_time_zone = <<0xE0, 0x01, 0x00, 0x00>>
     client_lcid = <<0x09, 0x04, 0x00, 0x00>>
@@ -540,6 +547,12 @@ defmodule Tds.Messages do
       encode_rpc_params(params, "")
   end
 
+  defp encode_rpc(proc, params) when is_binary(proc) do
+    rpc_size = byte_size(proc)
+    rpc_name = to_little_ucs2(proc)
+    <<rpc_size::little-size(16)>> <> rpc_name <> <<0x00, 0x00>> <> encode_rpc_params(params, "")
+  end
+
   # Finished processing params
   defp encode_rpc_params([], ret), do: ret
 
@@ -592,5 +605,13 @@ defmodule Tds.Messages do
       Bitwise.bxor(c, 0xA5)
     end
     |> Enum.map_join(&<<&1>>)
+  end
+
+  defp get_readonly_intent(params) do
+    if params[:readonly] do
+      0b00100000
+    else
+      0b00000000
+    end
   end
 end
