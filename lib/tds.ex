@@ -126,6 +126,12 @@ defmodule Tds do
     end
   end
 
+  def proc(pid, statement, params, opts \\ []) do
+    opts = Keyword.put_new(opts, :proc, statement)
+
+    query(pid, statement, params, opts)
+  end
+
   @spec execute(conn, Tds.Query.t(), list, [execute_option]) ::
           {:ok, Tds.Query.t(), Tds.Result.t()}
           | {:error, Tds.Error.t()}
