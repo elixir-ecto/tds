@@ -1,18 +1,15 @@
 name: Elixir TDS CI
 
-on: 
+on:
   push:
     branches:
       - master
-      - support-1.1
   pull_request:
     branches:
       - master
-      - support-1.1
 
 jobs:
   build:
-
     runs-on: ubuntu-latest
 
     services:
@@ -25,11 +22,22 @@ jobs:
           - 1433:1433
 
     strategy:
+      fail-fast: false
       matrix:
-        mssql_version: ["2017-latest", "2019-latest"]
-        otp: [23.3.4, 24.1.1]
-        elixir: [1.11.4, 1.12.3]
-
+        mssql_version:
+          - "2017-latest"
+          - "2019-latest"
+        otp:
+          - 23.3.4
+          - 24.1.1
+        elixir:
+          - 1.11.4
+          - 1.12.3
+        include:
+          - mssql_version: "2019-latest"
+            otp: 24.1.1
+            elixir: 1.12.3
+            lint: lint
 
     env:
       ACCEPT_EULA: Y
@@ -41,16 +49,41 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y mssql-tools unixodbc-dev
+
       - uses: actions/checkout@v2
+
       - name: Setup elixir
-        uses: erlef/setup-elixir@885971a72ed1f9240973bd92ab57af8c1aa68f24
+        uses: erlef/setup-beam@v1
         with:
           otp-version: ${{matrix.otp}}
           elixir-version: ${{matrix.elixir}}
+
+      - uses: actions/cache@v2
+        with:
+          path: |
+            deps
+            _build
+          key: ${{ runner.os }}-mix-${{matrix.elixir}}-${{matrix.otp}}-${{ hashFiles('**/mix.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-mix-
+
       - name: Install Dependencies
         run: mix deps.get
+
+      - run: mix format --check-formatted
+        if: ${{ matrix.lint }}
+
+      - run: mix deps.unlock --check-unused
+        if: ${{ matrix.lint }}
+
+      - run: mix deps.compile
+
+      - run: mix compile --warnings-as-errors
+        if: ${{ matrix.lint }}
+
       - name: Run Tests
         run: |
           export PATH="/opt/mssql-tools/bin:$PATH"
           mix test
+
       - run: mix coveralls.github
