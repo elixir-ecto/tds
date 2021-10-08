@@ -63,7 +63,7 @@ jobs:
           path: |
             deps
             _build
-          key: ${{ runner.os }}-mix-${{matrix.elixir-version}}-${{matrix.otp-version}}-${{ hashFiles('**/mix.lock') }}
+          key: ${{ runner.os }}-mix-${{matrix.elixir}}-${{matrix.otp}}-${{ hashFiles('**/mix.lock') }}
 
       - name: Install Dependencies
         run: mix deps.get
