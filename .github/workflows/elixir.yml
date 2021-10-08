@@ -87,3 +87,4 @@ jobs:
           mix test
 
       - run: mix coveralls.github
+        if: ${{ matrix.lint }}
