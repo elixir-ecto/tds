@@ -79,7 +79,7 @@ jobs:
       - run: mix deps.compile
 
       - run: mix compile --warnings-as-errors
-      if: ${{ matrix.lint }}
+        if: ${{ matrix.lint }}
 
       - name: Run Tests
         run: |
