@@ -70,16 +70,16 @@ jobs:
       - name: Install Dependencies
         run: mix deps.get
 
-      - run: mix format --check-formatted
-        if: ${{ matrix.lint }}
+      # - run: mix format --check-formatted
+        # if: ${{ matrix.lint }}
 
       - run: mix deps.unlock --check-unused
         if: ${{ matrix.lint }}
 
       - run: mix deps.compile
 
-      # - run: mix compile --warnings-as-errors
-      # if: ${{ matrix.lint }}
+      - run: mix compile --warnings-as-errors
+      if: ${{ matrix.lint }}
 
       - name: Run Tests
         run: |
