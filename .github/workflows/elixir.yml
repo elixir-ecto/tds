@@ -78,13 +78,10 @@ jobs:
 
       - run: mix deps.compile
 
-      - run: mix compile --warnings-as-errors
-        if: ${{ matrix.lint }}
+      # - run: mix compile --warnings-as-errors
+      # if: ${{ matrix.lint }}
 
       - name: Run Tests
         run: |
           export PATH="/opt/mssql-tools/bin:$PATH"
           mix test
-
-      - run: mix coveralls.github
-        if: ${{ matrix.lint }}
