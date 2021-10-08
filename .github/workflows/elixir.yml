@@ -27,8 +27,8 @@ jobs:
     strategy:
       matrix:
         mssql_version: ["2017-latest", "2019-latest"]
-        otp: [21.3.8.10, 22.1.7]
-        elixir: [1.9.4]
+        otp: [23.3.4, 24.1.1]
+        elixir: [1.11.4, 1.12.3]
 
 
     env:
@@ -43,7 +43,7 @@ jobs:
           sudo apt-get install -y mssql-tools unixodbc-dev
       - uses: actions/checkout@v2
       - name: Setup elixir
-        uses: actions/setup-elixir@v1
+        uses: erlef/setup-elixir@885971a72ed1f9240973bd92ab57af8c1aa68f24
         with:
           otp-version: ${{matrix.otp}}
           elixir-version: ${{matrix.elixir}}
