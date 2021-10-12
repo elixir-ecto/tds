@@ -1,3 +1,10 @@
+# v2.2.0
+### BugFix
+* Update `tds_encoding` to work with Erlang/OTP >= 24
+  
+### Improvements
+* Add support for `decimal` 2.0 (minimal version is now 1.9)
+
 # v2.1.3
 ### BugFix
 * Values in `datetimeoffset(n)` columns were failing to decode on match error due to offset unit mismatch (seconds != minutes).

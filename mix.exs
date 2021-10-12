@@ -2,20 +2,13 @@ defmodule Tds.Mixfile do
   @moduledoc false
   use Mix.Project
 
-  @version "2.1.3"
+  @version "2.2.0"
   def project do
     [
       app: :tds,
       version: @version,
       elixir: "~> 1.0",
       deps: deps(),
-      test_coverage: [tool: ExCoveralls],
-      preferred_cli_env: [
-        coveralls: :test,
-        "coveralls.detail": :test,
-        "coveralls.post": :test,
-        "coveralls.html": :test
-      ],
       description: description(),
       package: package(),
       xref: [exclude: [:ssl]],
