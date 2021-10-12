@@ -29,7 +29,6 @@ defmodule Tds.Protocol.Header do
           | :sspi
           | :pre_login
 
-
   @typedoc """
   Header flag that should tell if pakcage data that header preceding is end of
   TDS message or not.

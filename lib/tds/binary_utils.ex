@@ -162,7 +162,7 @@ defmodule Tds.BinaryUtils do
   @doc """
   A 64-bit signed integer
   """
-  defmacro uint64(), do: quote(do:  unsigned - 64)
+  defmacro uint64(), do: quote(do: unsigned - 64)
 
   @doc """
   A 64-bit signed float

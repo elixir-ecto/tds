@@ -372,8 +372,7 @@ defmodule Tds.Types do
             1..numparts,
             rest,
             fn _,
-               <<tsize::little-unsigned-16,
-                 _table_name::binary-size(tsize)-unit(16),
+               <<tsize::little-unsigned-16, _table_name::binary-size(tsize)-unit(16),
                  next_rest::binary>> ->
               next_rest
             end
@@ -696,9 +695,7 @@ defmodule Tds.Types do
   # UUID
   def decode_uuid(<<_::128>> = bin), do: bin
 
-  def encode_uuid(
-        <<_::64, ?-, _::32, ?-, _::32, ?-, _::32, ?-, _::96>> = string
-      ) do
+  def encode_uuid(<<_::64, ?-, _::32, ?-, _::32, ?-, _::32, ?-, _::96>> = string) do
     raise ArgumentError,
           "trying to load string UUID as Tds.Types.UUID: #{inspect(string)}. " <>
             "Maybe you wanted to declare :uuid as your database field?"
@@ -989,9 +986,7 @@ defmodule Tds.Types do
   @doc """
   Creates the Parameter Descriptor for the selected type
   """
-  def encode_param_descriptor(
-        %Parameter{name: name, value: value, type: type} = param
-      )
+  def encode_param_descriptor(%Parameter{name: name, value: value, type: type} = param)
       when type != nil do
     desc =
       case type do
@@ -1152,9 +1147,7 @@ defmodule Tds.Types do
   end
 
   # Decimal.new/0 is undefined -- modifying params to hopefully fix
-  def encode_decimal_descriptor(
-        %Parameter{type: :decimal, value: value} = param
-      ) do
+  def encode_decimal_descriptor(%Parameter{type: :decimal, value: value} = param) do
     encode_decimal_descriptor(%{param | value: Decimal.new(value)})
   end
 
@@ -1636,8 +1629,7 @@ defmodule Tds.Types do
     # 10^scale fs in 1 sec
     fs_per_sec = trunc(:math.pow(10, scale))
 
-    fsec =
-      hour * 3600 * fs_per_sec + min * 60 * fs_per_sec + sec * fs_per_sec + fsec
+    fsec = hour * 3600 * fs_per_sec + min * 60 * fs_per_sec + sec * fs_per_sec + fsec
 
     bin =
       cond do

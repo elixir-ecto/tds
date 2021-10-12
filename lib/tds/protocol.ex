@@ -348,8 +348,7 @@ defmodule Tds.Protocol do
           {:ok, Tds.Result.t(), new_state :: t()}
           | {:error | :disconnect, Exception.t(), new_state :: t()}
   def handle_deallocate(_query, _cursor, _opts, state) do
-    {:error, Tds.Error.exception("Cursor operations are not supported in TDS"),
-     state}
+    {:error, Tds.Error.exception("Cursor operations are not supported in TDS"), state}
   end
 
   @impl DBConnection
@@ -362,8 +361,7 @@ defmodule Tds.Protocol do
           {:ok, Query.t(), cursor :: any, new_state :: t}
           | {:error | :disconnect, Exception.t(), new_state :: t}
   def handle_declare(_query, _params, _opts, state) do
-    {:error, Tds.Error.exception("Cursor operations are not supported in TDS"),
-     state}
+    {:error, Tds.Error.exception("Cursor operations are not supported in TDS"), state}
   end
 
   # CONNECTION

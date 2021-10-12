@@ -104,6 +104,7 @@ defmodule RPCTest do
                query("SELECT @1", [
                  %Parameter{name: "@1", value: Decimal.new("1.0")}
                ])
+
       assert [[Decimal.new("1")]] ==
                query("SELECT @1", [
                  %Parameter{name: "@1", value: Decimal.new("1")}
@@ -129,6 +130,7 @@ defmodule RPCTest do
 
     test "with nvarchar strings", context do
       Application.put_env(:tds, :text_encoder, Tds.Encoding)
+
       strs = [
         "hello",
         "'",

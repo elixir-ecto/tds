@@ -85,21 +85,24 @@ defmodule PLPTest do
 
     query("CREATE XML SCHEMA COLLECTION EmployeeSchema AS N'#{@xml_schema}'", [])
 
-    assert [[_, _, _, "EmployeeSchema" | _]] = query(
-      "SELECT * FROM sys.xml_schema_collections WHERE [name] = @1;",
-      [%Tds.Parameter{value: "EmployeeSchema", type: :string, name: "@1"}]
-    )
+    assert [[_, _, _, "EmployeeSchema" | _]] =
+             query(
+               "SELECT * FROM sys.xml_schema_collections WHERE [name] = @1;",
+               [%Tds.Parameter{value: "EmployeeSchema", type: :string, name: "@1"}]
+             )
 
-    xml_value = [
-      "<Employee>",
-      "<Name>",
-      "<First>Jacob</First>",
-      "<Middle>V</Middle>",
-      "<Last>Sebastian</Last>",
-      "</Name>",
-      "<!-- Deleted other information for brevity -->",
-      "</Employee>",
-    ] |> Enum.join("")
+    xml_value =
+      [
+        "<Employee>",
+        "<Name>",
+        "<First>Jacob</First>",
+        "<Middle>V</Middle>",
+        "<Last>Sebastian</Last>",
+        "</Name>",
+        "<!-- Deleted other information for brevity -->",
+        "</Employee>"
+      ]
+      |> Enum.join("")
 
     :ok =
       query(

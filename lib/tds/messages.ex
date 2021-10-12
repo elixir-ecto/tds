@@ -160,8 +160,7 @@ defmodule Tds.Messages do
         c = %{c | rows: [row | c.rows], num_rows: c.num_rows + 1}
         {m, c, s}
 
-      {token, %{status: status, rows: num_rows}},
-      {msg_result(set: set) = m, c, s}
+      {token, %{status: status, rows: num_rows}}, {msg_result(set: set) = m, c, s}
       when token in [:done, :doneinproc, :doneproc] ->
         cond do
           status.count? and is_nil(c) ->
@@ -406,8 +405,7 @@ defmodule Tds.Messages do
     transaction_descriptor = trans <> <<0::size(padding)-unit(8)>>
     outstanding_request_count = <<1::little-size(4)-unit(8)>>
 
-    td_header =
-      header_type <> transaction_descriptor <> outstanding_request_count
+    td_header = header_type <> transaction_descriptor <> outstanding_request_count
 
     td_header_len = byte_size(td_header) + 4
     td_header = <<td_header_len::little-size(4)-unit(8)>> <> td_header
@@ -427,8 +425,7 @@ defmodule Tds.Messages do
     transaction_descriptor = trans <> <<0::size(padding)-unit(8)>>
     outstanding_request_count = <<1::little-size(4)-unit(8)>>
 
-    td_header =
-      header_type <> transaction_descriptor <> outstanding_request_count
+    td_header = header_type <> transaction_descriptor <> outstanding_request_count
 
     td_header_len = byte_size(td_header) + 4
     td_header = <<td_header_len::little-size(4)-unit(8)>> <> td_header
@@ -442,7 +439,9 @@ defmodule Tds.Messages do
     encode_packets(0x03, data)
   end
 
-  defp encode(msg_transmgr(command: "TM_BEGIN_XACT", isolation_level: isolation_level), %{trans: trans}) do
+  defp encode(msg_transmgr(command: "TM_BEGIN_XACT", isolation_level: isolation_level), %{
+         trans: trans
+       }) do
     isolation = encode_isolation_level(isolation_level)
     encode_trans(5, trans, <<isolation::size(1)-unit(8), 0x0::size(1)-unit(8)>>)
   end
@@ -452,9 +451,10 @@ defmodule Tds.Messages do
   end
 
   defp encode(msg_transmgr(command: "TM_ROLLBACK_XACT", name: name), %{trans: trans}) do
-    payload = unless name > 0,
-      do: <<0x00::size(2)-unit(8)>>,
-      else: <<2::unsigned-8, name::little-size(2)-unit(8), 0x0::size(1)-unit(8)>>
+    payload =
+      unless name > 0,
+        do: <<0x00::size(2)-unit(8)>>,
+        else: <<2::unsigned-8, name::little-size(2)-unit(8), 0x0::size(1)-unit(8)>>
 
     encode_trans(8, trans, payload)
   end
@@ -482,8 +482,7 @@ defmodule Tds.Messages do
     transaction_descriptor = trans <> <<0::size(padding)-unit(8)>>
     outstanding_request_count = <<1::little-size(4)-unit(8)>>
 
-    td_header =
-      header_type <> transaction_descriptor <> outstanding_request_count
+    td_header = header_type <> transaction_descriptor <> outstanding_request_count
 
     td_header_len = byte_size(td_header) + 4
     td_header = <<td_header_len::little-size(4)-unit(8)>> <> td_header
@@ -492,8 +491,7 @@ defmodule Tds.Messages do
     total_length = byte_size(headers) + 4
     all_headers = <<total_length::little-size(32)>> <> headers
 
-    data =
-      all_headers <> <<request_type::little-size(2)-unit(8), request_payload::binary>>
+    data = all_headers <> <<request_type::little-size(2)-unit(8), request_payload::binary>>
 
     encode_packets(0x0E, data)
   end
@@ -519,7 +517,7 @@ defmodule Tds.Messages do
           # for that parameter. Otherwise RPC will fail and we must use ProceName
           # instead. But we want to avoid execution overhead with named approach
           # hence ommiting @handle from parameter name
-          %{p| name: ""}
+          %{p | name: ""}
 
         p ->
           # other paramters should be named

@@ -414,8 +414,7 @@ defmodule Tds.Tokens do
 
   ## DONE
   defp decode_done(
-         <<status::little-unsigned-size(2)-unit(8),
-           cur_cmd::little-unsigned-size(2)-unit(8),
+         <<status::little-unsigned-size(2)-unit(8), cur_cmd::little-unsigned-size(2)-unit(8),
            row_count::little-size(8)-unit(8), tail::binary>>,
          collmetadata
        ) do
@@ -493,8 +492,7 @@ defmodule Tds.Tokens do
   end
 
   defp bitmap_list(
-         <<b8::1, b7::1, b6::1, b5::1, b4::1, b3::1, b2::1, b1::1,
-           tail::binary>>,
+         <<b8::1, b7::1, b6::1, b5::1, b4::1, b3::1, b2::1, b1::1, tail::binary>>,
          n
        ) do
     {bits, tail} = bitmap_list(tail, n - 1)
@@ -523,9 +521,7 @@ defmodule Tds.Tokens do
     {info, tail}
   end
 
-  defp decode_column_name(
-         <<length::int8, name::binary-size(length)-unit(16), tail::binary>>
-       ) do
+  defp decode_column_name(<<length::int8, name::binary-size(length)-unit(16), tail::binary>>) do
     name = ucs2_to_utf(name)
     {name, tail}
   end
