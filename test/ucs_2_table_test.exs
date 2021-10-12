@@ -8,6 +8,7 @@ defmodule Tds.Ucs2TableTest do
     {:ok, [pid: pid]}
   end
 
+  @tag capture_log: true
   test "should encode/decode correctly ucs2 strings", context do
     __DIR__
     |> Path.join('ucs_2_table.txt')

@@ -53,6 +53,7 @@ defmodule Packet.TokenStreamTest do
     done: %{cmd: 0, rows: 0, status: %{atnn?: false, count?: false, error?: false, final?: true, inxact?: false, more?: false, rpc_in_batch?: false, srverror?: false}}
   ]
 
+  @tag capture_log: true
   test "should decode loginack response" do
     <<_::binary-(8), package_data::binary>> = @package_data
     assert @token_stream == Tds.Tokens.decode_tokens(package_data, nil)
@@ -77,6 +78,7 @@ defmodule Packet.TokenStreamTest do
     done: %{cmd: 193, rows: 1, status: %{atnn?: false, count?: true, error?: false, final?: true, inxact?: false, more?: false, rpc_in_batch?: false, srverror?: false}}
   ]
 
+  @tag capture_log: true
   test "should decode SqlBatch Server Response" do
     <<_::binary-(8), package_data::binary>> = @package_data
     assert @token_stream == Tds.Tokens.decode_tokens(package_data, nil)
@@ -99,9 +101,9 @@ defmodule Packet.TokenStreamTest do
     doneproc: %{cmd: 224, rows: 0, status: %{atnn?: false, count?: false, error?: false, final?: true, inxact?: false, more?: false, rpc_in_batch?: false, srverror?: false}}
   ]
 
+  @tag capture_log: true
   test "should decode RPC Server Response" do
     <<_::binary-(8), package_data::binary>> = @package_data
     assert @token_stream == Tds.Tokens.decode_tokens(package_data, nil)
   end
 end
-
