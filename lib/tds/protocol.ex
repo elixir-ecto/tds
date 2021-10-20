@@ -2,18 +2,12 @@ defmodule Tds.Protocol do
   @moduledoc """
   Implements DBConnection behaviour for TDS protocol
   """
-  import Tds.BinaryUtils
-  import Tds.Messages
-  import Tds.Utils
-
-  alias Tds.Parameter
-  alias Tds.Query
-
+  alias Tds.{Parameter, Query}
+  import Tds.{BinaryUtils, Messages, Utils}
   require Logger
+  use DBConnection
 
-  @behaviour DBConnection
-
-  @timeout 5000
+  @timeout 5_000
   @sock_opts [packet: :raw, mode: :binary, active: false]
   @trans_levels [
     :read_uncommitted,
@@ -67,7 +61,6 @@ defmodule Tds.Protocol do
               packetsize: 4096
             }
 
-  @impl DBConnection
   @spec connect(opts :: Keyword.t()) ::
           {:ok, state :: t()} | {:error, Exception.t()}
   def connect(opts) do
@@ -96,7 +89,6 @@ defmodule Tds.Protocol do
     end
   end
 
-  @impl DBConnection
   @spec disconnect(err :: Exception.t() | String.t(), state :: t()) ::
           :ok
   def disconnect(_err, %{sock: {mod, sock}} = s) do
@@ -106,7 +98,6 @@ defmodule Tds.Protocol do
     mod.close(sock)
   end
 
-  @impl DBConnection
   @spec ping(t) :: {:ok, t} | {:disconnect, Exception.t(), t}
   def ping(state) do
     case send_query(~s{SELECT 'pong' as [msg]}, state) do
@@ -131,7 +122,6 @@ defmodule Tds.Protocol do
     end
   end
 
-  @impl DBConnection
   @spec checkout(state :: t) ::
           {:ok, new_state :: any}
           | {:disconnect, Exception.t(), new_state :: t}
@@ -153,7 +143,6 @@ defmodule Tds.Protocol do
     end
   end
 
-  @impl DBConnection
   @spec checkin(state :: t) ::
           {:ok, new_state :: t}
           | {:disconnect, Exception.t(), new_state :: t}
@@ -175,7 +164,6 @@ defmodule Tds.Protocol do
     end
   end
 
-  @impl DBConnection
   @spec handle_execute(Tds.Query.t(), DBConnection.params(), Keyword.t(), t) ::
           {:ok, Tds.Query.t(), Tds.Result.t(), new_state :: t}
           | {:error | :disconnect, Exception.t(), new_state :: t}
@@ -210,7 +198,6 @@ defmodule Tds.Protocol do
     end
   end
 
-  @impl DBConnection
   @spec handle_prepare(Tds.Query.t(), Keyword.t(), t) ::
           {:ok, Tds.Query.t(), new_state :: t()}
           | {:error | :disconnect, Exception.t(), new_state :: t}
@@ -235,7 +222,6 @@ defmodule Tds.Protocol do
     end
   end
 
-  @impl DBConnection
   @spec handle_close(Tds.Query.t(), nil | keyword | map, t()) ::
           {:ok, Tds.Result.t(), new_state :: t()}
           | {:error | :disconnect, Exception.t(), new_state :: t()}
@@ -244,7 +230,6 @@ defmodule Tds.Protocol do
     send_close(query, params, s)
   end
 
-  @impl DBConnection
   @spec handle_begin(Keyword.t(), t) ::
           {:ok, Tds.Result.t(), new_state :: t}
           | {DBConnection.status(), new_state :: t}
@@ -268,7 +253,6 @@ defmodule Tds.Protocol do
     end
   end
 
-  @impl DBConnection
   @spec handle_commit(Keyword.t(), t) ::
           {:ok, Tds.Result.t(), new_state :: t}
           | {DBConnection.status(), new_state :: t}
@@ -286,7 +270,6 @@ defmodule Tds.Protocol do
     end
   end
 
-  @impl DBConnection
   @spec handle_rollback(Keyword.t(), t) ::
           {:ok, Tds.Result.t(), new_state :: t}
           | {:idle, new_state :: t}
@@ -312,7 +295,6 @@ defmodule Tds.Protocol do
     end
   end
 
-  @impl DBConnection
   @spec handle_status(Keyword.t(), t) ::
           {:idle | :transaction | :error, t}
           | {:disconnect, Exception.t(), t}
@@ -325,7 +307,6 @@ defmodule Tds.Protocol do
     end
   end
 
-  @impl DBConnection
   @spec handle_fetch(
           Query.t(),
           cursor :: any(),
@@ -338,7 +319,6 @@ defmodule Tds.Protocol do
     {:error, Tds.Error.exception("Cursor is not supported by TDS"), state}
   end
 
-  @impl DBConnection
   @spec handle_deallocate(
           query :: Query.t(),
           cursor :: any,
@@ -351,7 +331,6 @@ defmodule Tds.Protocol do
     {:error, Tds.Error.exception("Cursor operations are not supported in TDS"), state}
   end
 
-  @impl DBConnection
   @spec handle_declare(
           Query.t(),
           params :: any,
