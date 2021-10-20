@@ -1,8 +1,7 @@
 # Tds - MSSQL Driver for Elixir
 
 [![Hex.pm](https://img.shields.io/hexpm/v/tds.svg)](https://hex.pm/packages/tds) 
-[![Coverage Status](https://coveralls.io/repos/github/livehelpnow/tds/badge.svg?branch=support-1.1)](https://coveralls.io/github/livehelpnow/tds?branch=master)
-![Elixir TDS CI](https://github.com/livehelpnow/tds/workflows/Elixir%20TDS%20CI/badge.svg)
+![Elixir TDS CI](https://github.com/elixir-ecto/tds/workflows/Elixir%20TDS%20CI/badge.svg)
 
 MSSQL / TDS Database driver for Elixir.
 
@@ -11,7 +10,7 @@ Since TDS version 2.0, `tds_ecto` package is deprecated, this version supports `
 
 Please check out the issues for a more complete overview. This branch should not be considered stable or ready for production yet.
 
-For stable versions always use [hex.pm](https://hex.pm/packages/tds) as source for your mix.exs!!!
+For stable versions always use [hex.pm](https://hex.pm/packages/tds) as source for your mix.exs.
 
 ## Usage
 
@@ -171,7 +170,7 @@ To convert a big-endian UUID string to a mixed-endian binary, use
 Clone and compile Tds with:
 
 ```bash
-git clone https://github.com/livehelpnow/tds.git
+git clone https://github.com/elixir-ecto/tds.git
 cd tds
 mix deps.get
 ```
