@@ -9,10 +9,11 @@ defmodule Tds.Protocol.Login7 do
 
   @packet_header 0x10
   ## Packet Size
-  @tds_pack_data_size 4088
   @tds_pack_header_size 8
+  @tds_pack_data_size 4088
   @tds_pack_size @tds_pack_header_size + @tds_pack_data_size
   @default_tds_version <<0x04, 0x00, 0x00, 0x74>>
+  @clt_int_name "ODBC"
 
   defstruct [
     # Highest TDS version used by the client
@@ -62,20 +63,38 @@ defmodule Tds.Protocol.Login7 do
       database: Keyword.get(opts, :database, "")
     }
 
-    login_a =
-      login.tds_version <>
-        login.packet_size <>
-        login.client_version <>
-        login.client_pid <>
-        login.connection_id <>
-        login.option_flags_1 <>
-        login.option_flags_2 <>
-        login.type_flags <>
-        login.option_flags_3 <>
-        login.client_time_zone <>
-        login.client_language_code_id
+    # Static login configuration
+    login_a = get_login_a(login)
 
+    # Dynamic login configuration (username, password, ...)
+    login_data = get_login_data(login)
+
+    # Offsets and length for dynamic login configuration
     offset_start = byte_size(login_a) + 4
+    curr_offset = offset_start + 58
+    offsets = get_offsets(login, curr_offset)
+
+    login7 = login_a <> offsets <> login_data
+    login7_len = byte_size(login7) + 4
+    data = <<login7_len::little-size(32)>> <> login7
+    Tds.Messages.encode_packets(@packet_header, data)
+  end
+
+  defp get_login_a(login) do
+    login.tds_version <>
+      login.packet_size <>
+      login.client_version <>
+      login.client_pid <>
+      login.connection_id <>
+      login.option_flags_1 <>
+      login.option_flags_2 <>
+      login.type_flags <>
+      login.option_flags_3 <>
+      login.client_time_zone <>
+      login.client_language_code_id
+  end
+
+  defp get_login_data(login) do
     username = to_little_ucs2(login.username)
 
     password =
@@ -87,101 +106,75 @@ defmodule Tds.Protocol.Login7 do
     app_name = to_little_ucs2(login.app_name)
     hostname = to_little_ucs2(login.hostname)
 
-    clt_int_name = to_little_ucs2("ODBC")
+    clt_int_name = to_little_ucs2(@clt_int_name)
     database = to_little_ucs2(login.database)
 
-    login_data =
-      hostname <>
-        username <>
-        password <>
-        app_name <>
-        servername <>
-        clt_int_name <>
-        database
+    hostname <>
+      username <>
+      password <>
+      app_name <>
+      servername <>
+      clt_int_name <>
+      database
+  end
 
-    curr_offset = offset_start + 58
-    ibHostName = <<curr_offset::little-size(16)>>
-    cchHostName = <<String.length(login.hostname)::little-size(16)>>
-    curr_offset = curr_offset + byte_size(hostname)
+  defp get_offsets(login, curr_offset) do
+    {curr_offset, user_params} =
+      [login.hostname, login.username, login.password, login.app_name, login.servername]
+      |> Enum.reduce({curr_offset, <<>>}, fn elem, {offset, acc} ->
+        {offset + byte_size(to_little_ucs2(elem)),
+         acc <> <<offset::little-size(16)>> <> <<String.length(elem)::little-size(16)>>}
+      end)
 
-    ibUserName = <<curr_offset::little-size(16)>>
-    cchUserName = <<String.length(login.username)::little-size(16)>>
-    curr_offset = curr_offset + byte_size(username)
+    ib_unused = <<0::size(16)>>
+    cb_unused = <<0::size(16)>>
 
-    ibPassword = <<curr_offset::little-size(16)>>
-    cchPassword = <<String.length(login.password)::little-size(16)>>
-    curr_offset = curr_offset + byte_size(password)
-
-    ibAppName = <<curr_offset::little-size(16)>>
-    cchAppName = <<String.length(login.app_name)::little-size(16)>>
-    curr_offset = curr_offset + byte_size(app_name)
-
-    ibServerName = <<curr_offset::little-size(16)>>
-    cchServerName = <<String.length(login.servername)::little-size(16)>>
-    curr_offset = curr_offset + byte_size(servername)
-
-    ibUnused = <<0::size(16)>>
-    cbUnused = <<0::size(16)>>
-
-    ibCltIntName = <<curr_offset::little-size(16)>>
-    cchCltIntName = <<4::little-size(16)>>
+    ib_clt_int_name = <<curr_offset::little-size(16)>>
+    cch_clt_int_name = <<4::little-size(16)>>
     curr_offset = curr_offset + 4 * 2
 
-    ibLanguage = <<0::size(16)>>
-    cchLanguage = <<0::size(16)>>
+    ib_language = <<0::size(16)>>
+    cch_language = <<0::size(16)>>
 
-    ibDatabase = <<curr_offset::little-size(16)>>
+    ib_database = <<curr_offset::little-size(16)>>
 
-    cchDatabase =
+    cch_database =
       if login.database == "" do
         <<0xAC>>
       else
         <<String.length(login.database)::little-size(16)>>
       end
 
-    clientID = <<0::size(48)>>
+    client_id = <<0::size(48)>>
 
-    ibSSPI = <<0::size(16)>>
-    cbSSPI = <<0::size(16)>>
+    ib_sspi = <<0::size(16)>>
+    cb_sspi = <<0::size(16)>>
 
-    ibAtchDBFile = <<0::size(16)>>
-    cchAtchDBFile = <<0::size(16)>>
+    ib_atch_db_file = <<0::size(16)>>
+    cch_atch_db_file = <<0::size(16)>>
 
-    ibChangePassword = <<0::size(16)>>
-    cchChangePassword = <<0::size(16)>>
+    ib_change_password = <<0::size(16)>>
+    cch_change_password = <<0::size(16)>>
 
-    cbSSPILong = <<0::size(32)>>
+    cb_sspi_long = <<0::size(32)>>
 
-    offset =
-      ibHostName <>
-        cchHostName <>
-        ibUserName <>
-        cchUserName <>
-        ibPassword <>
-        cchPassword <>
-        ibAppName <>
-        cchAppName <>
-        ibServerName <>
-        cchServerName <>
-        ibUnused <>
-        cbUnused <>
-        ibCltIntName <>
-        cchCltIntName <>
-        ibLanguage <>
-        cchLanguage <>
-        ibDatabase <>
-        cchDatabase <>
-        clientID <>
-        ibSSPI <>
-        cbSSPI <>
-        ibAtchDBFile <>
-        cchAtchDBFile <> ibChangePassword <> cchChangePassword <> cbSSPILong
-
-    login7 = login_a <> offset <> login_data
-
-    login7_len = byte_size(login7) + 4
-    data = <<login7_len::little-size(32)>> <> login7
-    Tds.Messages.encode_packets(0x10, data)
+    user_params <>
+      ib_unused <>
+      cb_unused <>
+      ib_clt_int_name <>
+      cch_clt_int_name <>
+      ib_language <>
+      cch_language <>
+      ib_database <>
+      cch_database <>
+      client_id <>
+      ib_sspi <>
+      cb_sspi <>
+      ib_atch_db_file <>
+      cch_atch_db_file <>
+      ib_change_password <>
+      cch_change_password <>
+      cb_sspi_long
   end
 
   defp encode_tdspassword(list) do
