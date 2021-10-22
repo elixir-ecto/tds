@@ -1,9 +1,11 @@
 defmodule Tds.Protocol.Prelogin do
-  @moduledoc false
+  @moduledoc """
+  Prelogin message definition
+
+  See: https://docs.microsoft.com/en-us/openspecs/windows_protocols/ms-tds/60f56408-0188-4cd5-8b90-25c6f2423868
+  """
   import Tds.Protocol.Grammar
   require Logger
-
-  # defstruct version: nil,
 
   @type state :: Tds.Protocol.t()
   @type packet_data :: iodata()
@@ -26,6 +28,8 @@ defmodule Tds.Protocol.Prelogin do
           instance: boolean(),
           mars: boolean()
         }
+
+  @packet_header 0x12
 
   @version_token 0x00
   @encryption_token 0x01
@@ -68,7 +72,7 @@ defmodule Tds.Protocol.Prelogin do
       end)
 
     data = IO.iodata_to_binary(iodata)
-    Tds.Messages.encode_packets(0x12, data)
+    Tds.Messages.encode_packets(@packet_header, data)
   end
 
   defp encode_version(_opts) do
