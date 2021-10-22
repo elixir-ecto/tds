@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - master
+      - ssl
   pull_request:
     branches:
       - master
