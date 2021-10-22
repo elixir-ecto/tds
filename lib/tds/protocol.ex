@@ -133,7 +133,7 @@ defmodule Tds.Protocol do
   def checkout(%{sock: {mod, sock}} = s) do
     sock_mod = inspect(mod)
 
-    case :inet.setopts(sock, active: false) do
+    case setopts(s.sock, active: false) do
       :ok ->
         {:ok, s}
 
@@ -154,7 +154,7 @@ defmodule Tds.Protocol do
   def checkin(%{sock: {mod, sock}} = s) do
     sock_mod = inspect(mod)
 
-    case :inet.setopts(sock, active: :once) do
+    case setopts(s.sock, active: :once) do
       :ok ->
         {:ok, s}
 
@@ -382,13 +382,13 @@ defmodule Tds.Protocol do
 
         :ok = :inet.setopts(sock, buffer: buffer)
 
-        case login(%{s | sock: {:gen_tcp, sock}}) do
+        case prelogin(%{s | sock: {:gen_tcp, sock}}) do
           {:error, error, _state} ->
             :gen_tcp.close(sock)
             {:error, error}
 
-          r ->
-            r
+          other ->
+            other
         end
 
       {:error, error} ->
@@ -439,6 +439,26 @@ defmodule Tds.Protocol do
     end
   end
 
+  defp ssl_connect(%{sock: {:gen_tcp, sock}, opts: opts} = s) do
+    {:ok, _} = Application.ensure_all_started(:ssl)
+    :inet.setopts(sock, active: false)
+
+    case Tds.Tls.connect(sock, opts[:ssl_opts] || []) do
+      {:ok, ssl_sock} ->
+        state = %{s | sock: {:ssl, ssl_sock}}
+        {:ok, state}
+
+      {:error, reason} ->
+        error =
+          Tds.Error.exception(
+            "Unable to establish secure connection to server due #{inspect(reason)}"
+          )
+
+        :gen_tcp.close(sock)
+        {:error, error, s}
+    end
+  end
+
   def handle_info({:udp_error, _, :econnreset}, s) do
     msg =
       "Tds encountered an error while connecting to the Sql Server " <>
@@ -451,10 +471,7 @@ defmodule Tds.Protocol do
         {:tcp, _, _data},
         %{sock: {mod, sock}, opts: opts, state: :prelogin} = s
       ) do
-    case mod do
-      :gen_tcp -> :inet.setopts(sock, active: false)
-      :ssl -> :ssl.setopts(sock, active: false)
-    end
+    setopts(s.sock, active: false)
 
     login(%{s | opts: opts, sock: {mod, sock}})
   end
@@ -521,22 +538,16 @@ defmodule Tds.Protocol do
   def prelogin(%{opts: opts} = s) do
     msg = msg_prelogin(params: opts)
 
-    case msg_send(msg, s) do
-      {:ok, s} ->
-        {:noreply, %{s | state: :prelogin}}
-
-      {:error, reason, s} ->
-        error(%Tds.Error{message: "tcp send: #{reason}"}, s)
-
-      any ->
-        any
+    case msg_send(msg, %{s | state: :prelogin}) do
+      {:ok, s} -> login(s)
+      any -> any
     end
   end
 
   def login(%{opts: opts} = s) do
     msg = msg_login(params: opts)
 
-    case login_send(msg, s) do
+    case login_send(msg, %{s | state: :login}) do
       {:ok, s} ->
         {:ok, %{s | state: :ready}}
 
@@ -740,14 +751,19 @@ defmodule Tds.Protocol do
     end
   end
 
+  def message(:prelogin, msg_preloginack(response: response), _) do
+    case response do
+      {:login, s} -> {:ok, s}
+      {:encrypt, s} -> ssl_connect(s)
+      other -> other
+    end
+  end
+
   def message(
         :login,
         msg_loginack(redirect: %{hostname: host, port: port}),
-        %{opts: opts} = s
+        %{opts: opts} = state
       ) do
-    # we got an ENVCHANGE:redirection token, we need to disconnect and start over with new server
-    disconnect("redirected", s)
-
     new_opts =
       opts
       |> Keyword.put(:hostname, host)
@@ -814,8 +830,9 @@ defmodule Tds.Protocol do
   end
 
   # Send Command To Sql Server
-  defp login_send(msg, %{sock: {mod, sock}, env: env} = s) do
+  defp login_send(msg, %{sock: {mod, sock}, env: env, opts: opts} = s) do
     paks = encode_msg(msg, env)
+    s = %{s | opts: clean_opts(opts)}
 
     Enum.each(paks, fn pak ->
       mod.send(sock, pak)
@@ -823,7 +840,7 @@ defmodule Tds.Protocol do
 
     case msg_recv(s) do
       {:disconnect, ex, s} ->
-        {:error, ex, s}
+        {:disconnect, ex, s}
 
       buffer ->
         buffer
@@ -834,51 +851,33 @@ defmodule Tds.Protocol do
 
   defp msg_send(
          msg,
-         %{sock: {mod, sock}, env: env, state: state, opts: opts} = s
+         %{sock: {mod, port}, env: env, state: state, opts: opts} = s
        ) do
-    :inet.setopts(sock, active: false)
+    setopts(s.sock, active: false)
 
     opts
     |> Keyword.get(:use_elixir_calendar_types, false)
     |> use_elixir_calendar_types()
 
-    {t_send, _} =
-      :timer.tc(fn ->
-        msg
-        |> encode_msg(env)
-        |> Enum.each(&mod.send(sock, &1))
-      end)
-
-    {t_recv, {t_decode, result}} =
-      :timer.tc(fn ->
-        case msg_recv(s) do
-          {:disconnect, _ex, _s} = res ->
-            {0, res}
-
-          buffer ->
-            :timer.tc(fn ->
-              buffer
-              |> IO.iodata_to_binary()
-              |> decode(s)
-            end)
+    send_result =
+      msg
+      |> encode_msg(env)
+      |> Enum.reduce_while(:ok, fn chunk, _ ->
+        case mod.send(port, chunk) do
+          {:error, reason} -> {:halt, {:error, reason}}
+          :ok -> {:cont, :ok}
         end
       end)
 
-    stm = Map.get(s, :query)
-
-    if Keyword.get(s.opts, :trace, false) == true do
-      Logger.debug(fn ->
-        "[trace] [Tds.Protocod.msg_send/2] " <>
-          "state=#{inspect(state)} " <>
-          "send=#{Tds.Perf.to_string(t_send)} " <>
-          "receive=#{Tds.Perf.to_string(t_recv - t_decode)} " <>
-          "decode=#{Tds.Perf.to_string(t_decode)}" <>
-          "\n" <>
-          "#{inspect(stm)}"
-      end)
+    with :ok <- send_result,
+         buffer when is_list(buffer) <- msg_recv(s) do
+      buffer
+      |> IO.iodata_to_binary()
+      |> decode(s)
+    else
+      {:disconnect, _ex, _s} = res -> {0, res}
+      other -> other
     end
-
-    result
   end
 
   defp msg_recv(%{sock: {mod, pid}} = s) do
@@ -1150,6 +1149,13 @@ defmodule Tds.Protocol do
           "set_allow_snapshot_isolation: #{inspect(val)} is an invalid value, " <>
             "should be either :on, :off, nil"
         )
+    end
+  end
+
+  defp setopts({mod, sock}, options) do
+    case mod do
+      :gen_tcp -> :inet.setopts(sock, options)
+      :ssl -> :ssl.setopts(sock, options)
     end
   end
 end

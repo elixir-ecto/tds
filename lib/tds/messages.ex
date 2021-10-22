@@ -19,6 +19,7 @@ defmodule Tds.Messages do
   defrecord :msg_attn, []
 
   # responses
+  defrecord :msg_preloginack, [:response]
   defrecord :msg_loginack, [:redirect]
   defrecord :msg_prepared, [:params]
   defrecord :msg_sql_result, [:columns, :rows, :row_count]
@@ -60,6 +61,13 @@ defmodule Tds.Messages do
   # @tds_pack_prelogin    18
 
   ## Parsers
+  def parse(:prelogin, packet_data, s) do
+    response =
+      packet_data
+      |> Tds.Protocol.Prelogin.decode(s)
+
+    {msg_preloginack(response: response), s}
+  end
 
   def parse(:login, packet_data, s) do
     packet_data
@@ -235,16 +243,17 @@ defmodule Tds.Messages do
     encode(msg, env)
   end
 
-  defp encode(msg_prelogin(params: _params), _env) do
-    version_data = <<11, 0, 12, 56, 0, 0>>
-    version_length = byte_size(version_data)
-    version_offset = 0x06
-    version = <<0x00, version_offset::size(16), version_length::size(16)>>
-    terminator = <<0xFF>>
-    prelogin_data = version_data
-    data = version <> terminator <> prelogin_data
-    encode_packets(0x12, data)
+  defp encode(msg_prelogin(params: opts), _env) do
+    # version_data = <<11, 0, 12, 56, 0, 0>>
+    # version_length = byte_size(version_data)
+    # version_offset = 0x06
+    # version = <<0x00, version_offset::size(16), version_length::size(16)>>
+    # terminator = <<0xFF>>
+    # prelogin_data = version_data
+    # data = version <> terminator <> prelogin_data
+    # encode_packets(0x12, data)
     # encode_header(0x12, data) <> data
+    Tds.Protocol.Prelogin.encode(opts)
   end
 
   defp encode(msg_login(params: params), _env) do
