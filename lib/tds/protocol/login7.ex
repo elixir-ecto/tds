@@ -70,9 +70,7 @@ defmodule Tds.Protocol.Login7 do
     login_data = get_login_data(login)
 
     # Offsets and length for dynamic login configuration
-    offset_start = byte_size(login_a) + 4
-    curr_offset = offset_start + 58
-    offsets = get_offsets(login, curr_offset)
+    offsets = get_offsets(login, byte_size(login_a) + 62)
 
     login7 = login_a <> offsets <> login_data
     login7_len = byte_size(login7) + 4
@@ -185,5 +183,5 @@ defmodule Tds.Protocol.Login7 do
     |> Enum.map_join(&<<&1>>)
   end
 
-  defp default_app_name, do: Node.self() |> Atom.to_string()
+  defp default_app_name, do: "Elixir TDS"
 end
