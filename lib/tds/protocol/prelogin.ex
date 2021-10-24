@@ -17,10 +17,11 @@ defmodule Tds.Protocol.Prelogin do
   defstruct version: nil,
             encryption: <<0x00>>,
             instance: true,
-            threadid: nil,
+            thread_id: nil,
             mars: false,
-            fedauth: false,
-            nonceopt: nil
+            trace_id: nil,
+            fed_auth_required: false,
+            nonce_opt: nil
 
   @type t :: %__MODULE__{
           version: tuple(),
@@ -34,24 +35,33 @@ defmodule Tds.Protocol.Prelogin do
   @version_token 0x00
   @encryption_token 0x01
   @instopt_token 0x02
-  @threadid_token 0x03
+  @thread_id_token 0x03
   @mars_token 0x04
-  @fedauth_token 0x06
-  @nonceopt_token 0x07
+  @fed_auth_required_token 0x06
+  @nonce_opt_token 0x07
   @termintator_token 0xFF
 
+  @version Mix.Project.config()[:version]
+           |> String.split(".")
+           |> Enum.map(&(Integer.parse(&1, 10) |> elem(0)))
+
   # ENCODE
+  def new(opts \\ []) do
+    %__MODULE__{
+      version: Application.spec(:tds, :vsn)
+    }
+  end
 
   @spec encode(maybe_improper_list()) :: [binary(), ...]
   def encode(opts) do
     stream = [
-      encode_version(opts),
+      {@version_token, get_version()},
       encode_encryption(opts),
       # when instance id check is sent, encryption is not negotiated
       # encode_instance(opts),
-      encode_threadid(opts),
+      encode_thread_id(opts),
       encode_mars(opts),
-      encode_fedauth(opts)
+      encode_fed_auth_required(opts)
     ]
 
     start_offset = 5 * Enum.count(stream) + 1
@@ -75,26 +85,19 @@ defmodule Tds.Protocol.Prelogin do
     Tds.Messages.encode_packets(@packet_header, data)
   end
 
-  defp encode_version(_opts) do
-    data =
-      Application.spec(:tds)
-      |> Keyword.get(:vsn)
-      |> to_string()
-      |> String.split(".")
-      |> Enum.map(&(Integer.parse(&1, 10) |> elem(0)))
-      |> case do
-        [major, minor, build] ->
-          <<build::little-ushort, minor, major, 0x00, 0x00>>
+  defp get_version do
+    @version
+    |> case do
+      [major, minor, build] ->
+        <<build::little-ushort, minor, major, 0x00, 0x00>>
 
-        [major, minor] ->
-          <<0x00, 0x00, minor, major, 0x00, 0x00>>
+      [major, minor] ->
+        <<0x00, 0x00, minor, major, 0x00, 0x00>>
 
-        _ ->
-          # probably PRE-release
-          <<0x01, 0x00, 0, 1, 0x00, 0x00>>
-      end
-
-    {@version_token, data}
+      _ ->
+        # probably PRE-release
+        <<0x01, 0x00, 0, 1, 0x00, 0x00>>
+    end
   end
 
   defp encode_encryption(opts) do
@@ -117,7 +120,7 @@ defmodule Tds.Protocol.Prelogin do
     end
   end
 
-  defp encode_threadid(_opts) do
+  defp encode_thread_id(_opts) do
     pid_serial =
       self()
       |> inspect()
@@ -126,15 +129,15 @@ defmodule Tds.Protocol.Prelogin do
       |> Integer.parse()
       |> elem(0)
 
-    {@threadid_token, <<pid_serial::ulong()>>}
+    {@thread_id_token, <<pid_serial::ulong()>>}
   end
 
   defp encode_mars(_opts) do
     {@mars_token, <<0x00>>}
   end
 
-  defp encode_fedauth(_opts) do
-    {@fedauth_token, <<0x01>>}
+  defp encode_fed_auth_required(_opts) do
+    {@fed_auth_required_token, <<0x01>>}
   end
 
   # DECODE
@@ -201,11 +204,11 @@ defmodule Tds.Protocol.Prelogin do
   end
 
   defp decode_tokens(
-         <<@threadid_token, offset::ushort, length::ushort, tail::binary>>,
+         <<@thread_id_token, offset::ushort, length::ushort, tail::binary>>,
          tokens,
          s
        ) do
-    tokens = [{:threadid, offset, length} | tokens]
+    tokens = [{:thread_id, offset, length} | tokens]
     decode_tokens(tail, tokens, s)
   end
 
@@ -219,20 +222,20 @@ defmodule Tds.Protocol.Prelogin do
   end
 
   defp decode_tokens(
-         <<@fedauth_token, offset::ushort, length::ushort, tail::binary>>,
+         <<@fed_auth_required_token, offset::ushort, length::ushort, tail::binary>>,
          tokens,
          s
        ) do
-    tokens = [{:fedauth, offset, length} | tokens]
+    tokens = [{:fed_auth_required, offset, length} | tokens]
     decode_tokens(tail, tokens, s)
   end
 
   defp decode_tokens(
-         <<@nonceopt_token, offset::ushort, length::ushort, tail::binary>>,
+         <<@nonce_opt_token, offset::ushort, length::ushort, tail::binary>>,
          tokens,
          s
        ) do
-    tokens = [{:nonceopt, offset, length} | tokens]
+    tokens = [{:nonce_opt, offset, length} | tokens]
     decode_tokens(tail, tokens, s)
   end
 
@@ -273,10 +276,10 @@ defmodule Tds.Protocol.Prelogin do
           %{m | instance: data == <<0x00>>}
         )
 
-      # :threadid ->
+      # :thread_id ->
       # :mars ->
-      # :fedauth ->
-      # :nonceopt ->
+      # :fed_auth_required ->
+      # :nonce_opt ->
       _ ->
         decode_data(tokens, tail, m)
     end
