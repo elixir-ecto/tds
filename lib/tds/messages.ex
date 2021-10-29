@@ -46,8 +46,8 @@ defmodule Tds.Messages do
 
   ## Packet Size
   @tds_pack_data_size 4088
-  @tds_pack_header_size 8
-  @tds_pack_size @tds_pack_header_size + @tds_pack_data_size
+  # @tds_pack_header_size 8
+  # @tds_pack_size @tds_pack_header_size + @tds_pack_data_size
 
   ## Packet Types
   # @tds_pack_sqlbatch    1
@@ -443,13 +443,5 @@ defmodule Tds.Messages do
   def encode_packets(type, data, id) do
     header = encode_header(type, data, id, 1)
     [header <> data]
-  end
-
-  defp encode_tdspassword(list) do
-    for <<b::4, a::4 <- list>> do
-      <<c>> = <<a::size(4), b::size(4)>>
-      Bitwise.bxor(c, 0xA5)
-    end
-    |> Enum.map_join(&<<&1>>)
   end
 end

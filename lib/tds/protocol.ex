@@ -130,7 +130,7 @@ defmodule Tds.Protocol do
     {:disconnect, err, s}
   end
 
-  def checkout(%{sock: {mod, sock}} = s) do
+  def checkout(%{sock: {mod, _sock}} = s) do
     sock_mod = inspect(mod)
 
     case setopts(s.sock, active: false) do
@@ -151,7 +151,7 @@ defmodule Tds.Protocol do
     {:disconnect, err, s}
   end
 
-  def checkin(%{sock: {mod, sock}} = s) do
+  def checkin(%{sock: {mod, _sock}} = s) do
     sock_mod = inspect(mod)
 
     case setopts(s.sock, active: :once) do
@@ -762,7 +762,7 @@ defmodule Tds.Protocol do
   def message(
         :login,
         msg_loginack(redirect: %{hostname: host, port: port}),
-        %{opts: opts} = state
+        %{opts: opts}
       ) do
     new_opts =
       opts
@@ -851,7 +851,7 @@ defmodule Tds.Protocol do
 
   defp msg_send(
          msg,
-         %{sock: {mod, port}, env: env, state: state, opts: opts} = s
+         %{sock: {mod, port}, env: env, opts: opts} = s
        ) do
     setopts(s.sock, active: false)
 
@@ -1049,7 +1049,7 @@ defmodule Tds.Protocol do
         raise(
           ArgumentError,
           "set_deadlock_priority: #{inspect(val)} is an invalid value, " <>
-            "valid values are #{inspect([:low, :high, :normal | -10..10])}"
+            "valid values are #{inspect([:low, :high, :normal] ++ [-10..10])}"
         )
     end
   end

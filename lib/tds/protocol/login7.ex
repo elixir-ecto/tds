@@ -63,18 +63,17 @@ defmodule Tds.Protocol.Login7 do
       database: Keyword.get(opts, :database, "")
     }
 
-    # Static login configuration
+    # Fixed login configuration
     login_a = get_login_a(login)
-
     # Dynamic login configuration (username, password, ...)
     login_data = get_login_data(login)
-
     # Offsets and length for dynamic login configuration
     offsets = get_offsets(login, byte_size(login_a) + 62)
 
     login7 = login_a <> offsets <> login_data
     login7_len = byte_size(login7) + 4
     data = <<login7_len::little-size(32)>> <> login7
+
     Tds.Messages.encode_packets(@packet_header, data)
   end
 
@@ -98,7 +97,7 @@ defmodule Tds.Protocol.Login7 do
     password =
       login.password
       |> to_little_ucs2()
-      |> encode_tdspassword()
+      |> encode_tds_password()
 
     servername = to_little_ucs2(login.servername)
     app_name = to_little_ucs2(login.app_name)
@@ -175,7 +174,7 @@ defmodule Tds.Protocol.Login7 do
       cb_sspi_long
   end
 
-  defp encode_tdspassword(list) do
+  defp encode_tds_password(list) do
     for <<b::4, a::4 <- list>> do
       <<c>> = <<a::size(4), b::size(4)>>
       Bitwise.bxor(c, 0xA5)

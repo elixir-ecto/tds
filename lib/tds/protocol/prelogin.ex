@@ -45,13 +45,6 @@ defmodule Tds.Protocol.Prelogin do
            |> String.split(".")
            |> Enum.map(&(Integer.parse(&1, 10) |> elem(0)))
 
-  # ENCODE
-  def new(opts \\ []) do
-    %__MODULE__{
-      version: Application.spec(:tds, :vsn)
-    }
-  end
-
   @spec encode(maybe_improper_list()) :: [binary(), ...]
   def encode(opts) do
     stream = [
@@ -109,16 +102,16 @@ defmodule Tds.Protocol.Prelogin do
     {@encryption_token, data}
   end
 
-  defp encode_instance(opts) do
-    # not working for some reason
-    instance = Keyword.get(opts, :instance)
+  # defp encode_instance(opts) do
+  #   # not working for some reason
+  #   instance = Keyword.get(opts, :instance)
 
-    if is_nil(instance) do
-      {@instopt_token, <<0x00>>}
-    else
-      {@instopt_token, instance <> <<0x00>>}
-    end
-  end
+  #   if is_nil(instance) do
+  #     {@instopt_token, <<0x00>>}
+  #   else
+  #     {@instopt_token, instance <> <<0x00>>}
+  #   end
+  # end
 
   defp encode_thread_id(_opts) do
     pid_serial =
