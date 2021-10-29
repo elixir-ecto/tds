@@ -425,6 +425,7 @@ defmodule Tds.Protocol do
 
   defp ssl_connect(%{sock: {:gen_tcp, sock}, opts: opts} = s) do
     {:ok, _} = Application.ensure_all_started(:ssl)
+
     case Tds.Tls.connect(sock, opts[:ssl_opts] || []) do
       {:ok, ssl_sock} ->
         state = %{s | sock: {:ssl, ssl_sock}}
