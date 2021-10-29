@@ -61,15 +61,11 @@ defmodule Tds.Protocol do
               packetsize: 4096
             }
 
-  @spec connect(opts :: Keyword.t()) ::
-          {:ok, state :: t()} | {:error, Exception.t()}
+  @spec connect(opts :: Keyword.t()) :: {:ok, state :: t()} | {:error, Exception.t()}
   def connect(opts) do
     opts =
       opts
-      |> Keyword.put_new(
-        :username,
-        System.get_env("MSSQLUSER") || System.get_env("USER")
-      )
+      |> Keyword.put_new(:username, System.get_env("MSSQLUSER") || System.get_env("USER"))
       |> Keyword.put_new(:password, System.get_env("MSSQLPASSWORD"))
       |> Keyword.put_new(:instance, System.get_env("MSSQLINSTANCE"))
       |> Keyword.put_new(:hostname, System.get_env("MSSQLHOST") || "localhost")
@@ -89,8 +85,7 @@ defmodule Tds.Protocol do
     end
   end
 
-  @spec disconnect(err :: Exception.t() | String.t(), state :: t()) ::
-          :ok
+  @spec disconnect(err :: Exception.t() | String.t(), state :: t()) :: :ok
   def disconnect(_err, %{sock: {mod, sock}} = s) do
     # If socket is active we flush any socket messages so the next
     # socket does not get the messages.
@@ -123,8 +118,7 @@ defmodule Tds.Protocol do
   end
 
   @spec checkout(state :: t) ::
-          {:ok, new_state :: any}
-          | {:disconnect, Exception.t(), new_state :: t}
+          {:ok, new_state :: any} | {:disconnect, Exception.t(), new_state :: t}
   def checkout(%{transaction: :started} = s) do
     err = %Tds.Error{message: "Unexpected transaction status `:started`"}
     {:disconnect, err, s}
@@ -144,8 +138,7 @@ defmodule Tds.Protocol do
   end
 
   @spec checkin(state :: t) ::
-          {:ok, new_state :: t}
-          | {:disconnect, Exception.t(), new_state :: t}
+          {:ok, new_state :: t} | {:disconnect, Exception.t(), new_state :: t}
   def checkin(%{transaction: :started} = s) do
     err = %Tds.Error{message: "Unexpected transaction status `:started`"}
     {:disconnect, err, s}
@@ -331,12 +324,7 @@ defmodule Tds.Protocol do
     {:error, Tds.Error.exception("Cursor operations are not supported in TDS"), state}
   end
 
-  @spec handle_declare(
-          Query.t(),
-          params :: any,
-          opts :: Keyword.t(),
-          state :: t
-        ) ::
+  @spec handle_declare(Query.t(), params :: any, opts :: Keyword.t(), state :: t) ::
           {:ok, Query.t(), cursor :: any, new_state :: t}
           | {:error | :disconnect, Exception.t(), new_state :: t}
   def handle_declare(_query, _params, _opts, state) do
@@ -363,34 +351,30 @@ defmodule Tds.Protocol do
   defp connect(opts, s) do
     host = Keyword.fetch!(opts, :hostname)
     host = if is_binary(host), do: String.to_charlist(host), else: host
+
     port = s.itcp || opts[:port] || System.get_env("MSSQLPORT") || 1433
     {port, _} = if is_binary(port), do: Integer.parse(port), else: {port, nil}
+
     timeout = opts[:timeout] || @timeout
+
     sock_opts = @sock_opts ++ (opts[:socket_options] || [])
 
     s = %{s | opts: opts}
 
-    case :gen_tcp.connect(host, port, sock_opts, timeout) do
-      {:ok, sock} ->
-        {:ok, [sndbuf: sndbuf, recbuf: recbuf, buffer: buffer]} =
-          :inet.getopts(sock, [:sndbuf, :recbuf, :buffer])
+    # Initalize TCP connection with the SQL Server
+    with {:ok, sock} <- :gen_tcp.connect(host, port, sock_opts, timeout),
+         {:ok, buffers} <- :inet.getopts(sock, [:sndbuf, :recbuf, :buffer]),
+         :ok <- :inet.setopts(sock, buffer: max_buf_size(buffers)) do
+      # Send Prelogin message to SQL Server
+      case send_prelogin(%{s | sock: {:gen_tcp, sock}}) do
+        {:error, error, _state} ->
+          :gen_tcp.close(sock)
+          {:error, error}
 
-        buffer =
-          buffer
-          |> max(sndbuf)
-          |> max(recbuf)
-
-        :ok = :inet.setopts(sock, buffer: buffer)
-
-        case prelogin(%{s | sock: {:gen_tcp, sock}}) do
-          {:error, error, _state} ->
-            :gen_tcp.close(sock)
-            {:error, error}
-
-          other ->
-            other
-        end
-
+        other ->
+          other
+      end
+    else
       {:error, error} ->
         error(%Tds.Error{message: "tcp connect: #{error}"}, s)
     end
@@ -441,8 +425,6 @@ defmodule Tds.Protocol do
 
   defp ssl_connect(%{sock: {:gen_tcp, sock}, opts: opts} = s) do
     {:ok, _} = Application.ensure_all_started(:ssl)
-    :inet.setopts(sock, active: false)
-
     case Tds.Tls.connect(sock, opts[:ssl_opts] || []) do
       {:ok, ssl_sock} ->
         state = %{s | sock: {:ssl, ssl_sock}}
@@ -535,7 +517,7 @@ defmodule Tds.Protocol do
 
   # PROTOCOL
 
-  def prelogin(%{opts: opts} = s) do
+  def send_prelogin(%{opts: opts} = s) do
     msg = msg_prelogin(params: opts)
 
     case msg_send(msg, %{s | state: :prelogin}) do
@@ -1157,5 +1139,11 @@ defmodule Tds.Protocol do
       :gen_tcp -> :inet.setopts(sock, options)
       :ssl -> :ssl.setopts(sock, options)
     end
+  end
+
+  defp max_buf_size(buffers) when is_list(buffers) do
+    buffers
+    |> Keyword.values()
+    |> Enum.max()
   end
 end

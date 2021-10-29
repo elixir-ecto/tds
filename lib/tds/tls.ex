@@ -1,55 +1,58 @@
 defmodule Tds.Tls do
   @moduledoc false
-  require Logger
   use GenServer
+
+  require Logger
+
   import Kernel, except: [send: 2]
   import Tds.BinaryUtils
 
-  defstruct [:socket, :ssl_opts, :owner_pid, :handshake, :buffer]
+  defstruct [:socket, :ssl_opts, :owner_pid, :handshake?, :buffer]
 
   def connect(socket, ssl_opts) do
-    ssl_opts =
-      ssl_opts ++
-        [
-          active: false,
-          cb_info: {Tds.Tls, :tcp, :tcp_closed, :tcp_error}
-        ]
-
+    ssl_opts = ssl_opts ++ [active: false, cb_info: {Tds.Tls, :tcp, :tcp_closed, :tcp_error}]
     :inet.setopts(socket, active: false)
 
     with {:ok, pid} <- GenServer.start_link(__MODULE__, {socket, ssl_opts}, []),
          :ok <- :gen_tcp.controlling_process(socket, pid) do
-      res = :ssl.connect(socket, ssl_opts, :infinity)
+      connection_result = :ssl.connect(socket, ssl_opts, :infinity)
 
-      # todo: remove this line and handle it when server respond with 0x12 message with status 0x01
-      GenServer.cast(pid, :handshake_complete)
-      res
+      # Check if ssl connection was established successfully
+      if elem(connection_result, 0) == :ok do
+        GenServer.cast(pid, :handshake_complete)
+      end
+
+      connection_result
     else
       error -> error
     end
   end
 
   def controlling_process(socket, tls_conn_pid) do
-    {:connected, pid} = Port.info(socket, :connected)
-    GenServer.call(pid, {:controlling_process, tls_conn_pid})
+    socket
+    |> assert_connected!()
+    |> GenServer.call({:controlling_process, tls_conn_pid})
   end
 
   def send(socket, payload) do
-    {:connected, pid} = Port.info(socket, :connected)
-    GenServer.call(pid, {:send, payload})
+    socket
+    |> assert_connected!()
+    |> GenServer.call({:send, payload})
   end
 
   def recv(socket, length, timeout \\ :infinity) do
-    {:connected, pid} = Port.info(socket, :connected)
-    GenServer.call(pid, {:recv, length, timeout}, timeout)
+    socket
+    |> assert_connected!()
+    |> GenServer.call({:recv, length, timeout}, timeout)
   end
 
   defdelegate getopts(port, options), to: :inet
 
   # defdelegate setopts(socket, options), to: :inet
   def setopts(socket, options) do
-    {:connected, pid} = Port.info(socket, :connected)
-    GenServer.call(pid, {:setopts, options})
+    socket
+    |> assert_connected!()
+    |> GenServer.call({:setopts, options})
   end
 
   defdelegate peername(socket), to: :inet
@@ -76,20 +79,22 @@ defmodule Tds.Tls do
       defdelegate unquote(name)(arg1, arg2, arg3, arg4), to: :gen_tcp
   end)
 
+  # Asserts that the port / socket is still open and returns its `pid`
+  defp assert_connected!(socket) do
+    {:connected, pid} = Port.info(socket, :connected)
+    pid
+  end
+
   # SERVER
   def init({socket, ssl_opts}) do
-    {:ok, %__MODULE__{socket: socket, ssl_opts: ssl_opts, handshake: true}}
+    {:ok, %__MODULE__{socket: socket, ssl_opts: ssl_opts, handshake?: true}}
   end
 
   def handle_call({:controlling_process, tls_conn_pid}, _from, s) do
     {:reply, :ok, %{s | owner_pid: tls_conn_pid}}
   end
 
-  def handle_call(
-        {:setopts, options},
-        _from,
-        %{socket: socket, handshake: hs} = s
-      ) do
+  def handle_call({:setopts, options}, _from, %{socket: socket, handshake?: hs} = s) do
     tds_header_size = if hs == true, do: 8, else: 0
 
     opts =
@@ -102,7 +107,7 @@ defmodule Tds.Tls do
     {:reply, :inet.setopts(socket, opts), s}
   end
 
-  def handle_call({:send, data}, _from, %{socket: socket, handshake: true} = s) do
+  def handle_call({:send, data}, _from, %{socket: socket, handshake?: true} = s) do
     size = IO.iodata_length(data) + 8
 
     header = <<0x12, 0x01, size::unsigned-size(2)-unit(8), 0x00, 0x00, 0x00, 0x00>>
@@ -111,12 +116,12 @@ defmodule Tds.Tls do
     {:reply, resp, s}
   end
 
-  def handle_call({:send, data}, _from, %{socket: socket, handshake: false} = s) do
+  def handle_call({:send, data}, _from, %{socket: socket, handshake?: false} = s) do
     resp = :gen_tcp.send(socket, data)
     {:reply, resp, s}
   end
 
-  # def handle_call({:recv, length, timeout}, _from, %{socket: socket, handshake: true} = s) do
+  # def handle_call({:recv, length, timeout}, _from, %{socket: socket, handshake?: true} = s) do
   #   res = case :gen_tcp.recv(socket, length, timeout) do
   #     {:ok, data}
   #   end
@@ -128,21 +133,16 @@ defmodule Tds.Tls do
     {:reply, res, s}
   end
 
-  def handle_cast(:handshake_complete, s) do
-    {:noreply, %{s | handshake: false}}
-  end
+  def handle_cast(:handshake_complete, s), do: {:noreply, %{s | handshake?: false}}
 
-  def handle_info(
-        {:tcp, _, _} = msg,
-        %{owner_pid: pid, handshake: false, buffer: nil} = s
-      ) do
+  def handle_info({:tcp, _, _} = msg, %{owner_pid: pid, handshake?: false, buffer: nil} = s) do
     Kernel.send(pid, msg)
     {:noreply, s}
   end
 
   def handle_info(
         {:tcp, port, <<0x12, 0, size::unsigned-16, _::32, tail::binary>>},
-        %{socket: socket, owner_pid: pid, buffer: nil, handshake: true} = s
+        %{socket: socket, owner_pid: pid, buffer: nil, handshake?: true} = s
       ) do
     expecting = size - 8
 
@@ -159,7 +159,7 @@ defmodule Tds.Tls do
 
   def handle_info(
         {:tcp, port, <<0x12, 1, size::unsigned-16, _::32, tail::binary>>},
-        %{socket: socket, owner_pid: pid, buffer: nil, handshake: true} = s
+        %{socket: socket, owner_pid: pid, buffer: nil, handshake?: true} = s
       ) do
     expecting = size - 8
 
@@ -176,12 +176,7 @@ defmodule Tds.Tls do
 
   def handle_info(
         {:tcp, port, bin},
-        %{
-          socket: socket,
-          owner_pid: pid,
-          buffer: {slice, expecting},
-          handshake: true
-        } = s
+        %{socket: socket, owner_pid: pid, buffer: {slice, expecting}, handshake?: true} = s
       ) do
     case IO.iodata_to_binary([slice, bin]) do
       <<ssl_payload::binary(expecting), next_packet::binary>> ->
@@ -194,16 +189,12 @@ defmodule Tds.Tls do
     end
   end
 
-  def handle_info(
-        {:tcp, _, _} = msg,
-        %{owner_pid: pid, handshake: true, buffer: nil} = s
-      ) do
+  def handle_info({:tcp, _, _} = msg, %{owner_pid: pid, handshake?: true, buffer: nil} = s) do
     Kernel.send(pid, msg)
     {:noreply, s}
   end
 
-  def handle_info({tag, _} = msg, %{owner_pid: pid} = s)
-      when tag in [:tcp_closed, :ssl_closed] do
+  def handle_info({tag, _} = msg, %{owner_pid: pid} = s) when tag in [:tcp_closed, :ssl_closed] do
     # todo
     send(pid, msg)
     {:stop, tag, s}
