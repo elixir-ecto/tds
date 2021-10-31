@@ -6,8 +6,7 @@ defmodule SSLTest do
 
   describe "test ssl connection" do
     setup do
-      opts = Application.fetch_env!(:tds, :opts)
-      opts = Keyword.put(opts, :ssl, :required)
+      opts = Keyword.put(opts(), :ssl, :required)
 
       {:ok, pid} = Tds.start_link(opts)
       {:ok, [pid: pid]}
@@ -21,8 +20,7 @@ defmodule SSLTest do
 
   describe "test non-ssl connect" do
     setup do
-      opts = Application.fetch_env!(:tds, :opts)
-      opts = Keyword.put(opts, :ssl, :not_supported)
+      opts = Keyword.put(opts(), :ssl, :not_supported)
 
       {:ok, pid} = Tds.start_link(opts)
       {:ok, [pid: pid]}

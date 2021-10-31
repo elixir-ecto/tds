@@ -3,8 +3,7 @@ defmodule Tds.Ucs2TableTest do
   import Tds.TestHelper
 
   setup do
-    opts = Application.fetch_env!(:tds, :opts)
-    {:ok, pid} = Tds.start_link(opts)
+    {:ok, pid} = Tds.start_link(opts())
     {:ok, [pid: pid]}
   end
 

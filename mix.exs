@@ -21,12 +21,7 @@ defmodule Tds.Mixfile do
       # Docs
       name: "Tds",
       source_url: "https://github.com/livehelpnow/tds",
-      docs: [
-        main: "readme",
-        extras: ["README.md", "CHANGELOG.md"],
-        source_ref: "v#{@version}",
-        source_url: "https://github.com/livehelpnow/tds"
-      ]
+      docs: docs()
     ]
   end
 
@@ -45,7 +40,7 @@ defmodule Tds.Mixfile do
       {:decimal, "~> 1.9 or ~> 2.0"},
       {:jason, "~> 1.0", optional: true},
       {:db_connection, "~> 2.0"},
-      {:ex_doc, "~> 0.19", only: :dev},
+      {:ex_doc, "~> 0.19", only: :docs},
       {:tds_encoding, "~> 1.1", optional: true, only: :test},
       {:tzdata, "~> 1.0", optional: true, only: :test}
     ]
@@ -55,6 +50,15 @@ defmodule Tds.Mixfile do
     """
     Microsoft SQL Server client (Elixir implementation of the MS TDS protocol)
     """
+  end
+
+  defp docs do
+    [
+      main: "readme",
+      extras: ["README.md", "CHANGELOG.md"],
+      source_ref: "v#{@version}",
+      source_url: "https://github.com/livehelpnow/tds"
+    ]
   end
 
   defp package do

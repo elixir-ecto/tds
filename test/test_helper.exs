@@ -5,6 +5,19 @@ defmodule Tds.TestHelper do
 
   require Logger
 
+  def opts do
+    [
+      hostname: System.get_env("SQL_HOSTNAME") || "127.0.0.1",
+      username: System.get_env("SQL_USERNAME") || "sa",
+      password: System.get_env("SQL_PASSWORD") || "some!Password",
+      database: "test",
+      ssl: true,
+      trace: false,
+      set_allow_snapshot_isolation: :on,
+      show_sensitive_data_on_connection_error: true
+    ]
+  end
+
   defmacro query(statement, params \\ [], opts \\ []) do
     quote do
       case Tds.query(
@@ -87,7 +100,7 @@ defmodule Tds.TestHelper do
   end
 end
 
-opts = Application.get_env(:tds, :opts)
+opts = Tds.TestHelper.opts()
 database = opts[:database]
 
 {"", 0} =

@@ -6,8 +6,7 @@ defmodule QueryTest do
   @tag timeout: 50000
 
   setup do
-    opts = Application.fetch_env!(:tds, :opts)
-    {:ok, pid} = Tds.start_link(opts)
+    {:ok, pid} = Tds.start_link(opts())
 
     {:ok, [pid: pid]}
   end
@@ -147,9 +146,7 @@ defmodule QueryTest do
 
   describe "execution mode" do
     test ":prepare_execute" do
-      opts =
-        Application.fetch_env!(:tds, :opts)
-        |> Keyword.put(:execution_mode, :prepare_execute)
+      opts = Keyword.put(opts(), :execution_mode, :prepare_execute)
 
       {:ok, pid} = Tds.start_link(opts)
       context = [pid: pid]
@@ -160,7 +157,7 @@ defmodule QueryTest do
 
     test ":executesql" do
       opts =
-        Application.fetch_env!(:tds, :opts)
+        opts()
         |> Keyword.put(:execution_mode, :executesql)
 
       {:ok, pid} = Tds.start_link(opts)
@@ -171,9 +168,7 @@ defmodule QueryTest do
     end
 
     test "unknown errors out" do
-      opts =
-        Application.fetch_env!(:tds, :opts)
-        |> Keyword.put(:execution_mode, :invalid)
+      opts = Keyword.put(opts(), :execution_mode, :invalid)
 
       {:ok, pid} = Tds.start_link(opts)
       context = [pid: pid]

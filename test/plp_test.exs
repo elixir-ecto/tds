@@ -6,8 +6,7 @@ defmodule PLPTest do
   @tag timeout: 50000
 
   setup do
-    opts = Application.fetch_env!(:tds, :opts)
-    {:ok, pid} = Tds.start_link(opts)
+    {:ok, pid} = Tds.start_link(opts())
 
     {:ok, [pid: pid]}
   end

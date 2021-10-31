@@ -7,9 +7,10 @@ defmodule ElixirCalendarTest do
   alias Tds.Parameter, as: P
 
   setup do
+    Calendar.put_time_zone_database(Tzdata.TimeZoneDatabase)
+
     {:ok, pid} =
-      :tds
-      |> Application.fetch_env!(:opts)
+      opts()
       |> Keyword.put(:use_elixir_calendar_types, true)
       |> Tds.start_link()
 

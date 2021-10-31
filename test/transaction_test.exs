@@ -18,9 +18,7 @@ defmodule Tds.TransactionTest do
       prepare: context[:prepare] || :named
     ]
 
-    opts =
-      Application.get_env(:tds, :opts)
-      |> Keyword.merge(opts)
+    opts = Keyword.merge(opts(), opts)
 
     {:ok, pid} = Tds.start_link(opts)
     {:ok, pid2} = Tds.start_link(opts)

@@ -8,10 +8,8 @@ defmodule RPCTest do
   @tag timeout: 50_000
 
   setup do
-    opts = Application.fetch_env!(:tds, :opts)
-
     # |> Keyword.put(:after_connect, {Tds, :query!, ["SET TRANSACTION ISOLATION LEVEL READ UNCOMMITTED", []]})
-    {:ok, pid} = Tds.start_link(opts)
+    {:ok, pid} = Tds.start_link(opts())
 
     {:ok, [pid: pid]}
   end
