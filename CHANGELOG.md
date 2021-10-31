@@ -1,3 +1,7 @@
+# v2.3.0-dev
+### Improvements
+* Add support for SSL / TLS connections
+
 # v2.2.0
 ### BugFix
 * Update `tds_encoding` to work with Erlang/OTP >= 24
