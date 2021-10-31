@@ -10,6 +10,8 @@ config :tds,
     username: System.get_env("SQL_USERNAME") || "sa",
     password: System.get_env("SQL_PASSWORD") || "some!Password",
     database: "test",
+    ssl: true,
     trace: false,
-    set_allow_snapshot_isolation: :on
+    set_allow_snapshot_isolation: :on,
+    show_sensitive_data_on_connection_error: true
   ]
