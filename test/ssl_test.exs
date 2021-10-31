@@ -7,30 +7,30 @@ defmodule SSLTest do
   describe "test ssl connection" do
     setup do
       opts = Application.fetch_env!(:tds, :opts)
-      opts = Keyword.put(opts, :ssl, :off)
+      opts = Keyword.put(opts, :ssl, :required)
 
       {:ok, pid} = Tds.start_link(opts)
       {:ok, [pid: pid]}
     end
 
     test "open new ssl connection to database", context do
-      assert [["TRUE"]] ==
-               query("SELECT encrypt_option FROM sys.dm_exec_connections")
+      assert ["TRUE"] ==
+               query("SELECT encrypt_option FROM sys.dm_exec_connections") |> List.last()
     end
   end
 
   describe "test non-ssl connect" do
     setup do
       opts = Application.fetch_env!(:tds, :opts)
-      opts = Keyword.put_new(opts, :ssl, false)
+      opts = Keyword.put(opts, :ssl, :not_supported)
 
       {:ok, pid} = Tds.start_link(opts)
       {:ok, [pid: pid]}
     end
 
     test "open new ssl connection to database", context do
-      assert [["FALSE"]] ==
-               query("SELECT encrypt_option FROM sys.dm_exec_connections")
+      assert ["FALSE"] ==
+               query("SELECT encrypt_option FROM sys.dm_exec_connections") |> List.last()
     end
   end
 end

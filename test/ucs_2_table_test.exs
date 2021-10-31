@@ -8,7 +8,6 @@ defmodule Tds.Ucs2TableTest do
     {:ok, [pid: pid]}
   end
 
-  @tag capture_log: true
   test "should encode/decode correctly ucs2 strings", context do
     __DIR__
     |> Path.join('ucs_2_table.txt')
@@ -32,7 +31,7 @@ defmodule Tds.Ucs2TableTest do
           []
       end
     end)
-    |> Stream.chunk_every(100)
+    |> Stream.chunk_every(2048)
     |> Enum.each(fn chunk ->
       sql =
         chunk

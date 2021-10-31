@@ -194,6 +194,11 @@ defmodule Tds.Tls do
     {:noreply, s}
   end
 
+  def handle_info({:tcp_passive, _port} = msg, %{owner_pid: pid} = s) do
+    Kernel.send(pid, msg)
+    {:noreply, s}
+  end
+
   def handle_info({tag, _} = msg, %{owner_pid: pid} = s) when tag in [:tcp_closed, :ssl_closed] do
     # todo
     send(pid, msg)
