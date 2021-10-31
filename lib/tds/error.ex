@@ -23,7 +23,6 @@ defmodule Tds.Error do
   @type error_details :: %{line_number: integer(), number: integer(), msg_text: String.t()}
   @type t :: %__MODULE__{message: String.t(), mssql: error_details}
 
-
   defexception [:message, :mssql]
 
   def exception(message) when is_binary(message) or is_atom(message) do
