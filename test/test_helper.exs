@@ -92,25 +92,30 @@ defmodule Tds.TestHelper do
       params[:password],
       "-S",
       params[:hostname],
+      # Set login timeout to 1 second
+      "-l",
+      "1",
       "-Q",
       ~s(#{sql}) | args
     ]
 
-    System.cmd("sqlcmd", args)
+    System.cmd("sqlcmd", args, stderr_to_stdout: true)
   end
 end
 
 opts = Tds.TestHelper.opts()
 database = opts[:database]
 
-{"", 0} =
-  Tds.TestHelper.sqlcmd(opts, """
-  IF EXISTS(SELECT * FROM sys.databases where name = '#{database}')
-  BEGIN
-    DROP DATABASE [#{database}];
-  END;
-  CREATE DATABASE [#{database}];
-  """)
+case Tds.TestHelper.sqlcmd(opts, """
+     IF EXISTS(SELECT * FROM sys.databases where name = '#{database}')
+     BEGIN
+       DROP DATABASE [#{database}];
+     END;
+     CREATE DATABASE [#{database}];
+     """) do
+  {"", 0} -> :ok
+  _ -> raise RuntimeError, "Initalizing database failed. Is the database server running?"
+end
 
 {"Changed database context to 'test'." <> _, 0} =
   Tds.TestHelper.sqlcmd(opts, """
