@@ -119,7 +119,8 @@ defmodule Tds.Protocol.Prelogin do
           # This requires that the LOGIN7 message is send encrypted, but
           # the other packages are send unencrypted over the wire.
           raise ArgumentError, ~s("ssl: :off" is currently not supported)
-          # <<@encryption_off::byte>>
+
+        # <<@encryption_off::byte>>
 
         value ->
           raise ArgumentError, "invalid value for :ssl: #{inspect(value)}"
