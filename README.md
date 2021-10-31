@@ -90,7 +90,7 @@ This will skip calling `sp_prepare` and query will be executed using `sp_execute
 Please note that only one execution mode can be set at a time, and SQL Server will probably 
 use single execution plan (since it is NOT estimated by checking data density!).
 
-### SSL / TLS support
+## SSL / TLS support
 
 tds `>= 2.3.0` supports encrypted connections to the SQL Server.
 

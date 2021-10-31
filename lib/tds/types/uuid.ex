@@ -1,5 +1,7 @@
 defmodule Tds.Types.UUID do
-  @moduledoc false
+  @moduledoc """
+  UUID data type
+  """
 
   @doc """
   Casts to UUID.

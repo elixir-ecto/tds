@@ -54,10 +54,14 @@ defmodule Tds.Mixfile do
 
   defp docs do
     [
+      extras: [
+        "CHANGELOG.md": [title: "Changelog"],
+        "README.md": [title: "Overview"]
+      ],
       main: "readme",
-      extras: ["README.md", "CHANGELOG.md"],
       source_ref: "v#{@version}",
-      source_url: "https://github.com/livehelpnow/tds"
+      source_url: "https://github.com/livehelpnow/tds",
+      formatters: ["html"]
     ]
   end
 
