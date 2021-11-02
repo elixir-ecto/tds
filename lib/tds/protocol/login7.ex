@@ -5,14 +5,23 @@ defmodule Tds.Protocol.Login7 do
   See: https://docs.microsoft.com/en-us/openspecs/windows_protocols/ms-tds/773a62b6-ee89-4c02-9e5e-344882630aac
   """
   alias Tds.UCS2
+  import Tds.BinaryUtils
 
   @packet_header 0x10
   ## Packet Size
   @tds_pack_header_size 8
   @tds_pack_data_size 4088
   @tds_pack_size @tds_pack_header_size + @tds_pack_data_size
-  @default_tds_version <<0x04, 0x00, 0x00, 0x74>>
+  @max_supported_tds_version <<0x04, 0x00, 0x00, 0x74>>
+  @default_client_version <<0x04, 0x00, 0x00, 0x07>>
+  @client_pid <<0x00, 0x10, 0x00, 0x00>>
+  # SQL_DFLT
+  @sql_type <<0x00>>
+  @options <<0x00>>
   @clt_int_name "ODBC"
+  @default_app_name "Elixir TDS"
+  # EN-US
+  @language_code_id <<0x09, 0x04, 0x00, 0x00>>
 
   defstruct [
     # Highest TDS version used by the client
@@ -25,37 +34,51 @@ defmodule Tds.Protocol.Login7 do
     :client_pid,
     # The connection ID of the primary Server. Used when connecting to an "Always Up" backup server.
     :connection_id,
+    # Options (currently not used)
     :option_flags_1,
+    # More options (also not used)
     :option_flags_2,
+    # The SQL type sent to the client
     :type_flags,
+    # More options (also not used)
     :option_flags_3,
+    # This field is not used and can be set to zero.
     :client_time_zone,
+    # The language code identifier (LCID) value for the client collation.
+    # If ClientLCID is specified, the specified collation is set as the session collation.
     :client_language_code_id,
+    # Client username
     :username,
+    # Client password
     :password,
+    # Server name
     :servername,
+    # Application name
     :app_name,
+    # Hostname of the SQL server
     :hostname,
+    # Database to use (defaults to user database)
     :database
   ]
 
   def encode(opts) do
+    # gethostname/0 always succeeds
     {:ok, hostname} = :inet.gethostname()
 
     login = %__MODULE__{
-      tds_version: @default_tds_version,
+      tds_version: @max_supported_tds_version,
       packet_size: <<@tds_pack_size::little-size(4)-unit(8)>>,
       hostname: to_string(hostname),
-      app_name: Keyword.get(opts, :app_name, default_app_name()),
-      client_version: <<0x04, 0x00, 0x00, 0x07>>,
-      client_pid: <<0x00, 0x10, 0x00, 0x00>>,
+      app_name: Keyword.get(opts, :app_name, @default_app_name),
+      client_version: @default_client_version,
+      client_pid: pid!(),
       connection_id: <<0x00::size(32)>>,
-      option_flags_1: <<0x00>>,
-      option_flags_2: <<0x00>>,
-      type_flags: <<0x00>>,
-      option_flags_3: <<0x00>>,
-      client_time_zone: <<0xE0, 0x01, 0x00, 0x00>>,
-      client_language_code_id: <<0x09, 0x04, 0x00, 0x00>>,
+      option_flags_1: @options,
+      option_flags_2: @options,
+      type_flags: @sql_type,
+      option_flags_3: @options,
+      client_time_zone: <<0x0, 0x0, 0x0, 0x0>>,
+      client_language_code_id: @language_code_id,
       username: opts[:username],
       password: opts[:password],
       servername: opts[:hostname],
@@ -63,20 +86,17 @@ defmodule Tds.Protocol.Login7 do
     }
 
     # Fixed login configuration
-    login_a = get_login_a(login)
-    # Dynamic login configuration (username, password, ...)
-    login_data = get_login_data(login)
-    # Offsets and length for dynamic login configuration
-    offsets = get_offsets(login, byte_size(login_a) + 62)
+    fixed_login = fixed_login(login)
+    {variable_login, offsets} = encode_variable_login(login, byte_size(fixed_login) + 62)
 
-    login7 = login_a <> offsets <> login_data
+    login7 = fixed_login <> offsets <> variable_login
     login7_len = byte_size(login7) + 4
     data = <<login7_len::little-size(32)>> <> login7
 
     Tds.Messages.encode_packets(@packet_header, data)
   end
 
-  defp get_login_a(login) do
+  defp fixed_login(login) do
     login.tds_version <>
       login.packet_size <>
       login.client_version <>
@@ -90,87 +110,78 @@ defmodule Tds.Protocol.Login7 do
       login.client_language_code_id
   end
 
-  defp get_login_data(login) do
-    username = UCS2.from_string(login.username)
+  defp encode_variable_login(login, start_offset) do
+    current_offset = start_offset
 
-    password =
-      login.password
-      |> UCS2.from_string()
-      |> encode_tds_password()
-
-    servername = UCS2.from_string(login.servername)
-    app_name = UCS2.from_string(login.app_name)
+    # Hostname
+    offsets = <<current_offset::ushort, String.length(login.hostname)::ushort>>
     hostname = UCS2.from_string(login.hostname)
+    variable_login = hostname
+    current_offset = current_offset + byte_size(hostname)
 
-    clt_int_name = UCS2.from_string(@clt_int_name)
-    database = UCS2.from_string(login.database)
+    # Username
+    offsets = offsets <> <<current_offset::ushort, String.length(login.username)::ushort>>
+    username = UCS2.from_string(login.username)
+    variable_login = variable_login <> username
+    current_offset = current_offset + byte_size(username)
 
-    hostname <>
-      username <>
-      password <>
-      app_name <>
-      servername <>
-      clt_int_name <>
-      database
-  end
+    # Password
+    offsets = offsets <> <<current_offset::ushort, String.length(login.password)::ushort>>
+    password = UCS2.from_string(login.password)
+    variable_login = variable_login <> encode_tds_password(password)
+    current_offset = current_offset + byte_size(password)
 
-  defp get_offsets(login, curr_offset) do
-    {curr_offset, user_params} =
-      [login.hostname, login.username, login.password, login.app_name, login.servername]
-      |> Enum.reduce({curr_offset, <<>>}, fn elem, {offset, acc} ->
-        {offset + byte_size(UCS2.from_string(elem)),
-         acc <> <<offset::little-size(16)>> <> <<String.length(elem)::little-size(16)>>}
-      end)
+    # App Name
+    offsets = offsets <> <<current_offset::ushort, String.length(login.app_name)::ushort>>
+    app_name = UCS2.from_string(login.app_name)
+    variable_login = variable_login <> app_name
+    current_offset = current_offset + byte_size(app_name)
 
-    ib_unused = <<0::size(16)>>
-    cb_unused = <<0::size(16)>>
+    # Servername
+    offsets = offsets <> <<current_offset::ushort, String.length(login.servername)::ushort>>
+    servername = UCS2.from_string(login.servername)
+    variable_login = variable_login <> servername
+    current_offset = current_offset + byte_size(servername)
 
-    ib_clt_int_name = <<curr_offset::little-size(16)>>
-    cch_clt_int_name = <<4::little-size(16)>>
-    curr_offset = curr_offset + 4 * 2
+    # Unused
+    offsets = offsets <> <<0::ushort, 0::ushort>>
 
-    ib_language = <<0::size(16)>>
-    cch_language = <<0::size(16)>>
+    # Client Int Name
+    variable_login = variable_login <> UCS2.from_string(@clt_int_name)
+    offsets = offsets <> <<current_offset::ushort, 4::ushort>>
+    current_offset = current_offset + 8
 
-    ib_database = <<curr_offset::little-size(16)>>
+    # Language
+    offsets = offsets <> <<0::ushort, 0::ushort>>
 
-    cch_database =
+    # Database
+    variable_login = variable_login <> UCS2.from_string(login.database)
+
+    database =
       if login.database == "" do
-        <<0xAC>>
+        0xAC
       else
-        <<String.length(login.database)::little-size(16)>>
+        String.length(login.database)
       end
 
-    client_id = <<0::size(48)>>
+    offsets = offsets <> <<current_offset::ushort, database::ushort>>
 
-    ib_sspi = <<0::size(16)>>
-    cb_sspi = <<0::size(16)>>
+    # Client ID
+    offsets = offsets <> <<0::sixbyte>>
 
-    ib_atch_db_file = <<0::size(16)>>
-    cch_atch_db_file = <<0::size(16)>>
+    # SSPI
+    offsets = offsets <> <<0::ushort, 0::ushort>>
 
-    ib_change_password = <<0::size(16)>>
-    cch_change_password = <<0::size(16)>>
+    # Attach DB File
+    offsets = offsets <> <<0::ushort, 0::ushort>>
 
-    cb_sspi_long = <<0::size(32)>>
+    # Change password?
+    offsets = offsets <> <<0::ushort, 0::ushort>>
 
-    user_params <>
-      ib_unused <>
-      cb_unused <>
-      ib_clt_int_name <>
-      cch_clt_int_name <>
-      ib_language <>
-      cch_language <>
-      ib_database <>
-      cch_database <>
-      client_id <>
-      ib_sspi <>
-      cb_sspi <>
-      ib_atch_db_file <>
-      cch_atch_db_file <>
-      ib_change_password <>
-      cch_change_password <>
-      cb_sspi_long
+    # SSPI Long
+    offsets = offsets <> <<0::dword>>
+
+    {variable_login, offsets}
   end
 
   defp encode_tds_password(list) do
@@ -181,5 +192,19 @@ defmodule Tds.Protocol.Login7 do
     |> Enum.map_join(&<<&1>>)
   end
 
-  defp default_app_name, do: "Elixir TDS"
+  # Return the current pid
+  # If that fails return a "default" pid
+  defp pid! do
+    value =
+      self()
+      |> :erlang.pid_to_list()
+      |> to_string()
+      |> String.split(".")
+      |> Enum.at(1)
+      |> String.to_integer()
+
+    <<value::dword>>
+  rescue
+    _ -> @client_pid
+  end
 end

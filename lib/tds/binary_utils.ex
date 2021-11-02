@@ -22,6 +22,11 @@ defmodule Tds.BinaryUtils do
   defmacro ushort(), do: quote(do: little - unsigned - 16)
 
   @doc """
+  An unsigned 6-byte (48-bit) value. The range is 0 to (2^48)-1
+  """
+  defmacro sixbyte(), do: quote(do: unsigned - 48)
+
+  @doc """
   A signed 4-byte (32-bit) value. The range is -(2^31) to (2^31)-1.
   """
   defmacro long(), do: quote(do: little - signed - 32)

@@ -30,7 +30,7 @@ defmodule Tds.Protocol.Header do
           | :pre_login
 
   @typedoc """
-  Header flag that should tell if pakcage data that header preceding is end of
+  Header flag that should tell if package data that header preceding is end of
   TDS message or not.
 
   * `:eom` - End of message (EOM). The packet is the last packet in the whole
@@ -38,7 +38,7 @@ defmodule Tds.Protocol.Header do
   * `normal` - Normal message, means that there is more packages comming after
     the one that header is preceding.
   """
-  @type msg_sned_status :: :normal | :eom
+  @type msg_send_status :: :normal | :eom
   @typedoc """
   (Client to SQL server only) Reset this connection before processing event.
   Only set for event types Batch, RPC, or Transaction Manager request
@@ -54,7 +54,7 @@ defmodule Tds.Protocol.Header do
   Tuple that holds decoded package header status flags.
   """
   @type pkg_header_status ::
-          {msg_sned_status, pkg_process, conn_reset}
+          {msg_send_status, pkg_process, conn_reset}
 
   @typedoc """
   Decoded TDS package header
@@ -80,14 +80,9 @@ defmodule Tds.Protocol.Header do
   ]
 
   @spec decode(<<_::64>>) :: t | {:error, any}
-  def decode(<<
-        type::int8,
-        status::int8,
-        length::int16,
-        spid::int16,
-        package::int8,
-        window::int8
-      >>) do
+  def decode(
+        <<type::int8, status::int8, length::int16, spid::int16, package::int8, window::int8>>
+      ) do
     with {^type, pkg_header_type, has_data} <- decode_type(type) do
       {:ok,
        struct!(__MODULE__,
