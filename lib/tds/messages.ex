@@ -1,10 +1,10 @@
 defmodule Tds.Messages do
   import Record, only: [defrecord: 2]
-  import Tds.Utils
   import Tds.Tokens, only: [decode_tokens: 1]
 
   alias Tds.Parameter
   alias Tds.Types
+  alias Tds.UCS2
 
   require Bitwise
   require Logger
@@ -257,7 +257,7 @@ defmodule Tds.Messages do
 
   defp encode(msg_sql(query: q), %{trans: trans}) do
     # convert query to unicodestream
-    q_ucs = to_little_ucs2(q)
+    q_ucs = UCS2.from_string(q)
 
     # Transaction Descriptor header
     header_type = <<2::little-size(2)-unit(8)>>
@@ -408,7 +408,7 @@ defmodule Tds.Messages do
   end
 
   defp encode_rpc_param(%Tds.Parameter{name: name} = param) do
-    p_name = to_little_ucs2(name)
+    p_name = UCS2.from_string(name)
     p_flags = param |> Parameter.option_flags()
     {type_code, type_data, type_attr} = Types.encode_data_type(param)
 

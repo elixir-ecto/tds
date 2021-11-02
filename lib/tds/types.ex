@@ -4,6 +4,7 @@ defmodule Tds.Types do
   use Bitwise
 
   alias Tds.Parameter
+  alias Tds.UCS2
 
   @year_1900_days :calendar.date_to_gregorian_days({1900, 1, 1})
   @secs_in_min 60
@@ -40,7 +41,7 @@ defmodule Tds.Types do
     @tds_data_type_datetime => 8,
     @tds_data_type_float => 8,
     @tds_data_type_smallmoney => 4,
-    @tds_data_type_bigint =>8
+    @tds_data_type_bigint => 8
   }
 
   # Variable-Length Data Types
@@ -702,11 +703,11 @@ defmodule Tds.Types do
   end
 
   def decode_nchar(_data_info, <<data::binary>>) do
-    ucs2_to_utf(data)
+    UCS2.to_string(data)
   end
 
   def decode_xml(_data_info, <<data::binary>>) do
-    ucs2_to_utf(data)
+    UCS2.to_string(data)
   end
 
   def decode_udt(%{}, <<data::binary>>) do
@@ -794,7 +795,7 @@ defmodule Tds.Types do
 
     length =
       if value != nil do
-        value = value |> to_little_ucs2
+        value = value |> UCS2.from_string()
         value_size = byte_size(value)
 
         if value_size == 0 or value_size > 8000 do
@@ -911,7 +912,7 @@ defmodule Tds.Types do
 
   def encode_float_type(%Parameter{value: value} = param)
       when is_float(value) do
-    encode_float_type(%{param | value: to_decimal(value)})
+    encode_float_type(%{param | value: Decimal.from_float(value)})
   end
 
   def encode_float_type(%Parameter{value: %Decimal{} = value}) do
@@ -1135,7 +1136,7 @@ defmodule Tds.Types do
   def encode_float_descriptor(%Parameter{value: value} = param)
       when is_float(value) do
     param
-    |> Map.put(:value, to_decimal(value))
+    |> Map.put(:value, Decimal.from_float(value))
     |> encode_float_descriptor
   end
 
@@ -1185,7 +1186,7 @@ defmodule Tds.Types do
     do: <<@tds_plp_null::little-unsigned-64>>
 
   def encode_data(@tds_data_type_nvarchar, value, _) do
-    value = to_little_ucs2(value)
+    value = UCS2.from_string(value)
     value_size = byte_size(value)
 
     cond do
@@ -1771,9 +1772,9 @@ defmodule Tds.Types do
     >> = tail
 
     schema_info = %{
-      db: ucs2_to_utf(db),
-      prefix: ucs2_to_utf(prefix),
-      schema: ucs2_to_utf(schema)
+      db: UCS2.to_string(db),
+      prefix: UCS2.to_string(prefix),
+      schema: UCS2.to_string(schema)
     }
 
     {schema_info, rest}

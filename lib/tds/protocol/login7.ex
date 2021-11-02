@@ -4,8 +4,7 @@ defmodule Tds.Protocol.Login7 do
 
   See: https://docs.microsoft.com/en-us/openspecs/windows_protocols/ms-tds/773a62b6-ee89-4c02-9e5e-344882630aac
   """
-
-  import Tds.Utils
+  alias Tds.UCS2
 
   @packet_header 0x10
   ## Packet Size
@@ -92,19 +91,19 @@ defmodule Tds.Protocol.Login7 do
   end
 
   defp get_login_data(login) do
-    username = to_little_ucs2(login.username)
+    username = UCS2.from_string(login.username)
 
     password =
       login.password
-      |> to_little_ucs2()
+      |> UCS2.from_string()
       |> encode_tds_password()
 
-    servername = to_little_ucs2(login.servername)
-    app_name = to_little_ucs2(login.app_name)
-    hostname = to_little_ucs2(login.hostname)
+    servername = UCS2.from_string(login.servername)
+    app_name = UCS2.from_string(login.app_name)
+    hostname = UCS2.from_string(login.hostname)
 
-    clt_int_name = to_little_ucs2(@clt_int_name)
-    database = to_little_ucs2(login.database)
+    clt_int_name = UCS2.from_string(@clt_int_name)
+    database = UCS2.from_string(login.database)
 
     hostname <>
       username <>
@@ -119,7 +118,7 @@ defmodule Tds.Protocol.Login7 do
     {curr_offset, user_params} =
       [login.hostname, login.username, login.password, login.app_name, login.servername]
       |> Enum.reduce({curr_offset, <<>>}, fn elem, {offset, acc} ->
-        {offset + byte_size(to_little_ucs2(elem)),
+        {offset + byte_size(UCS2.from_string(elem)),
          acc <> <<offset::little-size(16)>> <> <<String.length(elem)::little-size(16)>>}
       end)
 

@@ -344,7 +344,7 @@ defmodule Tds.Protocol do
         parse_udp(msg, %{s | opts: opts, usock: sock})
 
       {:error, error} ->
-        error(%Tds.Error{message: "udp connect: #{error}"}, s)
+        {:error, %Tds.Error{message: "udp connect: #{error}"}}
     end
   end
 
@@ -376,7 +376,7 @@ defmodule Tds.Protocol do
       end
     else
       {:error, error} ->
-        error(%Tds.Error{message: "tcp connect: #{error}"}, s)
+        {:error, %Tds.Error{message: "tcp connect: #{error}"}}
     end
   end
 
@@ -412,10 +412,7 @@ defmodule Tds.Protocol do
 
     case server do
       nil ->
-        error(%Tds.Error{message: "Instance #{opts[:instance]} not found"}, %{
-          s
-          | usock: nil
-        })
+        {:error, %Tds.Error{message: "Instance #{opts[:instance]} not found"}}
 
       serv ->
         {port, _} = Integer.parse(serv[:tcp])
