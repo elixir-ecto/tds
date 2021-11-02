@@ -10,7 +10,11 @@ defmodule Tds.Types do
   @secs_in_hour 60 * @secs_in_min
   @max_time_scale 7
 
+  # Zero Length Data Types
   @tds_data_type_null 0x1F
+
+  # Fixed Length Data Types
+  # See: https://docs.microsoft.com/en-us/openspecs/windows_protocols/ms-tds/859eb3d2-80d3-40f6-a637-414552c9c552
   @tds_data_type_tinyint 0x30
   @tds_data_type_bit 0x32
   @tds_data_type_smallint 0x34
@@ -23,21 +27,24 @@ defmodule Tds.Types do
   @tds_data_type_smallmoney 0x7A
   @tds_data_type_bigint 0x7F
 
-  @fixed_data_types [
-    @tds_data_type_null,
-    @tds_data_type_tinyint,
-    @tds_data_type_bit,
-    @tds_data_type_smallint,
-    @tds_data_type_int,
-    @tds_data_type_smalldatetime,
-    @tds_data_type_real,
-    @tds_data_type_money,
-    @tds_data_type_datetime,
-    @tds_data_type_float,
-    @tds_data_type_smallmoney,
-    @tds_data_type_bigint
-  ]
+  # Fixed Data Types with their length
+  @fixed_data_types %{
+    @tds_data_type_null => 0,
+    @tds_data_type_tinyint => 1,
+    @tds_data_type_bit => 1,
+    @tds_data_type_smallint => 2,
+    @tds_data_type_int => 4,
+    @tds_data_type_smalldatetime => 4,
+    @tds_data_type_real => 4,
+    @tds_data_type_money => 8,
+    @tds_data_type_datetime => 8,
+    @tds_data_type_float => 8,
+    @tds_data_type_smallmoney => 4,
+    @tds_data_type_bigint =>8
+  }
 
+  # Variable-Length Data Types
+  # See: https://docs.microsoft.com/en-us/openspecs/windows_protocols/ms-tds/ce3183a6-9d89-47e8-a02f-de5a1a1303de
   @tds_data_type_uniqueidentifier 0x24
   @tds_data_type_intn 0x26
   # legacy
@@ -160,42 +167,11 @@ defmodule Tds.Types do
   end
 
   def decode_info(<<data_type_code::unsigned-8, tail::binary>>)
-      when data_type_code in @fixed_data_types do
-    length =
-      cond do
-        data_type_code == @tds_data_type_null ->
-          0
-
-        data_type_code in [
-          @tds_data_type_tinyint,
-          @tds_data_type_bit
-        ] ->
-          1
-
-        data_type_code == @tds_data_type_smallint ->
-          2
-
-        data_type_code in [
-          @tds_data_type_int,
-          @tds_data_type_smalldatetime,
-          @tds_data_type_real,
-          @tds_data_type_smallmoney
-        ] ->
-          4
-
-        data_type_code in [
-          @tds_data_type_datetime,
-          @tds_data_type_float,
-          @tds_data_type_money,
-          @tds_data_type_bigint
-        ] ->
-          8
-      end
-
+      when is_map_key(@fixed_data_types, data_type_code) do
     {%{
        data_type: :fixed,
        data_type_code: data_type_code,
-       length: length,
+       length: @fixed_data_types[data_type_code],
        data_type_name: to_atom(data_type_code)
      }, tail}
   end
