@@ -61,11 +61,11 @@ defmodule Tds.Protocol.Login7 do
     :database
   ]
 
-  def encode(opts) do
+  def new(opts) do
     # gethostname/0 always succeeds
     {:ok, hostname} = :inet.gethostname()
 
-    login = %__MODULE__{
+    %__MODULE__{
       tds_version: @max_supported_tds_version,
       packet_size: <<@tds_pack_size::little-size(4)-unit(8)>>,
       hostname: to_string(hostname),
@@ -84,7 +84,9 @@ defmodule Tds.Protocol.Login7 do
       servername: opts[:hostname],
       database: Keyword.get(opts, :database, "")
     }
+  end
 
+  def encode(%__MODULE__{} = login) do
     # Fixed login configuration
     fixed_login = fixed_login(login)
     {variable_login, offsets} = encode_variable_login(login, byte_size(fixed_login) + 62)

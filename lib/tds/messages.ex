@@ -3,6 +3,7 @@ defmodule Tds.Messages do
   import Tds.Tokens, only: [decode_tokens: 1]
 
   alias Tds.Parameter
+  alias Tds.Protocol.{Login7, Prelogin}
   alias Tds.Types
   alias Tds.UCS2
 
@@ -244,11 +245,13 @@ defmodule Tds.Messages do
   end
 
   defp encode(msg_prelogin(params: opts), _env) do
-    Tds.Protocol.Prelogin.encode(opts)
+    Prelogin.encode(opts)
   end
 
   defp encode(msg_login(params: opts), _env) do
-    Tds.Protocol.Login7.encode(opts)
+    opts
+    |> Login7.new()
+    |> Login7.encode()
   end
 
   defp encode(msg_attn(), _s) do

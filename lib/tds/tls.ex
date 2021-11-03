@@ -7,10 +7,12 @@ defmodule Tds.Tls do
   import Kernel, except: [send: 2]
   import Tds.BinaryUtils
 
+  @default_ssl_opts  [active: false, cb_info: {Tds.Tls, :tcp, :tcp_closed, :tcp_error}]
+
   defstruct [:socket, :ssl_opts, :owner_pid, :handshake?, :buffer]
 
   def connect(socket, ssl_opts) do
-    ssl_opts = ssl_opts ++ [active: false, cb_info: {Tds.Tls, :tcp, :tcp_closed, :tcp_error}]
+    ssl_opts = ssl_opts ++ @default_ssl_opts
     :inet.setopts(socket, active: false)
 
     with {:ok, pid} <- GenServer.start_link(__MODULE__, {socket, ssl_opts}, []),
@@ -194,7 +196,7 @@ defmodule Tds.Tls do
     {:noreply, s}
   end
 
-  def handle_info({:tcp_passive, _port} = msg, %{owner_pid: pid} = s) do
+  def handle_info({:tcp_passive, _port} = msg, %{owner_pid: pid, handshake?: false, buffer: nil} = s) do
     Kernel.send(pid, msg)
     {:noreply, s}
   end
