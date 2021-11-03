@@ -1,6 +1,8 @@
 defmodule MessagesTest do
   use ExUnit.Case, async: true
 
+  alias Tds.Messages
+
   describe "encode_packets" do
     test "data length < 4088 is encoded into one packet" do
       assert [
@@ -22,7 +24,7 @@ defmodule MessagesTest do
                  # data
                  0xFF
                >>
-             ] == Tds.Messages.encode_packets(0x10, <<0xFF>>)
+             ] == Messages.encode_packets(0x10, <<0xFF>>)
     end
 
     test "data length == 4087 is encoded into one packet" do
@@ -46,7 +48,7 @@ defmodule MessagesTest do
                  0x0,
                  data::binary
                >>
-             ] == Tds.Messages.encode_packets(0x10, data)
+             ] == Messages.encode_packets(0x10, data)
     end
 
     test "data length == 4088 is encoded into one packet" do
@@ -75,7 +77,7 @@ defmodule MessagesTest do
                    data::binary
                  >>
                ]
-             ] == Tds.Messages.encode_packets(0x10, data)
+             ] == Messages.encode_packets(0x10, data)
     end
 
     test "data length == 4089 is encoded into two packets " do
@@ -124,7 +126,7 @@ defmodule MessagesTest do
                  # data
                  0xFF
                >>
-             ] == Tds.Messages.encode_packets(0x10, data)
+             ] == Messages.encode_packets(0x10, data)
     end
   end
 end
