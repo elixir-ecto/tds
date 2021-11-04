@@ -63,10 +63,7 @@ defmodule Tds.Messages do
 
   ## Parsers
   def parse(:prelogin, packet_data, s) do
-    response =
-      packet_data
-      |> Tds.Protocol.Prelogin.decode(s)
-
+    response = Prelogin.decode(packet_data, s)
     {msg_preloginack(response: response), s}
   end
 
