@@ -1,7 +1,7 @@
 # Changelog
-## v2.3.0-dev
+## v2.3.0-rc.0
 ### Improvements
-* Add support for SSL / TLS connections
+* Add initial support for SSL / TLS connections
 
 ## v2.2.0
 ### BugFix
