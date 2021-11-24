@@ -10,7 +10,13 @@ defmodule Tds.UCS2 do
   @doc """
   Converts a UTF-8 string into UCS-2
   """
-  @spec from_string(binary) :: binary
+  @spec from_string(binary | list) :: binary
+  def from_string(list) when is_list(list) do
+    list
+    |> IO.iodata_to_binary()
+    |> Utils.encode_chars(@ucs2_charset)
+  end
+
   def from_string(string) when is_binary(string) do
     Utils.encode_chars(string, @ucs2_charset)
   end
