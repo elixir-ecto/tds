@@ -1,4 +1,10 @@
 # Changelog
+
+## v2.3.0-rc.1
+### Fixes
+* Add `:crypto` to `extra_applications`
+* Fix missing `UCS.from_string` for list inputs
+  
 ## v2.3.0-rc.0
 ### Improvements
 * Add initial support for SSL / TLS connections
