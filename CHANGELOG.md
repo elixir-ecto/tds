@@ -1,5 +1,8 @@
 # Changelog
 
+## v2.3.0
+
+* No changes since v2.3.0-rc.1
 ## v2.3.0-rc.1
 ### Fixes
 * Add `:crypto` to `extra_applications`
