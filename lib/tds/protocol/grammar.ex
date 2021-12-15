@@ -135,5 +135,4 @@ defmodule Tds.Protocol.Grammar do
   defmacro unicodechar(n \\ 1), do: quote(do: size(unquote(n)) - unit(16))
 
   defmacro bigbinary(n), do: quote(do: binary - size(unquote(n)) - unit(8))
-
 end

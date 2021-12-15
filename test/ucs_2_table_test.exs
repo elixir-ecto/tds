@@ -3,8 +3,7 @@ defmodule Tds.Ucs2TableTest do
   import Tds.TestHelper
 
   setup do
-    opts = Application.fetch_env!(:tds, :opts)
-    {:ok, pid} = Tds.start_link(opts)
+    {:ok, pid} = Tds.start_link(opts())
     {:ok, [pid: pid]}
   end
 
@@ -18,17 +17,20 @@ defmodule Tds.Ucs2TableTest do
       case String.split(line, "  ") do
         [<<?[, char::utf8, ?]>>, code_hex, title] ->
           {code, ""} = Integer.parse(code_hex, 16)
-          [[
-            <<char::utf8>>,
-            "0x" <> Base.encode16(<<code::little-size(2)-unit(8)>>, case: :upper),
-            String.trim_trailing(title, "\n")
-            ]]
+
+          [
+            [
+              <<char::utf8>>,
+              "0x" <> Base.encode16(<<code::little-size(2)-unit(8)>>, case: :upper),
+              String.trim_trailing(title, "\n")
+            ]
+          ]
 
         _ ->
           []
       end
     end)
-    |> Stream.chunk_every(100)
+    |> Stream.chunk_every(2048)
     |> Enum.each(fn chunk ->
       sql =
         chunk

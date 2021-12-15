@@ -6,8 +6,7 @@ defmodule QueryTest do
   @tag timeout: 50000
 
   setup do
-    opts = Application.fetch_env!(:tds, :opts)
-    {:ok, pid} = Tds.start_link(opts)
+    {:ok, pid} = Tds.start_link(opts())
 
     {:ok, [pid: pid]}
   end
@@ -78,8 +77,7 @@ defmodule QueryTest do
     assert [[1, 1]] = query("SELECT 1, 1", [])
     assert [[-1]] = query("SELECT -1", [])
 
-    assert [[10_000_000_000_000]] =
-             query("select CAST(10000000000000 AS bigint)", [])
+    assert [[10_000_000_000_000]] = query("select CAST(10000000000000 AS bigint)", [])
 
     assert [["string"]] = query("SELECT 'string'", [])
 
@@ -90,6 +88,7 @@ defmodule QueryTest do
     assert [[true, false]] = query("SELECT CAST(1 AS BIT), CAST(0 AS BIT)", [])
     uuid = Tds.Types.UUID.bingenerate()
     {:ok, uuid_string} = Tds.Types.UUID.load(uuid)
+
     assert [[^uuid]] =
              query(
                """
@@ -147,9 +146,7 @@ defmodule QueryTest do
 
   describe "execution mode" do
     test ":prepare_execute" do
-      opts =
-        Application.fetch_env!(:tds, :opts)
-        |> Keyword.put(:execution_mode, :prepare_execute)
+      opts = Keyword.put(opts(), :execution_mode, :prepare_execute)
 
       {:ok, pid} = Tds.start_link(opts)
       context = [pid: pid]
@@ -160,7 +157,7 @@ defmodule QueryTest do
 
     test ":executesql" do
       opts =
-        Application.fetch_env!(:tds, :opts)
+        opts()
         |> Keyword.put(:execution_mode, :executesql)
 
       {:ok, pid} = Tds.start_link(opts)
@@ -171,17 +168,17 @@ defmodule QueryTest do
     end
 
     test "unknown errors out" do
-      opts =
-        Application.fetch_env!(:tds, :opts)
-        |> Keyword.put(:execution_mode, :invalid)
+      opts = Keyword.put(opts(), :execution_mode, :invalid)
 
       {:ok, pid} = Tds.start_link(opts)
       context = [pid: pid]
 
       params = [%Tds.Parameter{name: "@1", value: 1}]
+
       assert %Tds.Error{
-        message: "Unknown execution mode :invalid, please check your config.Supported modes are :prepare_execute and :executesql"
-      } = query("SELECT 1 WHERE 1 = @1", params, opts)
+               message:
+                 "Unknown execution mode :invalid, please check your config.Supported modes are :prepare_execute and :executesql"
+             } = query("SELECT 1 WHERE 1 = @1", params, opts)
     end
   end
 end

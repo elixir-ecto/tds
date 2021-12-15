@@ -8,10 +8,8 @@ defmodule RPCTest do
   @tag timeout: 50_000
 
   setup do
-    opts = Application.fetch_env!(:tds, :opts)
-
     # |> Keyword.put(:after_connect, {Tds, :query!, ["SET TRANSACTION ISOLATION LEVEL READ UNCOMMITTED", []]})
-    {:ok, pid} = Tds.start_link(opts)
+    {:ok, pid} = Tds.start_link(opts())
 
     {:ok, [pid: pid]}
   end
@@ -104,6 +102,7 @@ defmodule RPCTest do
                query("SELECT @1", [
                  %Parameter{name: "@1", value: Decimal.new("1.0")}
                ])
+
       assert [[Decimal.new("1")]] ==
                query("SELECT @1", [
                  %Parameter{name: "@1", value: Decimal.new("1")}
@@ -129,6 +128,7 @@ defmodule RPCTest do
 
     test "with nvarchar strings", context do
       Application.put_env(:tds, :text_encoder, Tds.Encoding)
+
       strs = [
         "hello",
         "'",

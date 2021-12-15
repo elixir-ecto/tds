@@ -1,26 +1,23 @@
 defmodule Tds.Version do
   import Tds.Protocol.Grammar
 
-  defstruct version: 0x74000004, str_version: "7.4"
+  @default_version :v7_4
+  @default_code 0x74000004
 
   @versions [
-    {0x71000001, "7.1"},
-    {0x72090002, "7.2"},
-    {0x730A0003, "7.3.A"},
-    {0x730B0003, "7.3.B"},
-    {0x74000004, "7.4"}
+    {0x71000001, :v7_1},
+    {0x72090002, :v7_2},
+    {0x730A0003, :v7_3_a},
+    {0x730B0003, :v7_3_b},
+    {0x74000004, :v7_4}
   ]
 
   def decode(<<key::little-dword>>) do
-    @versions
-    |> List.keyfind(key, 0, "7.4")
+    List.keyfind(@versions, key, 0, @default_version)
   end
 
   def encode(ver) do
-    val =
-      @versions
-      |> List.keyfind(ver, 1, 0x74000004)
-
+    val = List.keyfind(@versions, ver, 1, @default_code)
     <<val::little-dword>>
   end
 end

@@ -1,17 +1,9 @@
 # Tds - MSSQL Driver for Elixir
 
 [![Hex.pm](https://img.shields.io/hexpm/v/tds.svg)](https://hex.pm/packages/tds) 
-[![Coverage Status](https://coveralls.io/repos/github/livehelpnow/tds/badge.svg?branch=support-1.1)](https://coveralls.io/github/livehelpnow/tds?branch=master)
-![Elixir TDS CI](https://github.com/livehelpnow/tds/workflows/Elixir%20TDS%20CI/badge.svg)
+![Elixir TDS CI](https://github.com/elixir-ecto/tds/workflows/Elixir%20TDS%20CI/badge.svg)
 
 MSSQL / TDS Database driver for Elixir.
-
-### NOTE: 
-Since TDS version 2.0, `tds_ecto` package is deprecated, this version supports `ecto_sql` since version 3.3.4. 
-
-Please check out the issues for a more complete overview. This branch should not be considered stable or ready for production yet.
-
-For stable versions always use [hex.pm](https://hex.pm/packages/tds) as source for your mix.exs!!!
 
 ## Usage
 
@@ -98,6 +90,35 @@ This will skip calling `sp_prepare` and query will be executed using `sp_execute
 Please note that only one execution mode can be set at a time, and SQL Server will probably 
 use single execution plan (since it is NOT estimated by checking data density!).
 
+## SSL / TLS support
+
+tds `>= 2.3.0` supports encrypted connections to the SQL Server.
+
+The following encryption behaviours are currently supported:
+
+- `:required`: Requires the server to use TLS
+- `:on`: Same as required
+- `:not_supported`: Indicates to the server that encryption is not supported. If server requires encryption, the connection will not be established.
+
+Currently not supported:
+
+- `:off`: This setting allows the server to upgrade the connection (if server encryption is `:on` or `:required`) and only encrypts the LOGIN packet when the server has encryption set to `:off`.
+- `:client_cert`: This will make the server check the client cerfiticate.
+
+Setting `ssl: true` or `ssl: false` is also allowed. In that case `true` is mapped to `:required` and `false` to `:not_supported`.
+
+```elixir
+config :your_app, :tds_conn,
+  hostname: "localhost",
+  username: "test_user",
+  password: "test_password",
+  database: "test_db",
+  ssl: :required,
+  port: 1433,
+  execution_mode: :executesql
+
+```
+
 ## Connecting to SQL Server Instances
 
 Tds supports SQL Server instances by passing `instance: "instancename"` to the connection options.
@@ -171,7 +192,7 @@ To convert a big-endian UUID string to a mixed-endian binary, use
 Clone and compile Tds with:
 
 ```bash
-git clone https://github.com/livehelpnow/tds.git
+git clone https://github.com/elixir-ecto/tds.git
 cd tds
 mix deps.get
 ```

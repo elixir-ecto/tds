@@ -1,10 +1,12 @@
 defmodule Tds.Query do
-  @moduledoc false
+  @moduledoc """
+  TDS query encoding and decoding
+  """
 
   @type t :: %__MODULE__{
-    statement: String.t,
-    handle: term
-  }
+          statement: String.t(),
+          handle: term
+        }
 
   defstruct [:statement, :handle]
 end

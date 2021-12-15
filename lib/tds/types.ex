@@ -5,13 +5,19 @@ defmodule Tds.Types do
 
   alias Tds.Parameter
   alias Tds.Column
+  alias Tds.UCS2
+
 
   @year_1900_days :calendar.date_to_gregorian_days({1900, 1, 1})
   @secs_in_min 60
   @secs_in_hour 60 * @secs_in_min
   @max_time_scale 7
 
+  # Zero Length Data Types
   @tds_data_type_null 0x1F
+
+  # Fixed Length Data Types
+  # See: https://docs.microsoft.com/en-us/openspecs/windows_protocols/ms-tds/859eb3d2-80d3-40f6-a637-414552c9c552
   @tds_data_type_tinyint 0x30
   @tds_data_type_bit 0x32
   @tds_data_type_smallint 0x34
@@ -24,21 +30,24 @@ defmodule Tds.Types do
   @tds_data_type_smallmoney 0x7A
   @tds_data_type_bigint 0x7F
 
-  @fixed_data_types [
-    @tds_data_type_null,
-    @tds_data_type_tinyint,
-    @tds_data_type_bit,
-    @tds_data_type_smallint,
-    @tds_data_type_int,
-    @tds_data_type_smalldatetime,
-    @tds_data_type_real,
-    @tds_data_type_money,
-    @tds_data_type_datetime,
-    @tds_data_type_float,
-    @tds_data_type_smallmoney,
-    @tds_data_type_bigint
-  ]
+  # Fixed Data Types with their length
+  @fixed_data_types %{
+    @tds_data_type_null => 0,
+    @tds_data_type_tinyint => 1,
+    @tds_data_type_bit => 1,
+    @tds_data_type_smallint => 2,
+    @tds_data_type_int => 4,
+    @tds_data_type_smalldatetime => 4,
+    @tds_data_type_real => 4,
+    @tds_data_type_money => 8,
+    @tds_data_type_datetime => 8,
+    @tds_data_type_float => 8,
+    @tds_data_type_smallmoney => 4,
+    @tds_data_type_bigint => 8
+  }
 
+  # Variable-Length Data Types
+  # See: https://docs.microsoft.com/en-us/openspecs/windows_protocols/ms-tds/ce3183a6-9d89-47e8-a02f-de5a1a1303de
   @tds_data_type_uniqueidentifier 0x24
   @tds_data_type_intn 0x26
   # legacy
@@ -162,42 +171,11 @@ defmodule Tds.Types do
   end
 
   def decode_info(<<data_type_code::unsigned-8, tail::binary>>)
-      when data_type_code in @fixed_data_types do
-    length =
-      cond do
-        data_type_code == @tds_data_type_null ->
-          0
-
-        data_type_code in [
-          @tds_data_type_tinyint,
-          @tds_data_type_bit
-        ] ->
-          1
-
-        data_type_code == @tds_data_type_smallint ->
-          2
-
-        data_type_code in [
-          @tds_data_type_int,
-          @tds_data_type_smalldatetime,
-          @tds_data_type_real,
-          @tds_data_type_smallmoney
-        ] ->
-          4
-
-        data_type_code in [
-          @tds_data_type_datetime,
-          @tds_data_type_float,
-          @tds_data_type_money,
-          @tds_data_type_bigint
-        ] ->
-          8
-      end
-
+      when is_map_key(@fixed_data_types, data_type_code) do
     {%{
        data_type: :fixed,
        data_type_code: data_type_code,
-       length: length,
+       length: @fixed_data_types[data_type_code],
        data_type_name: to_atom(data_type_code)
      }, tail}
   end
@@ -374,8 +352,7 @@ defmodule Tds.Types do
             1..numparts,
             rest,
             fn _,
-               <<tsize::little-unsigned-16,
-                 _table_name::binary-size(tsize)-unit(16),
+               <<tsize::little-unsigned-16, _table_name::binary-size(tsize)-unit(16),
                  next_rest::binary>> ->
               next_rest
             end
@@ -698,9 +675,7 @@ defmodule Tds.Types do
   # UUID
   def decode_uuid(<<_::128>> = bin), do: bin
 
-  def encode_uuid(
-        <<_::64, ?-, _::32, ?-, _::32, ?-, _::32, ?-, _::96>> = string
-      ) do
+  def encode_uuid(<<_::64, ?-, _::32, ?-, _::32, ?-, _::32, ?-, _::96>> = string) do
     raise ArgumentError,
           "trying to load string UUID as Tds.Types.UUID: #{inspect(string)}. " <>
             "Maybe you wanted to declare :uuid as your database field?"
@@ -731,11 +706,11 @@ defmodule Tds.Types do
   end
 
   def decode_nchar(_data_info, <<data::binary>>) do
-    ucs2_to_utf(data)
+    UCS2.to_string(data)
   end
 
   def decode_xml(_data_info, <<data::binary>>) do
-    ucs2_to_utf(data)
+    UCS2.to_string(data)
   end
 
   def decode_udt(%{}, <<data::binary>>) do
@@ -830,7 +805,7 @@ defmodule Tds.Types do
 
     length =
       if value != nil do
-        value = value |> to_little_ucs2
+        value = value |> UCS2.from_string()
         value_size = byte_size(value)
 
         if value_size == 0 or value_size > 8000 do
@@ -947,7 +922,7 @@ defmodule Tds.Types do
 
   def encode_float_type(%Parameter{value: value} = param)
       when is_float(value) do
-    encode_float_type(%{param | value: to_decimal(value)})
+    encode_float_type(%{param | value: Decimal.from_float(value)})
   end
 
   def encode_float_type(%Parameter{value: %Decimal{} = value}) do
@@ -998,9 +973,7 @@ defmodule Tds.Types do
   @doc """
   Creates the Parameter Descriptor for the selected type
   """
-  def encode_param_descriptor(
-        %Parameter{name: name, value: value, type: type} = param
-      )
+  def encode_param_descriptor(%Parameter{name: name, value: value, type: type} = param)
       when type != nil do
     desc =
       case type do
@@ -1163,9 +1136,7 @@ defmodule Tds.Types do
   end
 
   # Decimal.new/0 is undefined -- modifying params to hopefully fix
-  def encode_decimal_descriptor(
-        %Parameter{type: :decimal, value: value} = param
-      ) do
+  def encode_decimal_descriptor(%Parameter{type: :decimal, value: value} = param) do
     encode_decimal_descriptor(%{param | value: Decimal.new(value)})
   end
 
@@ -1177,7 +1148,7 @@ defmodule Tds.Types do
   def encode_float_descriptor(%Parameter{value: value} = param)
       when is_float(value) do
     param
-    |> Map.put(:value, to_decimal(value))
+    |> Map.put(:value, Decimal.from_float(value))
     |> encode_float_descriptor
   end
 
@@ -1310,7 +1281,7 @@ defmodule Tds.Types do
     do: <<@tds_plp_null::little-unsigned-64>>
 
   def encode_data(@tds_data_type_nvarchar, value, _) do
-    value = to_little_ucs2(value)
+    value = UCS2.from_string(value)
     value_size = byte_size(value)
 
     cond do
@@ -1345,9 +1316,9 @@ defmodule Tds.Types do
   end
 
   def encode_data(@tds_data_type_floatn, value, _) do
-    # d_ctx = Decimal.get_context()
+    # d_ctx = Decimal.Context.get()
     # d_ctx = %{d_ctx | precision: 38}
-    # Decimal.set_context(d_ctx)
+    # Decimal.Context.set(d_ctx)
 
     # value_list =
     #   value
@@ -1445,7 +1416,7 @@ defmodule Tds.Types do
   end
 
   def encode_data(@tds_data_type_timen, value, _attr) do
-    # Logger.debug "encode_data_timen"
+    # Logger.debug"encode_data_timen"
     {data, scale} = encode_time(value)
     # Logger.debug "#{inspect data}"
     if data == nil do
@@ -1730,8 +1701,7 @@ defmodule Tds.Types do
     # 10^scale fs in 1 sec
     fs_per_sec = trunc(:math.pow(10, scale))
 
-    fsec =
-      hour * 3600 * fs_per_sec + min * 60 * fs_per_sec + sec * fs_per_sec + fsec
+    fsec = hour * 3600 * fs_per_sec + min * 60 * fs_per_sec + sec * fs_per_sec + fsec
 
     bin =
       cond do
@@ -1897,9 +1867,9 @@ defmodule Tds.Types do
     >> = tail
 
     schema_info = %{
-      db: ucs2_to_utf(db),
-      prefix: ucs2_to_utf(prefix),
-      schema: ucs2_to_utf(schema)
+      db: UCS2.to_string(db),
+      prefix: UCS2.to_string(prefix),
+      schema: UCS2.to_string(schema)
     }
 
     {schema_info, rest}

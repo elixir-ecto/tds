@@ -87,7 +87,7 @@ defmodule Tds do
   Executes statement that can contain multiple sql batches, result will contain
   all results that server yield for each batch.
   """
-  @spec query_multi(conn(), iodata(), option(), [execute_option]) ::
+  @spec query_multi(conn, iodata, list, [execute_option]) ::
           {:ok, resultset()}
           | {:error, Exception.t()}
   def query_multi(conn, statemnt, params, opts \\ []) do

@@ -75,7 +75,8 @@ defmodule BinaryTest do
     ],
     [
       "Indic_General_100_CI_AS",
-      "कः खगौघाङचिच्छौजा झाञ्ज्ञोऽटौठीडडण्ढणः। तथोदधीन् पफ र्बाभीर्मयोऽरिल्वाशिषां सहः।।"],
+      "कः खगौघाङचिच्छौजा झाञ्ज्ञोऽटौठीडडण्ढणः। तथोदधीन् पफ र्बाभीर्मयोऽरिल्वाशिषां सहः।।"
+    ],
     [
       "Serbian_Latin_100_CI_AS",
       "Gojazni đačić s biciklom drži hmelj i finu vatu u džepu nošnje"
@@ -89,8 +90,7 @@ defmodule BinaryTest do
   @tag timeout: 50000
 
   setup do
-    opts = Application.fetch_env!(:tds, :opts)
-    {:ok, pid} = Tds.start_link(opts)
+    {:ok, pid} = Tds.start_link(opts())
 
     {:ok, [pid: pid]}
   end
@@ -240,8 +240,7 @@ defmodule BinaryTest do
       params
     )
 
-    assert [[nil, nil, nil, nil, nil, nil]] =
-             query("SELECT TOP(1) * FROM bin_test", [])
+    assert [[nil, nil, nil, nil, nil, nil]] = query("SELECT TOP(1) * FROM bin_test", [])
   end
 
   test "strings as nvarchar", context do
