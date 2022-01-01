@@ -1,27 +1,24 @@
 defmodule Tds.Mixfile do
-  @moduledoc false
   use Mix.Project
 
+  @source_url "https://github.com/elixir-ecto/tds"
   @version "2.3.0"
+
   def project do
     [
       app: :tds,
       version: @version,
       elixir: "~> 1.0",
+      name: "Tds",
       deps: deps(),
-      description: description(),
+      docs: docs(),
       package: package(),
       xref: [exclude: [:ssl]],
       rustler_crates: [
         tds_encoding: [
           mode: if(Mix.env() == :prod, do: :release, else: :debug)
         ]
-      ],
-
-      # Docs
-      name: "Tds",
-      source_url: "https://github.com/livehelpnow/tds",
-      docs: docs()
+      ]
     ]
   end
 
@@ -46,32 +43,28 @@ defmodule Tds.Mixfile do
     ]
   end
 
-  defp description do
-    """
-    Microsoft SQL Server client (Elixir implementation of the MS TDS protocol)
-    """
+  defp package do
+    [
+      description: "Microsoft SQL Server client (Elixir implementation of the MS TDS protocol)",
+      name: "tds",
+      files: ["lib", "mix.exs", "README*", "CHANGELOG*", "LICENSE*"],
+      maintainers: ["Eric Witchin", "Milan Jaric"],
+      licenses: ["Apache-2.0"],
+      links: %{"Github" => @source_url}
+    ]
   end
 
   defp docs do
     [
       extras: [
-        "CHANGELOG.md": [title: "Changelog"],
+        "CHANGELOG.md": [],
+        LICENSE: [title: "License"],
         "README.md": [title: "Overview"]
       ],
       main: "readme",
+      source_url: @source_url,
       source_ref: "v#{@version}",
-      source_url: "https://github.com/livehelpnow/tds",
       formatters: ["html"]
-    ]
-  end
-
-  defp package do
-    [
-      name: "tds",
-      files: ["lib", "mix.exs", "README*"],
-      maintainers: ["Eric Witchin", "Milan Jaric"],
-      licenses: ["Apache 2.0"],
-      links: %{"Github" => "https://github.com/livehelpnow/tds"}
     ]
   end
 end

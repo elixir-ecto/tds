@@ -7,10 +7,12 @@ defmodule Tds do
   Tabular Data Stream Protocol.
 
   A Tds query is performed in separate server-side prepare and execute stages.
+
   At the moment query handle is not reused, but there is plan to cahce handles in
   near feature. It uses [RPC](https://docs.microsoft.com/en-us/openspecs/windows_protocols/ms-tds/619c43b6-9495-4a58-9e49-a4950db245b3)
   requests by default to `Sp_Prepare` (ProcId=11) and `Sp_Execute` (ProcId=12)
   query, but it is possible to configure driver to use only Sp_ExecuteSql.
+
   Please consult with [configuration](readme.html#configuration) how to do this.
   """
   alias Tds.Query
@@ -84,7 +86,7 @@ defmodule Tds do
   end
 
   @doc """
-  Executes statement that can contain multiple sql batches, result will contain
+  Executes statement that can contain multiple SQL batches, result will contain
   all results that server yield for each batch.
   """
   @spec query_multi(conn, iodata, list, [execute_option]) ::
@@ -205,12 +207,12 @@ defmodule Tds do
   def generate_uuid(), do: Tds.Types.UUID.bingenerate()
 
   @doc """
-  Decodes MS uniqueidentifier binary to its string representation
+  Decodes MS uniqueidentifier binary to its string representation.
   """
   def decode_uuid(uuid), do: Tds.Types.UUID.load(uuid)
 
   @doc """
-  Same as `decode_uuid/1` but raises `ArgumentError` if value is invalid
+  Same as `decode_uuid/1` but raises `ArgumentError` if value is invalid.
   """
   def decode_uuid!(uuid) do
     case Tds.Types.UUID.load(uuid) do
@@ -223,13 +225,13 @@ defmodule Tds do
   end
 
   @doc """
-  Encodes uuid string into MS uniqueidentifier binary
+  Encodes UUID string into MS uniqueidentifier binary.
   """
   @spec encode_uuid(any) :: :error | {:ok, <<_::128>>}
   def encode_uuid(value), do: Tds.Types.UUID.dump(value)
 
   @doc """
-  Same as `encode_uuid/1` but raises `ArgumentError` if value is invalid
+  Same as `encode_uuid/1` but raises `ArgumentError` if value is invalid.
   """
   @spec encode_uuid!(any) :: <<_::128>>
   def encode_uuid!(value), do: Tds.Types.UUID.dump!(value)
