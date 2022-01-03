@@ -103,7 +103,7 @@ defmodule Tds.TestHelper do
   end
 
   def assert_sqlcmd! do
-    if System.cmd("command", ["-v", "sqlcmd"]) |> elem(1) == 1 do
+    if System.shell("command -v sqlcmd") |> elem(1) != 0 do
       IO.puts """
       sqlcmd not installed!
 
