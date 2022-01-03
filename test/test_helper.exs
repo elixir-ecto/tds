@@ -101,10 +101,41 @@ defmodule Tds.TestHelper do
 
     System.cmd("sqlcmd", args, stderr_to_stdout: true)
   end
+
+  def assert_sqlcmd! do
+    if System.cmd("command", ["-v", "sqlcmd"]) |> elem(1) == 1 do
+      IO.puts """
+      sqlcmd not installed!
+
+      To install it, follow these instructions:
+
+      macOS:
+        brew tap microsoft/mssql-release https://github.com/Microsoft/homebrew-mssql-release
+        brew update
+        brew install mssql-tools
+
+      Ubuntu:
+        curl https://packages.microsoft.com/keys/microsoft.asc | sudo apt-key add -
+        curl https://packages.microsoft.com/config/ubuntu/16.04/prod.list | sudo tee /etc/apt/sources.list.d/msprod.list
+        sudo apt-get update
+        sudo apt-get install mssql-tools unixodbc-dev
+        echo 'export PATH="$PATH:/opt/mssql-tools/bin"' >> ~/.bashrc
+        source ~/.bashrc
+
+      For other OS check:
+        https://docs.microsoft.com/en-us/sql/linux/sql-server-linux-setup-tools?view=sql-server-ver15
+      """
+
+
+      System.halt(1)
+    end
+  end
 end
 
 opts = Tds.TestHelper.opts()
 database = opts[:database]
+
+Tds.TestHelper.assert_sqlcmd!()
 
 case Tds.TestHelper.sqlcmd(opts, """
      IF EXISTS(SELECT * FROM sys.databases where name = '#{database}')
