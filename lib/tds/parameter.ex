@@ -57,6 +57,7 @@ defmodule Tds.Parameter do
 
   def do_name([param | tail], name, acc) do
     name = name + 1
+
     param =
       case param do
         %Tds.Parameter{name: nil} -> fix_data_type(%{param | name: "@#{name}"})
@@ -140,9 +141,7 @@ defmodule Tds.Parameter do
     %{param | type: :datetime}
   end
 
-  def fix_data_type(
-        %Tds.Parameter{value: %NaiveDateTime{microsecond: {_, s}}} = param
-      ) do
+  def fix_data_type(%Tds.Parameter{value: %NaiveDateTime{microsecond: {_, s}}} = param) do
     type = if s > 3, do: :datetime2, else: :datetime
     %{param | type: type}
   end
@@ -158,9 +157,7 @@ defmodule Tds.Parameter do
     %{param | type: :datetimeoffset}
   end
 
-  def fix_data_type(
-        %Tds.Parameter{value: {{_y, _m, _d}, _time, _offset}} = param
-      ) do
+  def fix_data_type(%Tds.Parameter{value: {{_y, _m, _d}, _time, _offset}} = param) do
     %{param | type: :datetimeoffset}
   end
 

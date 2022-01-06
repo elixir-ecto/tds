@@ -1,11 +1,11 @@
 defmodule Tds.Tokens do
   import Tds.BinaryUtils
-  import Tds.Utils
   import Bitwise
 
   require Logger
 
   alias Tds.Types
+  alias Tds.UCS2
 
   def retval_typ_size(38) do
     # 0x26 - SYBINTN - 1
@@ -86,7 +86,7 @@ defmodule Tds.Tokens do
       data::binary
     >> = bin
 
-    name = ucs2_to_utf(name)
+    name = UCS2.to_string(name)
     {type_info, tail} = Tds.Types.decode_info(data)
     {value, tail} = Tds.Types.decode_data(type_info, tail)
     param = %Tds.Parameter{name: name, value: value, direction: :output}
@@ -138,9 +138,9 @@ defmodule Tds.Tokens do
       number: number,
       state: state,
       class: class,
-      msg_text: ucs2_to_utf(:binary.copy(msg)),
-      server_name: ucs2_to_utf(:binary.copy(server_name)),
-      proc_name: ucs2_to_utf(:binary.copy(proc_name)),
+      msg_text: UCS2.to_string(:binary.copy(msg)),
+      server_name: UCS2.to_string(:binary.copy(server_name)),
+      proc_name: UCS2.to_string(:binary.copy(proc_name)),
       line_number: line_number
     }
 
@@ -170,9 +170,9 @@ defmodule Tds.Tokens do
       number: number,
       state: state,
       class: class,
-      msg_text: ucs2_to_utf(msg),
-      server_name: ucs2_to_utf(server_name),
-      proc_name: ucs2_to_utf(proc_name),
+      msg_text: UCS2.to_string(msg),
+      server_name: UCS2.to_string(server_name),
+      proc_name: UCS2.to_string(proc_name),
       line_number: line_number
     }
 
@@ -227,8 +227,8 @@ defmodule Tds.Tokens do
             rest::binary
           >> = tail
 
-          new_database = ucs2_to_utf(new_value)
-          old_database = ucs2_to_utf(old_value)
+          new_database = UCS2.to_string(new_value)
+          old_database = UCS2.to_string(old_value)
           {{:database, new_database, old_database}, rest}
 
         0x02 ->
@@ -240,8 +240,8 @@ defmodule Tds.Tokens do
             rest::binary
           >> = tail
 
-          new_language = ucs2_to_utf(new_value)
-          old_language = ucs2_to_utf(old_value)
+          new_language = UCS2.to_string(new_value)
+          old_language = UCS2.to_string(old_value)
           {{:language, new_language, old_language}, rest}
 
         0x03 ->
@@ -253,8 +253,8 @@ defmodule Tds.Tokens do
             rest::binary
           >> = tail
 
-          new_charset = ucs2_to_utf(new_value)
-          old_charset = ucs2_to_utf(old_value)
+          new_charset = UCS2.to_string(new_value)
+          old_charset = UCS2.to_string(old_value)
           {{:charset, new_charset, old_charset}, rest}
 
         0x04 ->
@@ -268,7 +268,7 @@ defmodule Tds.Tokens do
 
           new_packetsize =
             new_value
-            |> ucs2_to_utf()
+            |> UCS2.to_string()
             |> Integer.parse()
             |> case do
               :error -> 4096
@@ -278,7 +278,7 @@ defmodule Tds.Tokens do
 
           old_packetsize =
             old_value
-            |> ucs2_to_utf()
+            |> UCS2.to_string()
             |> Integer.parse()
             |> case do
               :error -> 4096
@@ -386,7 +386,7 @@ defmodule Tds.Tokens do
             rest::binary
           >> = tail
 
-          {{:userinfo, ucs2_to_utf(value), nil}, rest}
+          {{:userinfo, UCS2.to_string(value), nil}, rest}
 
         0x14 ->
           <<
@@ -402,7 +402,7 @@ defmodule Tds.Tokens do
           >> = tail
 
           routing = %{
-            hostname: ucs2_to_utf(alt_host),
+            hostname: UCS2.to_string(alt_host),
             port: port
           }
 
@@ -414,8 +414,7 @@ defmodule Tds.Tokens do
 
   ## DONE
   defp decode_done(
-         <<status::little-unsigned-size(2)-unit(8),
-           cur_cmd::little-unsigned-size(2)-unit(8),
+         <<status::little-unsigned-size(2)-unit(8), cur_cmd::little-unsigned-size(2)-unit(8),
            row_count::little-size(8)-unit(8), tail::binary>>,
          collmetadata
        ) do
@@ -469,7 +468,7 @@ defmodule Tds.Tokens do
     token = %{
       t_sql_only: interface == 1,
       tds_version: tds_version,
-      program: ucs2_to_utf(prog_name),
+      program: UCS2.to_string(prog_name),
       version: "#{major_ver}.#{minor_ver}.#{build_hi}.#{build_low}"
     }
 
@@ -493,8 +492,7 @@ defmodule Tds.Tokens do
   end
 
   defp bitmap_list(
-         <<b8::1, b7::1, b6::1, b5::1, b4::1, b3::1, b2::1, b1::1,
-           tail::binary>>,
+         <<b8::1, b7::1, b6::1, b5::1, b4::1, b3::1, b2::1, b1::1, tail::binary>>,
          n
        ) do
     {bits, tail} = bitmap_list(tail, n - 1)
@@ -523,10 +521,8 @@ defmodule Tds.Tokens do
     {info, tail}
   end
 
-  defp decode_column_name(
-         <<length::int8, name::binary-size(length)-unit(16), tail::binary>>
-       ) do
-    name = ucs2_to_utf(name)
+  defp decode_column_name(<<length::int8, name::binary-size(length)-unit(16), tail::binary>>) do
+    name = UCS2.to_string(name)
     {name, tail}
   end
 

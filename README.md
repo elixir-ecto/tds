@@ -1,31 +1,31 @@
 # Tds - MSSQL Driver for Elixir
 
-[![Hex.pm](https://img.shields.io/hexpm/v/tds.svg)](https://hex.pm/packages/tds) 
-[![Coverage Status](https://coveralls.io/repos/github/livehelpnow/tds/badge.svg?branch=support-1.1)](https://coveralls.io/github/livehelpnow/tds?branch=master)
-![Elixir TDS CI](https://github.com/livehelpnow/tds/workflows/Elixir%20TDS%20CI/badge.svg)
+[![Hex.pm](https://img.shields.io/hexpm/v/tds.svg)](https://hex.pm/packages/tds)
+![Elixir TDS CI](https://github.com/elixir-ecto/tds/workflows/Elixir%20TDS%20CI/badge.svg)
 
 MSSQL / TDS Database driver for Elixir.
 
-### NOTE: 
-Since TDS version 2.0, `tds_ecto` package is deprecated, this version supports `ecto_sql` since version 3.3.4. 
+### NOTE:
+Since TDS version 2.0, `tds_ecto` package is deprecated, this version supports `ecto_sql` since version 3.3.4.
 
 Please check out the issues for a more complete overview. This branch should not be considered stable or ready for production yet.
 
-For stable versions always use [hex.pm](https://hex.pm/packages/tds) as source for your mix.exs!!!
+For stable versions always use [hex.pm](https://hex.pm/packages/tds) as source for your mix.exs.
 
 ## Usage
-
 
 Add `:tds` as a dependency in your `mix.exs` file.
 
 ```elixir
 def deps do
-  [{:tds, "~> 2.0"}]
+  [
+    {:tds, "~> 2.0"}
+  ]
 end
 ```
 
-As of TDS version `>= 1.2`, tds can support windows codepages other than `windows-1252` (latin1). 
-If you need such support you will need to include additional dependency `{:tds_encoding, "~> 1.0"}` 
+As of TDS version `>= 1.2`, tds can support windows codepages other than `windows-1252` (latin1).
+If you need such support you will need to include additional dependency `{:tds_encoding, "~> 1.0"}`
 and configure `:tds` app to use `Tds.Encoding` module like this:
 
 
@@ -35,15 +35,14 @@ import Mix.Config
 config :tds, :text_encoder, Tds.Encoding
 ```
 
-Note that `:tds_encoding` requires Rust compiler installed in order to compile nif. 
-In previous versions only SQL_Latin1_General was suported (codepage `windows-1252`). 
-Please follow instructions at [rust website](https://www.rust-lang.org/tools/install) 
-to install rust.
+Note that `:tds_encoding` requires Rust compiler installed in order to compile nif.
+In previous versions only `SQL_Latin1_General` was supported (codepage `windows-1252`).
+Please follow instructions at [Rust website](https://www.rust-lang.org/tools/install) to install Rust.
 
-When you are done, run `mix deps.get` in your shell to fetch and compile Tds. 
+When you are done, run `mix deps.get` in your shell to fetch and compile Tds.
 Start an interactive Elixir shell with `iex -S mix`.
 
-```iex
+```elixir
 iex> {:ok, pid} = Tds.start_link([hostname: "localhost", username: "test_user", password: "test_password", database: "test_db", port: 4000])
 {:ok, #PID<0.69.0>}
 
@@ -68,35 +67,64 @@ Example configuration
 import Mix.Config
 
 config :your_app, :tds_conn,
-  hostname: "localhost", 
-  username: "test_user", 
-  password: "test_password", 
-  database: "test_db", 
+  hostname: "localhost",
+  username: "test_user",
+  password: "test_password",
+  database: "test_db",
   port: 1433
 ```
 
 Then using `Application.get_env(:your_app, :tds_conn)` use this as first parameter in `Tds.start_link/1` function.
 
-There is additional parameter that can be used in configuration and 
-can improve query execution in SQL Server. If you find out that 
+There is additional parameter that can be used in configuration and
+can improve query execution in SQL Server. If you find out that
 your queries suffer from "density estimation" as described [here](https://www.brentozar.com/archive/2018/03/sp_prepare-isnt-good-sp_executesql-performance/)
 
-you can try switching how tds executes queries as below:
+You can try switching how tds executes queries as below:
 
 ```elixir
 import Mix.Config
 
 config :your_app, :tds_conn,
-  hostname: "localhost", 
-  username: "test_user", 
-  password: "test_password", 
-  database: "test_db", 
+  hostname: "localhost",
+  username: "test_user",
+  password: "test_password",
+  database: "test_db",
   port: 1433,
   execution_mode: :executesql
 ```
-This will skip calling `sp_prepare` and query will be executed using `sp_executesql` instead. 
-Please note that only one execution mode can be set at a time, and SQL Server will probably 
+This will skip calling `sp_prepare` and query will be executed using `sp_executesql` instead.
+Please note that only one execution mode can be set at a time, and SQL Server will probably
 use single execution plan (since it is NOT estimated by checking data density!).
+
+## SSL / TLS support
+
+tds `>= 2.3.0` supports encrypted connections to the SQL Server.
+
+The following encryption behaviours are currently supported:
+
+- `:required`: Requires the server to use TLS
+- `:on`: Same as required
+- `:not_supported`: Indicates to the server that encryption is not supported. If server requires encryption, the connection will not be established.
+
+Currently not supported:
+
+- `:off`: This setting allows the server to upgrade the connection (if server encryption is `:on` or `:required`) and only encrypts the LOGIN packet when the server has encryption set to `:off`.
+- `:client_cert`: This will make the server check the client cerfiticate.
+
+Setting `ssl: true` or `ssl: false` is also allowed. In that case `true` is mapped to `:required` and `false` to `:not_supported`.
+
+```elixir
+config :your_app, :tds_conn,
+  hostname: "localhost",
+  username: "test_user",
+  password: "test_password",
+  database: "test_db",
+  ssl: :required,
+  port: 1433,
+  execution_mode: :executesql
+
+```
 
 ## Connecting to SQL Server Instances
 
@@ -114,8 +142,8 @@ Since v1.0.16, additional connection parameters are:
   - `:set_cursor_close_on_commit` - atom, one of `:on | :off`
   - `:set_read_committed_snapshot` - atom, one of `:on | :off`
 
-Set this option to enable snapshot isolation on the database level. 
-Requires connecting with a user with appropriate rights. 
+Set this option to enable snapshot isolation on the database level.
+Requires connecting with a user with appropriate rights.
 More info [here](https://docs.microsoft.com/en-us/dotnet/framework/data/adonet/sql/snapshot-isolation-in-sql-server).
 
 ## Data representation
@@ -161,7 +189,7 @@ Note that the DateTimeOffset tuple expects the date and time in UTC and the offs
 format](https://dba.stackexchange.com/a/121878), and these mixed-endian UUIDs
 are returned in [Tds.Result](https://hexdocs.pm/tds/Tds.Result.html).
 
-To convert a mixed-endian UUID binary to a big-endian string, use 
+To convert a mixed-endian UUID binary to a big-endian string, use
 [Tds.Types.UUID.load/1](https://hexdocs.pm/tds/Tds.Types.UUID.html#load/1)
 
 To convert a big-endian UUID string to a mixed-endian binary, use
@@ -172,7 +200,7 @@ To convert a big-endian UUID string to a mixed-endian binary, use
 Clone and compile Tds with:
 
 ```bash
-git clone https://github.com/livehelpnow/tds.git
+git clone https://github.com/elixir-ecto/tds.git
 cd tds
 mix deps.get
 ```
@@ -183,11 +211,11 @@ use it for the first time.
 
 ### Development SQL Server Setup
 
-The tests require an SQL Server database to be available on localhost. 
+The tests require an SQL Server database to be available on localhost.
 If you are not using Windows OS you can start sql server instance using Docker.
 Official SQL Server Docker image can be found [here](https://hub.docker.com/r/microsoft/mssql-server-linux).
 
-If you do not have specific requirements on how you would like to start sql server 
+If you do not have specific requirements on how you would like to start sql server
 in docker, you can use script for this repo.
 
 ```bash
@@ -214,15 +242,13 @@ Thanks to [ericmj](https://github.com/ericmj), this driver takes a lot of inspir
 
 Also thanks to everyone in the Elixir Google group and on the Elixir IRC Channel.
 
-## License
+## Copyright and License
 
-Copyright 2014, 2015, 2017 LiveHelpNow
+Copyright (c) 2015 LiveHelpNow
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
-
-    http://www.apache.org/licenses/LICENSE-2.0
+You may obtain a copy of the License at [https://www.apache.org/licenses/LICENSE-2.0](https://www.apache.org/licenses/LICENSE-2.0)
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,

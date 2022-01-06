@@ -1,6 +1,4 @@
 defmodule Tds.Protocol.Collation do
-  import Tds.Protocol.Grammar
-
   @moduledoc """
   The collation rule is used to specify collation information for character data
   or metadata describing character data.
@@ -11,6 +9,8 @@ defmodule Tds.Protocol.Collation do
   For more information about column definition, see
   COLMETADATA in MS-TDS.pdf.
   """
+
+  import Tds.Protocol.Grammar
 
   defstruct codepage: "WINDOWS-1252",
             lcid: nil,

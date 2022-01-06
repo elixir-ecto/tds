@@ -1,7 +1,7 @@
 defmodule Tds.Latin1 do
   @moduledoc false
 
-  def encode(str, "utf-16le") do
+  def encode(str, "utf-16le") when is_binary(str) do
     case :unicode.characters_to_binary(str, :unicode, {:utf16, :little}) do
       utf16 when is_bitstring(utf16) ->
         utf16
@@ -12,7 +12,7 @@ defmodule Tds.Latin1 do
     end
   end
 
-  def encode(str, "windows-1252") do
+  def encode(str, "windows-1252") when is_binary(str) do
     case :unicode.characters_to_binary(str, :unicode, :latin1) do
       utf16 when is_bitstring(utf16) ->
         utf16
@@ -23,11 +23,11 @@ defmodule Tds.Latin1 do
     end
   end
 
-  def decode(binary, "utf-16le") do
-    :unicode.characters_to_binary(binary, {:utf16, :little}, :utf8)
+  def decode(binary, "utf-16le") when is_binary(binary) do
+    :unicode.characters_to_binary(binary, {:utf16, :little})
   end
 
-  def decode(binary, _) do
+  def decode(binary, _) when is_binary(binary) do
     binary
   end
 end

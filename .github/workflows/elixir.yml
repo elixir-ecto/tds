@@ -1,23 +1,21 @@
 name: Elixir TDS CI
 
-on: 
+on:
   push:
     branches:
       - master
-      - support-1.1
+      - ssl
   pull_request:
     branches:
       - master
-      - support-1.1
 
 jobs:
   build:
-
     runs-on: ubuntu-latest
 
     services:
       mssql:
-        image: mcr.microsoft.com/mssql/server:${{ matrix.mssql_version }}
+        image: mcr.microsoft.com/${{ matrix.mssql_version }}
         env:
           ACCEPT_EULA: Y
           SA_PASSWORD: some!Password
@@ -25,11 +23,23 @@ jobs:
           - 1433:1433
 
     strategy:
+      fail-fast: false
       matrix:
-        mssql_version: ["2017-latest", "2019-latest"]
-        otp: [21.3.8.10, 22.1.7]
-        elixir: [1.9.4]
-
+        mssql_version:
+          - "mssql/server:2017-latest"
+          - "mssql/server:2019-latest"
+          - "azure-sql-edge:latest"
+        otp:
+          - 23.3.4
+          - 24.1.1
+        elixir:
+          - 1.11.4
+          - 1.12.3
+        include:
+          - mssql_version: "mssql/server:2019-latest"
+            otp: 24.1.1
+            elixir: 1.12.3
+            lint: lint
 
     env:
       ACCEPT_EULA: Y
@@ -41,16 +51,37 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y mssql-tools unixodbc-dev
+
       - uses: actions/checkout@v2
+
       - name: Setup elixir
-        uses: actions/setup-elixir@v1
+        uses: erlef/setup-beam@v1
         with:
           otp-version: ${{matrix.otp}}
           elixir-version: ${{matrix.elixir}}
+
+      - uses: actions/cache@v2
+        with:
+          path: |
+            deps
+            _build
+          key: ${{ runner.os }}-mix-${{matrix.elixir}}-${{matrix.otp}}-${{ hashFiles('**/mix.lock') }}
+
       - name: Install Dependencies
         run: mix deps.get
+
+      - run: mix format --check-formatted
+        if: ${{ matrix.lint }}
+
+      - run: mix deps.unlock --check-unused
+        if: ${{ matrix.lint }}
+
+      - run: mix deps.compile
+
+      - run: mix compile --warnings-as-errors
+        if: ${{ matrix.lint }}
+
       - name: Run Tests
         run: |
           export PATH="/opt/mssql-tools/bin:$PATH"
           mix test
-      - run: mix coveralls.github

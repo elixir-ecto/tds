@@ -7,8 +7,7 @@ defmodule TdsIssuesTest do
   @tag timeout: 50000
 
   setup do
-    opts = Application.fetch_env!(:tds, :opts)
-    {:ok, pid} = Tds.start_link(opts)
+    {:ok, pid} = Tds.start_link(opts())
 
     {:ok, [pid: pid]}
   end
@@ -16,40 +15,47 @@ defmodule TdsIssuesTest do
   @tag :float
   test "float read and write", context do
     query("DROP TABLE [float_tests]", [])
-    :ok = query("""
-      CREATE TABLE [float_tests] (
-        [id] int NOT NULL identity(1,1) primary key,
-        [float_value] float
+
+    :ok =
+      query(
+        """
+          CREATE TABLE [float_tests] (
+            [id] int NOT NULL identity(1,1) primary key,
+            [float_value] float
+          )
+        """,
+        []
       )
-    """, [])
+
     test_vals = [
-      {-1234.1234,          << 78, 209, 145,  92, 126,  72, 147, 192>>},
-      {-1234.0,             <<  0,   0,   0,   0,   0,  72, 147, 192>>},
-      {-1.0,                <<  0,   0,   0,   0,   0,   0, 240, 191>>},
-      {-0.5,                <<  0,   0,   0,   0,   0,   0, 224, 191>>},
-      {-0.3333333333333333, << 85,  85,  85,  85,  85,  85, 213, 191>>},
-      {-0.25,               <<  0,   0,   0,   0,   0,   0, 208, 191>>},
-      {-0.2,                <<154, 153, 153, 153, 153, 153, 201, 191>>},
-      {0.0,                 <<  0,   0,   0,   0,   0,   0,   0,   0>>},
-      {0.0,                 <<  0,   0,   0,   0,   0,   0,   0,   0>>},
-      {0.2,                 <<154, 153, 153, 153, 153, 153, 201,  63>>},
-      {0.25,                <<  0,   0,   0,   0,   0,   0, 208,  63>>},
-      {0.3333333333333333,  << 85,  85,  85,  85,  85,  85, 213,  63>>},
-      {0.5,                 <<  0,   0,   0,   0,   0,   0, 224,  63>>},
-      {1.0,                 <<  0,   0,   0,   0,   0,   0, 240,  63>>},
-      {1234.0,              <<  0,   0,   0,   0,   0,  72, 147,  64>>},
-      {1234.1234,           << 78, 209, 145,  92, 126,  72, 147,  64>>}
+      {-1234.1234, <<78, 209, 145, 92, 126, 72, 147, 192>>},
+      {-1234.0, <<0, 0, 0, 0, 0, 72, 147, 192>>},
+      {-1.0, <<0, 0, 0, 0, 0, 0, 240, 191>>},
+      {-0.5, <<0, 0, 0, 0, 0, 0, 224, 191>>},
+      {-0.3333333333333333, <<85, 85, 85, 85, 85, 85, 213, 191>>},
+      {-0.25, <<0, 0, 0, 0, 0, 0, 208, 191>>},
+      {-0.2, <<154, 153, 153, 153, 153, 153, 201, 191>>},
+      {0.0, <<0, 0, 0, 0, 0, 0, 0, 0>>},
+      {0.0, <<0, 0, 0, 0, 0, 0, 0, 0>>},
+      {0.2, <<154, 153, 153, 153, 153, 153, 201, 63>>},
+      {0.25, <<0, 0, 0, 0, 0, 0, 208, 63>>},
+      {0.3333333333333333, <<85, 85, 85, 85, 85, 85, 213, 63>>},
+      {0.5, <<0, 0, 0, 0, 0, 0, 224, 63>>},
+      {1.0, <<0, 0, 0, 0, 0, 0, 240, 63>>},
+      {1234.0, <<0, 0, 0, 0, 0, 72, 147, 64>>},
+      {1234.1234, <<78, 209, 145, 92, 126, 72, 147, 64>>}
     ]
+
     Enum.each(test_vals, fn {val, _} ->
       :ok = query("INSERT INTO [float_tests] values (#{val})", [])
     end)
 
     values = Enum.map(test_vals, fn {val, _} -> [val] end)
     assert values == query("SELECT float_value FROM [float_tests]", [])
+
     Enum.each(values, fn [val] ->
       assert [[val]] == query("SELECT cast(#{val} as float)", [])
     end)
-
 
     query("DROP TABLE [float_tests]", [])
   end
@@ -91,13 +97,13 @@ defmodule TdsIssuesTest do
       assert :ok == res
 
       assert [[val]] ==
-                 query(
-                   """
-                   SELECT [total] FROM hades_sealed_cfdis
-                   WHERE id in (select max(id) from hades_sealed_cfdis)
-                   """,
-                   []
-                 )
+               query(
+                 """
+                 SELECT [total] FROM hades_sealed_cfdis
+                 WHERE id in (select max(id) from hades_sealed_cfdis)
+                 """,
+                 []
+               )
     end
 
     1..17
@@ -141,8 +147,8 @@ defmodule TdsIssuesTest do
 
     assert [[1, "Elixir"]] ==
              query("exec RetrieveDummyValues @filterId", [
-        %Tds.Parameter{name: "@filterId", value: 1}
-      ])
+               %Tds.Parameter{name: "@filterId", value: 1}
+             ])
 
     query(
       """
@@ -174,28 +180,28 @@ defmodule TdsIssuesTest do
 
     fun = fn ->
       assert %Tds.Error{
-        message: _,
-        mssql: %{
-          class: 16,
-          line_number: 1,
-          msg_text: "Invalid column name 'b'.",
-          number: 207,
-          proc_name: _,
-          server_name: _,
-          state: 1
-        }
-      } =
-        query(
-          """
-          SELECT TOP (1000) [id] ,[txt], [b]
-          FROM [test].[dbo].[test_collation1]
-          """,
-          []
-        )
+               message: _,
+               mssql: %{
+                 class: 16,
+                 line_number: 1,
+                 msg_text: "Invalid column name 'b'.",
+                 number: 207,
+                 proc_name: _,
+                 server_name: _,
+                 state: 1
+               }
+             } =
+               query(
+                 """
+                 SELECT TOP (1000) [id] ,[txt], [b]
+                 FROM [test].[dbo].[test_collation1]
+                 """,
+                 []
+               )
     end
 
     # this should be error returned to as result of query execution
-    assert not(capture_log(fun) =~ "Invalid column name 'b'")
+    assert not (capture_log(fun) =~ "Invalid column name 'b'")
     # this should be logged in console
     assert capture_log(fun) =~ "Statement(s) could not be prepared"
   end
@@ -219,15 +225,14 @@ defmodule TdsIssuesTest do
       []
     )
 
-
-      assert 2 =
-        query(
-          """
-          SELECT TOP (1000) [id] ,[txt]
-          FROM [test].[dbo].[test_collation]
-          """,
-          []
-        )
-        |> length()
+    assert 2 =
+             query(
+               """
+               SELECT TOP (1000) [id] ,[txt]
+               FROM [test].[dbo].[test_collation]
+               """,
+               []
+             )
+             |> length()
   end
 end
