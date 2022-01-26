@@ -3,8 +3,8 @@ defmodule Tds.Types do
   import Tds.Utils
   use Bitwise
 
+  alias Tds.Encoding.UCS2
   alias Tds.Parameter
-  alias Tds.UCS2
 
   @year_1900_days :calendar.date_to_gregorian_days({1900, 1, 1})
   @secs_in_min 60

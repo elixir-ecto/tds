@@ -1,4 +1,4 @@
-defmodule Tds.UCS2 do
+defmodule Tds.Encoding.UCS2 do
   @moduledoc """
   Converting UTF-8 strings into UCS-2 (UTF16 Little Endian) strings
   used by the MSSQL Database

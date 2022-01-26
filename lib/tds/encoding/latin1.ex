@@ -1,4 +1,4 @@
-defmodule Tds.Latin1 do
+defmodule Tds.Encoding.Latin1 do
   @moduledoc false
 
   def encode(str, "utf-16le") when is_binary(str) do

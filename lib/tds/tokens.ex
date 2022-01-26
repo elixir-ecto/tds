@@ -4,8 +4,8 @@ defmodule Tds.Tokens do
 
   require Logger
 
+  alias Tds.Encoding.UCS2
   alias Tds.Types
-  alias Tds.UCS2
 
   def retval_typ_size(38) do
     # 0x26 - SYBINTN - 1

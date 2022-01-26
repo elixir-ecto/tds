@@ -2,10 +2,10 @@ defmodule Tds.Messages do
   import Record, only: [defrecord: 2]
   import Tds.Tokens, only: [decode_tokens: 1]
 
+  alias Tds.Encoding.UCS2
   alias Tds.Parameter
   alias Tds.Protocol.{Login7, Prelogin}
   alias Tds.Types
-  alias Tds.UCS2
 
   require Bitwise
   require Logger

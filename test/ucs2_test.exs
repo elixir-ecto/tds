@@ -2,7 +2,7 @@ defmodule Tds.Ucs2Test do
   use ExUnit.Case, async: true
   import Tds.TestHelper
 
-  alias Tds.UCS2
+  alias Tds.Encoding.UCS2
 
   test "encode list to UCS2" do
     assert UCS2.from_string([
