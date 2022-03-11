@@ -1,7 +1,8 @@
 defmodule Tds.TransactionTest do
   use ExUnit.Case, async: true
-  # import ExUnit.CaptureLog
   import Tds.TestHelper
+
+  @moduletag capture_log: true
 
   setup context do
     transactions =
@@ -36,7 +37,6 @@ defmodule Tds.TransactionTest do
                         []
                       )
 
-             #  assert {:error, %Tds.Error{mssql: %{class: 16, number: 3971}}} =
              assert {:ok, %Tds.Result{columns: [""], num_rows: 1, rows: ['*']}} =
                       Tds.query(conn, "SELECT 42", [])
 
@@ -60,7 +60,6 @@ defmodule Tds.TransactionTest do
                         []
                       )
 
-             #  assert {:error, %Tds.Error{mssql: %{class: 16, number: 3971}}} =
              assert {:ok, %Tds.Result{columns: [""], num_rows: 1, rows: ['*']}} =
                       Tds.query(conn, "SELECT 42", [])
 
@@ -96,7 +95,6 @@ defmodule Tds.TransactionTest do
 
                assert DBConnection.status(conn, opts) == :error
 
-               # assert {:error, %Tds.Error{mssql: %{class: 16, number: 3971}}} =
                assert {:ok, %Tds.Result{columns: [""], num_rows: 1, rows: ['*']}} =
                         Tds.query(conn, "SELECT 42", [], opts)
 
@@ -115,9 +113,6 @@ defmodule Tds.TransactionTest do
   test "should set transaction isolation level", context do
     :ok = query("CREATE TABLE TranIsolation (num INT)", [])
 
-    #    opts = Application.get_env(:tds, :opts)
-    #    {:ok, conn} = Tds.start_link(opts)
-    #    {:ok, conn2} = Tds.start_link(opts)
     conn = context[:pid]
     conn2 = context[:pid2]
 

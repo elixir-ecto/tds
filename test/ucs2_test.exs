@@ -1,6 +1,5 @@
 defmodule Tds.Ucs2Test do
   use ExUnit.Case, async: true
-  import Tds.TestHelper
 
   alias Tds.Encoding.UCS2
 

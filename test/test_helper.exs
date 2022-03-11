@@ -12,6 +12,9 @@ defmodule Tds.TestHelper do
       password: System.get_env("SQL_PASSWORD") || "some!Password",
       database: "test",
       ssl: true,
+      ssl_opts: [
+        verify: :verify_none
+      ],
       trace: false,
       set_allow_snapshot_isolation: :on,
       show_sensitive_data_on_connection_error: true

@@ -8,7 +8,6 @@ defmodule RPCTest do
   @tag timeout: 50_000
 
   setup do
-    # |> Keyword.put(:after_connect, {Tds, :query!, ["SET TRANSACTION ISOLATION LEVEL READ UNCOMMITTED", []]})
     {:ok, pid} = Tds.start_link(opts())
 
     {:ok, [pid: pid]}
@@ -276,17 +275,12 @@ defmodule RPCTest do
         type: {:array, :string},
         value: nil
       },
-      # %Tds.Parameter{
-      #   direction: :input, name: "@5", type: :string, value: nil},
-      # %Tds.Parameter{
-      # direction: :input, name: "@6", type: :string, value: nil},
       %Tds.Parameter{
         direction: :input,
         name: "@7",
         type: :datetime,
         value: {{2015, 2, 6}, {20, 30, 50, 0}}
       }
-      # %Tds.Parameter{direction: :input, name: "@8", type: :uuid, value: nil}]
     ]
 
     assert [[1, nil]] = query(sql, params)
