@@ -33,7 +33,6 @@ defmodule Tds.Mixfile do
 
   defp deps do
     [
-      {:binpp, ">= 0.0.0", only: [:dev, :test]},
       {:decimal, "~> 1.9 or ~> 2.0"},
       {:jason, "~> 1.0", optional: true},
       {:db_connection, "~> 2.0"},
@@ -48,7 +47,7 @@ defmodule Tds.Mixfile do
       description: "Microsoft SQL Server client (Elixir implementation of the MS TDS protocol)",
       name: "tds",
       files: ["lib", "mix.exs", "README*", "CHANGELOG*", "LICENSE*"],
-      maintainers: ["Eric Witchin", "Milan Jaric"],
+      maintainers: ["Kevin Seidel"],
       licenses: ["Apache-2.0"],
       links: %{"Github" => @source_url}
     ]
