@@ -6,7 +6,6 @@ defmodule QueryMultiTest do
   @tag timeout: 50000
   @moduletag capture_log: true
 
-
   setup do
     {:ok, pid} = Tds.start_link(opts())
 
