@@ -60,8 +60,8 @@ defmodule Tds.Parameter do
 
     param =
       case param do
-        %Tds.Parameter{name: nil} -> fix_data_type(%{param | name: "@#{name}"})
-        %Tds.Parameter{} -> fix_data_type(param)
+        %__MODULE__{name: nil} -> fix_data_type(%{param | name: "@#{name}"})
+        %__MODULE__{} -> fix_data_type(param)
         raw_param -> fix_data_type(raw_param, name)
       end
 
@@ -72,28 +72,28 @@ defmodule Tds.Parameter do
     acc
   end
 
-  def fix_data_type(%Tds.Parameter{type: type, value: _value} = param)
+  def fix_data_type(%__MODULE__{type: type, value: _value} = param)
       when not is_nil(type) do
     param
   end
 
-  def fix_data_type(%Tds.Parameter{type: nil, value: nil} = param) do
+  def fix_data_type(%__MODULE__{type: nil, value: nil} = param) do
     # should fix ecto has_one, on_change :nulify issue where type is not know when ecto
     # build query/statement for on_chage callback
     %{param | type: :binary}
   end
 
-  def fix_data_type(%Tds.Parameter{value: value} = param)
+  def fix_data_type(%__MODULE__{value: value} = param)
       when is_boolean(value) do
     %{param | type: :boolean}
   end
 
-  def fix_data_type(%Tds.Parameter{value: value} = param)
+  def fix_data_type(%__MODULE__{value: value} = param)
       when is_binary(value) and value == "" do
     %{param | type: :string}
   end
 
-  def fix_data_type(%Tds.Parameter{value: value} = param)
+  def fix_data_type(%__MODULE__{value: value} = param)
       when is_binary(value) do
     if String.valid?(value) do
       %{param | type: :string}
@@ -102,7 +102,7 @@ defmodule Tds.Parameter do
     end
   end
 
-  def fix_data_type(%Tds.Parameter{value: value} = param)
+  def fix_data_type(%__MODULE__{value: value} = param)
       when is_integer(value) do
     # if -2_147_483_648 >= value and value <= 2_147_483_647 do
     #   %{param | type: :integer}
@@ -112,56 +112,56 @@ defmodule Tds.Parameter do
     %{param | type: :integer}
   end
 
-  def fix_data_type(%Tds.Parameter{value: value} = param)
+  def fix_data_type(%__MODULE__{value: value} = param)
       when is_float(value) do
     %{param | type: :float}
   end
 
-  def fix_data_type(%Tds.Parameter{value: %Decimal{}} = param) do
+  def fix_data_type(%__MODULE__{value: %Decimal{}} = param) do
     %{param | type: :decimal}
   end
 
-  def fix_data_type(%Tds.Parameter{value: {{_, _, _}}} = param) do
+  def fix_data_type(%__MODULE__{value: {{_, _, _}}} = param) do
     %{param | type: :date}
   end
 
-  def fix_data_type(%Tds.Parameter{value: %Date{}} = param) do
+  def fix_data_type(%__MODULE__{value: %Date{}} = param) do
     %{param | type: :date}
   end
 
-  def fix_data_type(%Tds.Parameter{value: {{_, _, _, _}}} = param) do
+  def fix_data_type(%__MODULE__{value: {{_, _, _, _}}} = param) do
     %{param | type: :time}
   end
 
-  def fix_data_type(%Tds.Parameter{value: %Time{}} = param) do
+  def fix_data_type(%__MODULE__{value: %Time{}} = param) do
     %{param | type: :time}
   end
 
-  def fix_data_type(%Tds.Parameter{value: {{_, _, _}, {_, _, _}}} = param) do
+  def fix_data_type(%__MODULE__{value: {{_, _, _}, {_, _, _}}} = param) do
     %{param | type: :datetime}
   end
 
-  def fix_data_type(%Tds.Parameter{value: %NaiveDateTime{microsecond: {_, s}}} = param) do
+  def fix_data_type(%__MODULE__{value: %NaiveDateTime{microsecond: {_, s}}} = param) do
     type = if s > 3, do: :datetime2, else: :datetime
     %{param | type: type}
   end
 
-  def fix_data_type(%Tds.Parameter{value: {{_, _, _}, {_, _, _, fsec}}} = param) do
+  def fix_data_type(%__MODULE__{value: {{_, _, _}, {_, _, _, fsec}}} = param) do
     # todo: enable warning and introduce Tds.Types.DateTime2 and Tds.Types.DateTime
     # Logger.warn(fn -> "Datetime as tuple is obsolete, please use NaiveDateTime." end)
     type = if rem(fsec, 1000) > 0, do: :datetime2, else: :datetime
     %{param | type: type}
   end
 
-  def fix_data_type(%Tds.Parameter{value: %DateTime{}} = param) do
+  def fix_data_type(%__MODULE__{value: %DateTime{}} = param) do
     %{param | type: :datetimeoffset}
   end
 
-  def fix_data_type(%Tds.Parameter{value: {{_y, _m, _d}, _time, _offset}} = param) do
+  def fix_data_type(%__MODULE__{value: {{_y, _m, _d}, _time, _offset}} = param) do
     %{param | type: :datetimeoffset}
   end
 
-  def fix_data_type(%Tds.Parameter{} = raw_param, acc) do
+  def fix_data_type(%__MODULE__{} = raw_param, acc) do
     param =
       if is_nil(raw_param.name) do
         %{raw_param | name: "@#{acc}"}

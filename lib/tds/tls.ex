@@ -61,8 +61,8 @@ defmodule Tds.Tls do
 
   :exports
   |> :gen_tcp.module_info()
-  |> Enum.reject(fn {fun, _} ->
-    fun in [:send, :recv, :module_info, :controlling_process]
+  |> Enum.reject(fn {fun, arity} ->
+    fun in [:send, :recv, :module_info, :controlling_process] or (fun == :connect and arity == 2)
   end)
   |> Enum.each(fn
     {name, 0} ->

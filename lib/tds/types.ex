@@ -1,7 +1,6 @@
 defmodule Tds.Types do
   import Tds.BinaryUtils
   import Tds.Utils
-  use Bitwise
 
   alias Tds.Encoding.UCS2
   alias Tds.Parameter
@@ -729,6 +728,7 @@ defmodule Tds.Types do
       :string -> encode_string_type(param)
       :integer -> encode_integer_type(param)
       :decimal -> encode_decimal_type(param)
+      :numeric -> encode_decimal_type(param)
       :float -> encode_float_type(param)
       :smalldatetime -> encode_smalldatetime_type(param)
       :datetime -> encode_datetime_type(param)
@@ -1046,6 +1046,9 @@ defmodule Tds.Types do
           "bigint"
 
         :decimal ->
+          encode_decimal_descriptor(param)
+
+        :numeric ->
           encode_decimal_descriptor(param)
 
         :float ->
