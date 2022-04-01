@@ -13,7 +13,7 @@ defmodule Tds.Result do
   @typedoc "The result of a database query."
   @type t :: %__MODULE__{
           columns: nil | [String.t()],
-          rows: [tuple],
+          rows: nil | [[any()]],
           num_rows: integer
         }
 
