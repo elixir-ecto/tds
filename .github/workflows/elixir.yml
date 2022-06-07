@@ -31,14 +31,15 @@ jobs:
         otp:
           - 23.3.4
           - 24.3
+          - 25.0
         elixir:
           - 1.11.4
           - 1.12.3
-          - 1.13.3
+          - 1.13.4
         include:
           - mssql_version: "mssql/server:2019-latest"
-            otp: 24.3
-            elixir: 1.13.3
+            otp: 25.0
+            elixir: 1.13.4
             lint: lint
 
     env:
