@@ -12,12 +12,12 @@ defmodule Tds.Version do
     {0x74000004, :v7_4}
   ]
 
-  def decode(<<key::little-dword>>) do
+  def decode(<<key::little-dword()>>) do
     List.keyfind(@versions, key, 0, @default_version)
   end
 
   def encode(ver) do
     val = List.keyfind(@versions, ver, 1, @default_code)
-    <<val::little-dword>>
+    <<val::little-dword()>>
   end
 end

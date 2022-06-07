@@ -683,7 +683,7 @@ defmodule Tds.Types do
     do: raise(ArgumentError, "Invalid uuid value #{inspect(any)}")
 
   # Decimal
-  def decode_decimal(precision, scale, <<sign::int8, value::binary>>) do
+  def decode_decimal(precision, scale, <<sign::int8(), value::binary>>) do
     size = byte_size(value)
     <<value::little-size(size)-unit(8)>> = value
 

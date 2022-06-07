@@ -380,7 +380,7 @@ defmodule Tds.Tokens do
 
         0x13 ->
           <<
-            size::little-uint16,
+            size::little-uint16(),
             value::binary(size, 16),
             0x00,
             rest::binary
@@ -390,11 +390,11 @@ defmodule Tds.Tokens do
 
         0x14 ->
           <<
-            _routing_data_len::little-uint16,
+            _routing_data_len::little-uint16(),
             # Protocol MUST be 0, specifying TCP-IP protocol
             0x00,
-            port::little-uint16,
-            alt_host_len::little-uint16,
+            port::little-uint16(),
+            alt_host_len::little-uint16(),
             alt_host::binary(alt_host_len, 16),
             0x00,
             0x00,
@@ -452,7 +452,7 @@ defmodule Tds.Tokens do
 
   defp decode_loginack(
          <<
-           _length::little-uint16,
+           _length::little-uint16(),
            interface::size(8),
            tds_version::unsigned-32,
            prog_name_len::size(8),
@@ -510,7 +510,7 @@ defmodule Tds.Tokens do
     decode_columns(tail, n - 1, [column | acc])
   end
 
-  defp decode_column(<<_usertype::int32, _flags::int16, tail::binary>>) do
+  defp decode_column(<<_usertype::int32(), _flags::int16(), tail::binary>>) do
     {info, tail} = Types.decode_info(tail)
     {name, tail} = decode_column_name(tail)
 
@@ -521,7 +521,7 @@ defmodule Tds.Tokens do
     {info, tail}
   end
 
-  defp decode_column_name(<<length::int8, name::binary-size(length)-unit(16), tail::binary>>) do
+  defp decode_column_name(<<length::int8(), name::binary-size(length)-unit(16), tail::binary>>) do
     name = UCS2.to_string(name)
     {name, tail}
   end

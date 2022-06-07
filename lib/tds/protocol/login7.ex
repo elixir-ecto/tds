@@ -116,45 +116,45 @@ defmodule Tds.Protocol.Login7 do
     current_offset = start_offset
 
     # Hostname
-    offsets = <<current_offset::ushort, String.length(login.hostname)::ushort>>
+    offsets = <<current_offset::ushort(), String.length(login.hostname)::ushort()>>
     hostname = UCS2.from_string(login.hostname)
     variable_login = hostname
     current_offset = current_offset + byte_size(hostname)
 
     # Username
-    offsets = offsets <> <<current_offset::ushort, String.length(login.username)::ushort>>
+    offsets = offsets <> <<current_offset::ushort(), String.length(login.username)::ushort()>>
     username = UCS2.from_string(login.username)
     variable_login = variable_login <> username
     current_offset = current_offset + byte_size(username)
 
     # Password
-    offsets = offsets <> <<current_offset::ushort, String.length(login.password)::ushort>>
+    offsets = offsets <> <<current_offset::ushort(), String.length(login.password)::ushort()>>
     password = UCS2.from_string(login.password)
     variable_login = variable_login <> encode_tds_password(password)
     current_offset = current_offset + byte_size(password)
 
     # App Name
-    offsets = offsets <> <<current_offset::ushort, String.length(login.app_name)::ushort>>
+    offsets = offsets <> <<current_offset::ushort(), String.length(login.app_name)::ushort()>>
     app_name = UCS2.from_string(login.app_name)
     variable_login = variable_login <> app_name
     current_offset = current_offset + byte_size(app_name)
 
     # Servername
-    offsets = offsets <> <<current_offset::ushort, String.length(login.servername)::ushort>>
+    offsets = offsets <> <<current_offset::ushort(), String.length(login.servername)::ushort()>>
     servername = UCS2.from_string(login.servername)
     variable_login = variable_login <> servername
     current_offset = current_offset + byte_size(servername)
 
     # Unused
-    offsets = offsets <> <<0::ushort, 0::ushort>>
+    offsets = offsets <> <<0::ushort(), 0::ushort()>>
 
     # Client Int Name
     variable_login = variable_login <> UCS2.from_string(@clt_int_name)
-    offsets = offsets <> <<current_offset::ushort, 4::ushort>>
+    offsets = offsets <> <<current_offset::ushort(), 4::ushort()>>
     current_offset = current_offset + 8
 
     # Language
-    offsets = offsets <> <<0::ushort, 0::ushort>>
+    offsets = offsets <> <<0::ushort(), 0::ushort()>>
 
     # Database
     variable_login = variable_login <> UCS2.from_string(login.database)
@@ -166,22 +166,22 @@ defmodule Tds.Protocol.Login7 do
         String.length(login.database)
       end
 
-    offsets = offsets <> <<current_offset::ushort, database::ushort>>
+    offsets = offsets <> <<current_offset::ushort(), database::ushort()>>
 
     # Client ID
-    offsets = offsets <> <<0::sixbyte>>
+    offsets = offsets <> <<0::sixbyte()>>
 
     # SSPI
-    offsets = offsets <> <<0::ushort, 0::ushort>>
+    offsets = offsets <> <<0::ushort(), 0::ushort()>>
 
     # Attach DB File
-    offsets = offsets <> <<0::ushort, 0::ushort>>
+    offsets = offsets <> <<0::ushort(), 0::ushort()>>
 
     # Change password?
-    offsets = offsets <> <<0::ushort, 0::ushort>>
+    offsets = offsets <> <<0::ushort(), 0::ushort()>>
 
     # SSPI Long
-    offsets = offsets <> <<0::dword>>
+    offsets = offsets <> <<0::dword()>>
 
     {variable_login, offsets}
   end
@@ -205,7 +205,7 @@ defmodule Tds.Protocol.Login7 do
       |> Enum.at(1)
       |> String.to_integer()
 
-    <<value::dword>>
+    <<value::dword()>>
   rescue
     _ -> @client_pid
   end

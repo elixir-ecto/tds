@@ -26,8 +26,8 @@ defmodule Tds do
           | {:database, String.t()}
           | {:username, String.t()}
           | {:password, String.t()}
-          | {:timeout, timeout}
-          | {:connect_timeout, timeout}
+          | {:timeout, timeout()}
+          | {:connect_timeout, timeout()}
           | DBConnection.start_option()
 
   @type isolation_level ::

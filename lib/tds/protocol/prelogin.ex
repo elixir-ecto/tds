@@ -90,7 +90,7 @@ defmodule Tds.Protocol.Prelogin do
     @version
     |> case do
       [major, minor, build] ->
-        <<build::little-ushort, minor, major, 0x00, 0x00>>
+        <<build::little-ushort(), minor, major, 0x00, 0x00>>
 
       [major, minor] ->
         <<0x00, 0x00, minor, major, 0x00, 0x00>>
@@ -106,13 +106,13 @@ defmodule Tds.Protocol.Prelogin do
     data =
       case ssl?(opts) do
         :on ->
-          <<@encryption_on::byte>>
+          <<@encryption_on::byte()>>
 
         :not_supported ->
-          <<@encryption_not_supported::byte>>
+          <<@encryption_not_supported::byte()>>
 
         :required ->
-          <<@encryption_required::byte>>
+          <<@encryption_required::byte()>>
 
         :off ->
           # TODO: Support ssl: :off
@@ -202,7 +202,7 @@ defmodule Tds.Protocol.Prelogin do
   end
 
   defp decode_tokens(
-         <<@version_token, offset::ushort, length::ushort, tail::binary>>,
+         <<@version_token, offset::ushort(), length::ushort(), tail::binary>>,
          tokens,
          s
        ) do
@@ -211,7 +211,7 @@ defmodule Tds.Protocol.Prelogin do
   end
 
   defp decode_tokens(
-         <<@encryption_token, offset::ushort, length::ushort, tail::binary>>,
+         <<@encryption_token, offset::ushort(), length::ushort(), tail::binary>>,
          tokens,
          s
        ) do
@@ -220,7 +220,7 @@ defmodule Tds.Protocol.Prelogin do
   end
 
   defp decode_tokens(
-         <<@instopt_token, offset::ushort, length::ushort, tail::binary>>,
+         <<@instopt_token, offset::ushort(), length::ushort(), tail::binary>>,
          tokens,
          s
        ) do
@@ -229,7 +229,7 @@ defmodule Tds.Protocol.Prelogin do
   end
 
   defp decode_tokens(
-         <<@thread_id_token, offset::ushort, length::ushort, tail::binary>>,
+         <<@thread_id_token, offset::ushort(), length::ushort(), tail::binary>>,
          tokens,
          s
        ) do
@@ -238,7 +238,7 @@ defmodule Tds.Protocol.Prelogin do
   end
 
   defp decode_tokens(
-         <<@mars_token, offset::ushort, length::ushort, tail::binary>>,
+         <<@mars_token, offset::ushort(), length::ushort(), tail::binary>>,
          tokens,
          s
        ) do
@@ -247,7 +247,7 @@ defmodule Tds.Protocol.Prelogin do
   end
 
   defp decode_tokens(
-         <<@fed_auth_required_token, offset::ushort, length::ushort, tail::binary>>,
+         <<@fed_auth_required_token, offset::ushort(), length::ushort(), tail::binary>>,
          tokens,
          s
        ) do
@@ -256,7 +256,7 @@ defmodule Tds.Protocol.Prelogin do
   end
 
   defp decode_tokens(
-         <<@nonce_opt_token, offset::ushort, length::ushort, tail::binary>>,
+         <<@nonce_opt_token, offset::ushort(), length::ushort(), tail::binary>>,
          tokens,
          s
        ) do

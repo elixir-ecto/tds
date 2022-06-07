@@ -81,7 +81,8 @@ defmodule Tds.Protocol.Header do
 
   @spec decode(<<_::64>>) :: t | {:error, any}
   def decode(
-        <<type::int8, status::int8, length::int16, spid::int16, package::int8, window::int8>>
+        <<type::int8(), status::int8(), length::int16(), spid::int16(), package::int8(),
+          window::int8()>>
       ) do
     with {^type, pkg_header_type, has_data} <- decode_type(type) do
       {:ok,

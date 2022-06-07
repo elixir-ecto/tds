@@ -909,11 +909,11 @@ defmodule Tds.Protocol do
 
   defp next_tds_pkg(pkg, buffer) do
     case pkg do
-      <<0x04, 0x01, size::int16, _::int32, chunk::binary>> ->
+      <<0x04, 0x01, size::int16(), _::int32(), chunk::binary>> ->
         more = size - 8
         next_tds_pkg(chunk, buffer, more, true)
 
-      <<0x04, 0x00, size::int16, _::int32, chunk::binary>> ->
+      <<0x04, 0x00, size::int16(), _::int32(), chunk::binary>> ->
         more = size - 8
         next_tds_pkg(chunk, buffer, more, false)
 
