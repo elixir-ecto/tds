@@ -12,6 +12,7 @@
 * Elixir version (elixir -v):
 * TDS version (mix deps):
 * MSSQL Server version (SQL Server 2016 / 2019 / Azure SQL Edge):
+* Additional configuration parameter (`ssl_opts`, `socket_options`, ...): 
 * Operating system:
 
 ### Expected behavior
