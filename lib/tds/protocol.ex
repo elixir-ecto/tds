@@ -744,12 +744,10 @@ defmodule Tds.Protocol do
         msg_loginack(redirect: %{hostname: host, port: port}),
         %{opts: opts}
       ) do
-    new_opts =
-      opts
-      |> Keyword.put(:hostname, host)
-      |> Keyword.put(:port, port)
-
-    connect(new_opts)
+    opts
+    |> Keyword.put(:hostname, host)
+    |> Keyword.put(:port, port)
+    |> connect()
   end
 
   def message(:login, msg_loginack(), %{opts: opts} = s) do
@@ -812,7 +810,6 @@ defmodule Tds.Protocol do
   # Send Command To Sql Server
   defp login_send(msg, %{sock: {mod, sock}, env: env, opts: opts} = s) do
     paks = encode_msg(msg, env)
-    s = %{s | opts: clean_opts(opts)}
 
     Enum.each(paks, fn pak ->
       mod.send(sock, pak)
@@ -820,7 +817,7 @@ defmodule Tds.Protocol do
 
     case msg_recv(s) do
       {:disconnect, ex, s} ->
-        {:disconnect, ex, s}
+        {:disconnect, ex, %{s | opts: clean_opts(opts)}}
 
       buffer ->
         buffer
