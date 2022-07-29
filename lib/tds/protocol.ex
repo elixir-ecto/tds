@@ -104,7 +104,7 @@ defmodule Tds.Protocol do
 
       {:error, err, s} ->
         err =
-          if Exception.exception?(err) do
+          if is_exception(err) do
             err
           else
             Tds.Error.exception(inspect(err))

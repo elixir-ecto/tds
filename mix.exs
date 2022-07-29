@@ -8,7 +8,7 @@ defmodule Tds.Mixfile do
     [
       app: :tds,
       version: @version,
-      elixir: "~> 1.0",
+      elixir: "~> 1.11",
       name: "Tds",
       deps: deps(),
       docs: docs(),
