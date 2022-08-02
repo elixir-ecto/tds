@@ -81,7 +81,7 @@ defmodule QueryTest do
 
     assert [["string"]] = query("SELECT 'string'", [])
 
-    Application.put_env(:tds, :text_encoder, Tds.Encoding)
+    Application.put_env(:tds, :text_encoder, Excoding)
     assert [["ẽstring"]] = query("SELECT N'ẽstring'", [])
     Application.delete_env(:tds, :text_encoder)
 

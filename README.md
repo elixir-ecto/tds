@@ -25,19 +25,15 @@ end
 ```
 
 As of TDS version `>= 1.2`, tds can support windows codepages other than `windows-1252` (latin1).
-If you need such support you will need to include additional dependency `{:tds_encoding, "~> 1.0"}`
-and configure `:tds` app to use `Tds.Encoding` module like this:
+If you need such support you will need to include additional dependency `{:excoding, "~> 0.1"}`
+and configure `:tds` app to use `Excoding` module like this:
 
 
 ```elixir
 import Mix.Config
 
-config :tds, :text_encoder, Tds.Encoding
+config :tds, :text_encoder, Excoding
 ```
-
-Note that `:tds_encoding` requires Rust compiler installed in order to compile nif.
-In previous versions only `SQL_Latin1_General` was supported (codepage `windows-1252`).
-Please follow instructions at [Rust website](https://www.rust-lang.org/tools/install) to install Rust.
 
 When you are done, run `mix deps.get` in your shell to fetch and compile Tds.
 Start an interactive Elixir shell with `iex -S mix`.

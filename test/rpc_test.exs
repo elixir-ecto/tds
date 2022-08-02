@@ -126,7 +126,7 @@ defmodule RPCTest do
     end
 
     test "with nvarchar strings", context do
-      Application.put_env(:tds, :text_encoder, Tds.Encoding)
+      Application.put_env(:tds, :text_encoder, Excoding)
 
       strs = [
         "hello",

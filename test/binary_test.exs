@@ -244,7 +244,7 @@ defmodule BinaryTest do
   end
 
   test "strings as nvarchar", context do
-    Application.put_env(:tds, :text_encoder, Tds.Encoding)
+    Application.put_env(:tds, :text_encoder, Excoding)
     query("DROP TABLE pangrams", [])
 
     query(
