@@ -401,7 +401,7 @@ defmodule Tds.Tokens do
             rest::binary
           >> = tail
 
-	  {hostname, instance} =
+          {hostname, instance} =
             UCS2.to_string(alt_host)
             |> String.split("\\")
             |> case do
