@@ -401,8 +401,17 @@ defmodule Tds.Tokens do
             rest::binary
           >> = tail
 
+	  {hostname, instance} =
+            UCS2.to_string(alt_host)
+            |> String.split("\\")
+            |> case do
+              [host, instance] -> {host, instance}
+              [host] -> {host, nil}
+            end
+
           routing = %{
-            hostname: UCS2.to_string(alt_host),
+            hostname: hostname,
+            instance: instance,
             port: port
           }
 
