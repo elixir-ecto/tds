@@ -3,7 +3,7 @@ defmodule QueryMultiTest do
   require Logger
   use ExUnit.Case, async: true
 
-  @tag timeout: 50000
+  @tag timeout: 50_000
   @moduletag capture_log: true
 
   setup do

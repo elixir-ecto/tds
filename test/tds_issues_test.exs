@@ -4,7 +4,7 @@ defmodule TdsIssuesTest do
   use ExUnit.Case, async: true
   import ExUnit.CaptureLog
 
-  @tag timeout: 50000
+  @tag timeout: 50_000
 
   setup do
     {:ok, pid} = Tds.start_link(opts())

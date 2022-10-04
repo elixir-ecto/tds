@@ -1,4 +1,6 @@
 defmodule Tds.Types do
+  @moduledoc false
+
   import Tds.BinaryUtils
   import Tds.Utils
 

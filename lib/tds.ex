@@ -16,6 +16,7 @@ defmodule Tds do
   Please consult with [configuration](readme.html#configuration) how to do this.
   """
   alias Tds.Query
+  alias Tds.Types.UUID
 
   @timeout 5000
   @execution_mode :prepare_execute
@@ -195,8 +196,8 @@ defmodule Tds do
 
   Defaults to `Jason`.
   """
-  @spec json_library() :: module()
-  def json_library() do
+  @spec json_library :: module()
+  def json_library do
     Application.fetch_env!(:tds, :json_library)
   end
 
@@ -204,18 +205,18 @@ defmodule Tds do
   Generates a version 4 (random) UUID in the MS uniqueidentifier binary format.
   """
   @spec generate_uuid :: <<_::128>>
-  def generate_uuid(), do: Tds.Types.UUID.bingenerate()
+  def generate_uuid, do: UUID.bingenerate()
 
   @doc """
   Decodes MS uniqueidentifier binary to its string representation.
   """
-  def decode_uuid(uuid), do: Tds.Types.UUID.load(uuid)
+  def decode_uuid(uuid), do: UUID.load(uuid)
 
   @doc """
   Same as `decode_uuid/1` but raises `ArgumentError` if value is invalid.
   """
   def decode_uuid!(uuid) do
-    case Tds.Types.UUID.load(uuid) do
+    case UUID.load(uuid) do
       {:ok, value} ->
         value
 
@@ -228,11 +229,11 @@ defmodule Tds do
   Encodes UUID string into MS uniqueidentifier binary.
   """
   @spec encode_uuid(any) :: :error | {:ok, <<_::128>>}
-  def encode_uuid(value), do: Tds.Types.UUID.dump(value)
+  def encode_uuid(value), do: UUID.dump(value)
 
   @doc """
   Same as `encode_uuid/1` but raises `ArgumentError` if value is invalid.
   """
   @spec encode_uuid!(any) :: <<_::128>>
-  def encode_uuid!(value), do: Tds.Types.UUID.dump!(value)
+  def encode_uuid!(value), do: UUID.dump!(value)
 end

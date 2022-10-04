@@ -5,7 +5,7 @@ defmodule Handle0Test do
 
   alias Tds
 
-  @tag timeout: 50000
+  @tag timeout: 50_000
   @table "foo"
 
   setup do

@@ -1,9 +1,11 @@
 defmodule QueryTest do
-  import Tds.TestHelper
-  require Logger
   use ExUnit.Case, async: true
 
-  @tag timeout: 50000
+  import Tds.TestHelper
+
+  require Logger
+
+  @tag timeout: 50_000
 
   setup do
     {:ok, pid} = Tds.start_link(opts())

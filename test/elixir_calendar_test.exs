@@ -3,8 +3,8 @@ defmodule ElixirCalendarTest do
   require Logger
   use ExUnit.Case, async: true
 
-  alias Tds.Types
   alias Tds.Parameter, as: P
+  alias Tds.Types
 
   setup do
     Calendar.put_time_zone_database(Tzdata.TimeZoneDatabase)

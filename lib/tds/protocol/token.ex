@@ -1,4 +1,6 @@
 defmodule Tds.Protocol.Token do
+  @moduledoc false
+
   import Bitwise
 
   # @tokens [

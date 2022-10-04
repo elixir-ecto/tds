@@ -378,7 +378,7 @@ defmodule Packet.TokenStreamTest do
        %Tds.Protocol.Collation{
          codepage: "WINDOWS-1252",
          col_flags: 0,
-         lcid: 36941,
+         lcid: 36_941,
          sort_id: 52,
          version: 0
        }, nil},
@@ -485,7 +485,7 @@ defmodule Packet.TokenStreamTest do
         collation: %Tds.Protocol.Collation{
           codepage: "WINDOWS-1252",
           col_flags: 0,
-          lcid: 36941,
+          lcid: 36_941,
           sort_id: 52,
           version: 0
         },

@@ -1,4 +1,6 @@
 defmodule Tds.Version do
+  @moduledoc false
+
   import Tds.Protocol.Grammar
 
   @default_version :v7_4

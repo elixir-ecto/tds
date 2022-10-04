@@ -1,4 +1,6 @@
 defmodule Tds.Tokens do
+  @moduledoc false
+
   import Tds.BinaryUtils
   import Bitwise
 

@@ -1,4 +1,6 @@
 defmodule Tds.Parameter do
+  @moduledoc false
+
   alias Tds.Types
 
   @type t :: %__MODULE__{
@@ -35,9 +37,11 @@ defmodule Tds.Parameter do
     params
     |> List.wrap()
     |> name(0)
-    |> Enum.map(&fix_data_type/1)
-    |> Enum.map(&Types.encode_param_descriptor/1)
-    |> Enum.join(", ")
+    |> Enum.map_join(", ", fn param ->
+      param
+      |> fix_data_type()
+      |> Types.encode_param_descriptor()
+    end)
   end
 
   @doc """
