@@ -89,17 +89,17 @@ defmodule Tds.Protocol.Header do
     case decode_type(type) do
       {^type, pkg_header_type, has_data} ->
         {:ok,
-         struct!(__MODULE__,
+         %__MODULE__{
            type: pkg_header_type,
            status: decode_status(status),
            length: length - 8,
            spid: spid,
            package: package,
            window: window,
-           has_data: has_data
-         )}
+           has_data?: has_data
+         }}
 
-      {:error, _} = e ->
+      {:error, _reason} = e ->
         e
     end
   end
@@ -126,15 +126,4 @@ defmodule Tds.Protocol.Header do
 
     {snd_status, msg_ignore, conn_reset}
   end
-
-  # defp encode_type(pkg_header_type) when pkg_header_type in @pkg_header_types do
-  #   List.keyfind(
-  #     @messages,
-  #     pkg_header_type,
-  #     1,
-  #     {:error,
-  #      "[Protocol Error]: Unable to encode Message Type `#{pkg_header_type}`. " <>
-  #        "It is unknown message type."}
-  #   )
-  # end
 end

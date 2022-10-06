@@ -177,8 +177,6 @@ defmodule Tds.Parameter do
   end
 
   def fix_data_type(raw_param, acc) do
-    __MODULE__
-    |> struct!(name: "@#{acc}", value: raw_param)
-    |> fix_data_type()
+    fix_data_type(%__MODULE__{name: "@#{acc}", value: raw_param})
   end
 end
