@@ -141,6 +141,12 @@ Set this option to enable snapshot isolation on the database level.
 Requires connecting with a user with appropriate rights.
 More info [here](https://docs.microsoft.com/en-us/dotnet/framework/data/adonet/sql/snapshot-isolation-in-sql-server).
 
+
+## Federation Authentication
+
+This Authentication mechanism is not supported.
+This functionality requires specific environment to be developed.
+
 ## Data representation
 
 | TDS               | Elixir                                                                                     |
