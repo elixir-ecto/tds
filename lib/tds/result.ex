@@ -14,8 +14,9 @@ defmodule Tds.Result do
   @type t :: %__MODULE__{
           columns: nil | [String.t()],
           rows: nil | [[any()]],
-          num_rows: integer
+          num_rows: integer,
+          messages: nil | [map()]
         }
 
-  defstruct columns: nil, rows: nil, num_rows: 0
+  defstruct columns: nil, rows: nil, num_rows: 0, messages: nil
 end

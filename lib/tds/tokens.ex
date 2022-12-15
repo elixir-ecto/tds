@@ -178,18 +178,6 @@ defmodule Tds.Tokens do
       line_number: line_number
     }
 
-    Logger.debug(fn ->
-      [
-        "(Tds.Info)",
-        "Line",
-        to_string(info.line_number),
-        "(Class #{info.class})",
-        info.msg_text
-      ]
-      |> Enum.intersperse(" ")
-      |> IO.iodata_to_binary()
-    end)
-
     # tokens = Keyword.update(tokens, :info, [i], &[i | &1])
     {{:info, info}, tail, collmetadata}
   end

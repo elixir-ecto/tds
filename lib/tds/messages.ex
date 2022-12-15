@@ -168,6 +168,10 @@ defmodule Tds.Messages do
         c = %{c | rows: [row | c.rows], num_rows: c.num_rows + 1}
         {m, c, s}
 
+      {:info, info}, {msg_result() = m, c, s} ->
+        c = Map.update!(c || %Tds.Result{}, :messages, &[info | &1 || []])
+        {m, c, s}
+
       {token, %{status: status, rows: num_rows}}, {msg_result(set: set) = m, c, s}
       when token in [:done, :doneinproc, :doneproc] ->
         cond do
