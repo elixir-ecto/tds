@@ -195,7 +195,7 @@ defmodule Tds.Protocol do
           {:ok, Tds.Query.t(), new_state :: t()}
           | {:error | :disconnect, Exception.t(), new_state :: t}
   def handle_prepare(%{statement: statement} = query, opts, s) do
-    case Keyword.get(opts, :execution_mode, :prepare_execute) do
+    case Keyword.get(s.opts, :execution_mode, :prepare_execute) do
       :prepare_execute ->
         params =
           opts[:parameters]
