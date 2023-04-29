@@ -29,7 +29,6 @@ jobs:
         pair:
           - otp: 23.3
             elixir: 1.13.4
-        lint: skip_lint
         include:
           - mssql:
               version: "mssql/server:2022-latest"
@@ -40,8 +39,8 @@ jobs:
           - mssql:
               version: "mssql/server:2022-latest"
             pair:
-              otp: 21.3
-              elixir: 1.11.4
+              otp: 23.3
+              elixir: 1.13.4
             lint: skip_lint
 
     env:
