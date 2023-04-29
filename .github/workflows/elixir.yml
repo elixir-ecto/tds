@@ -1,20 +1,18 @@
-name: Elixir TDS CI
+name: TDS CI
 
 on:
   push:
-    branches:
-      - master
+    branches: [ master ]
   pull_request:
-    branches:
-      - master
+    branches: [ master ]
 
 jobs:
-  build:
-    runs-on: ubuntu-latest
-
+  tests:
+    name: Unit Tests
+    runs-on: ubuntu-20.04
     services:
       mssql:
-        image: mcr.microsoft.com/${{ matrix.mssql_version }}
+        image: mcr.microsoft.com/${{ matrix.mssql.version }}
         env:
           ACCEPT_EULA: Y
           SA_PASSWORD: some!Password
@@ -24,22 +22,26 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        mssql_version:
-          - "mssql/server:2017-latest"
-          - "mssql/server:2019-latest"
-          - "azure-sql-edge:latest"
-        otp:
-          - 23.3.4
-          - 24.3
-        elixir:
-          - 1.11.4
-          - 1.12.3
-          - 1.13.4
-        include:
-          - mssql_version: "mssql/server:2019-latest"
-            otp: 25.0
+        mssql:
+          - version: "mssql/server:2017-latest"
+          - version:  "mssql/server:2022-latest"
+          - version: "azure-sql-edge:latest"
+        pair:
+          - otp: 23.3
             elixir: 1.13.4
+        include:
+          - mssql:
+              version: "mssql/server:2022-latest"
+            pair:
+              otp: 24.3
+              elixir: 1.14.4
             lint: lint
+          - mssql:
+              version: "mssql/server:2022-latest"
+            pair:
+              otp: 23.3
+              elixir: 1.13.4
+            lint: skip_lint
 
     env:
       ACCEPT_EULA: Y
@@ -47,7 +49,7 @@ jobs:
       GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
     steps:
-      - name: Install MsSql Client Tools
+      - name: Install MSSql Client Tools
         run: |
           sudo apt-get update
           sudo apt-get install -y mssql-tools unixodbc-dev
@@ -57,31 +59,33 @@ jobs:
       - name: Setup elixir
         uses: erlef/setup-beam@v1
         with:
-          otp-version: ${{matrix.otp}}
-          elixir-version: ${{matrix.elixir}}
+          otp-version: ${{matrix.pair.otp}}
+          elixir-version: ${{matrix.pair.elixir}}
 
       - uses: actions/cache@v2
         with:
           path: |
             deps
             _build
-          key: ${{ runner.os }}-mix-${{matrix.elixir}}-${{matrix.otp}}-${{ hashFiles('**/mix.lock') }}
+          key: ${{ runner.os }}-mix-${{matrix.pair.elixir}}-${{matrix.pair.otp}}-${{ hashFiles('**/mix.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-mix-${{matrix.pair.elixir}}-${{matrix.pair.otp}}-
 
       - name: Install Dependencies
         run: mix deps.get
 
       - run: mix format --check-formatted
-        if: ${{ matrix.lint }}
+        if: ${{ matrix.lint == 'lint' }}
 
       - run: mix deps.unlock --check-unused
-        if: ${{ matrix.lint }}
+        if: ${{ matrix.lint == 'lint' }}
 
       - run: mix deps.compile
 
       - run: mix compile --warnings-as-errors
-        if: ${{ matrix.lint }}
+        if: ${{ matrix.lint == 'lint' }}
 
       - name: Run Tests
         run: |
-          export PATH="/opt/mssql-tools/bin:$PATH"
+          export PATH=/opt/mssql-tools/bin:$PATH
           mix test
