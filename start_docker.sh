@@ -7,12 +7,15 @@ if [ "$(uname -m)" = "arm64" ]; then
   IMAGE="mcr.microsoft.com/azure-sql-edge:latest"
   echo "Using azure-sql-edge image"
 else
-  IMAGE="mcr.microsoft.com/mssql/server:2019-latest"
-  echo "Using mssql-server 2019 image"
+  IMAGE="mcr.microsoft.com/mssql/server:2022-latest"
+  echo "Using mssql-server 2022 image"
 fi
 
 docker run \
   -e 'ACCEPT_EULA=Y' \
   -e 'SA_PASSWORD=some!Password' \
   -p 1433:1433 \
+  --hostname mssql-server \
+  --name mssql-server-2022 \
   -d $IMAGE
+
