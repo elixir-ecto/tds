@@ -31,15 +31,15 @@ jobs:
             elixir: 1.13.4
         include:
           - mssql:
-            version: "mssql/server:2022-latest"
+              version: "mssql/server:2022-latest"
             pair:
-              elixir: 1.14.4
               otp: 24.3
+              elixir: 1.14.4
           - mssql:
-            version: "mssql/server:2022-latest"
+              version: "mssql/server:2022-latest"
             pair:
-              elixir: 1.11.4
               otp: 21.3
+              elixir: 1.11.4
             lint: lint
 
     env:
