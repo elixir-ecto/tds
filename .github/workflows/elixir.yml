@@ -85,6 +85,6 @@ jobs:
         if: ${{ matrix.lint }}
 
       - name: Run Tests
-        run: mix test
-        env:
-          PATH: "/opt/mssql-tools/bin:$PATH"
+        run: |
+          export PATH=/opt/mssql-tools/bin:$PATH
+          mix test
