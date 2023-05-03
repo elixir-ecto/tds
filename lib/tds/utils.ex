@@ -1,7 +1,13 @@
 defmodule Tds.Utils do
+  @moduledoc """
+  Utility functions for Tds
+  """
   alias Tds.Encoding.Latin1
 
-  @moduledoc false
+  @doc """
+  Encodes given string to given codepage using configured encoder.
+  Defaults to Tds.Encoding.Latin1 if none is configured
+  """
   def encode_chars(string, to_codepage) do
     Application.get_env(:tds, :text_encoder, Latin1)
     |> apply(:encode, [string, to_codepage])

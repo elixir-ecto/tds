@@ -178,16 +178,16 @@ defmodule Tds.Types do
      }, tail}
   end
 
-  def decode_info(<<data_type_code::unsigned-8, tail::binary>>)
-      when data_type_code in @variable_data_types do
+  def decode_info(<<user_type::unsigned-8, tail::binary>>)
+      when user_type in @variable_data_types do
     def_type_info = %{
       data_type: :variable,
-      data_type_code: data_type_code,
-      sql_type: to_atom(data_type_code)
+      data_type_code: user_type,
+      sql_type: to_atom(user_type)
     }
 
     cond do
-      data_type_code == @tds_data_type_daten ->
+      user_type == @tds_data_type_daten ->
         length = 3
 
         type_info =
@@ -197,7 +197,7 @@ defmodule Tds.Types do
 
         {type_info, tail}
 
-      data_type_code in [
+      user_type in [
         @tds_data_type_timen,
         @tds_data_type_datetime2n,
         @tds_data_type_datetimeoffsetn
@@ -213,7 +213,7 @@ defmodule Tds.Types do
           end
 
         length =
-          case data_type_code do
+          case user_type do
             @tds_data_type_datetime2n -> length + 3
             @tds_data_type_datetimeoffsetn -> length + 5
             _ -> length
@@ -227,7 +227,7 @@ defmodule Tds.Types do
 
         {type_info, rest}
 
-      data_type_code in [
+      user_type in [
         @tds_data_type_numericn,
         @tds_data_type_decimaln
       ] ->
@@ -247,7 +247,7 @@ defmodule Tds.Types do
 
         {type_info, rest}
 
-      data_type_code in [
+      user_type in [
         @tds_data_type_uniqueidentifier,
         @tds_data_type_intn,
         @tds_data_type_decimal,
@@ -268,7 +268,7 @@ defmodule Tds.Types do
 
         {type_info, rest}
 
-      data_type_code in [
+      user_type in [
         @tds_data_type_char,
         @tds_data_type_varchar
       ] ->
@@ -283,7 +283,7 @@ defmodule Tds.Types do
 
         {type_info, rest}
 
-      data_type_code == @tds_data_type_xml ->
+      user_type == @tds_data_type_xml ->
         {_schema_info, rest} = decode_schema_info(tail)
 
         type_info =
@@ -292,7 +292,7 @@ defmodule Tds.Types do
 
         {type_info, rest}
 
-      data_type_code in [
+      user_type in [
         @tds_data_type_bigvarchar,
         @tds_data_type_bigchar,
         @tds_data_type_nvarchar,
@@ -312,7 +312,7 @@ defmodule Tds.Types do
 
         {type_info, rest}
 
-      data_type_code in [
+      user_type in [
         @tds_data_type_bigvarbinary,
         @tds_data_type_bigbinary,
         @tds_data_type_udt
@@ -329,7 +329,7 @@ defmodule Tds.Types do
 
         {type_info, rest}
 
-      data_type_code in [@tds_data_type_text, @tds_data_type_ntext] ->
+      user_type in [@tds_data_type_text, @tds_data_type_ntext] ->
         <<
           length::little-unsigned-32,
           collation::binary-5,
@@ -358,15 +358,20 @@ defmodule Tds.Types do
 
         {type_info, rest}
 
-      data_type_code == @tds_data_type_image ->
-        # TODO NumBarts Reader
-        <<length::signed-32, numparts::signed-8, rest::binary>> = tail
+      user_type == @tds_data_type_image ->
+        # TODO NumParts Reader
+        <<length::little-unsigned-32, numparts::signed-8, rest::binary>> = tail
+        IO.puts("image length: #{length}")
+        IO.puts("image numparts: #{numparts}")
 
         rest =
           Enum.reduce(
             1..numparts,
             rest,
-            fn _, <<s::unsigned-16, _str::size(s)-unit(16), next::binary>> ->
+            fn _,
+               <<tsize::little-unsigned-16, table_name::binary-size(tsize)-unit(16),
+                 next::binary>> ->
+              IO.puts("str: #{Tds.Encoding.UCS2.to_string(table_name)}")
               next
             end
           )
@@ -374,11 +379,11 @@ defmodule Tds.Types do
         type_info =
           def_type_info
           |> Map.put(:length, length)
-          |> Map.put(:data_reader, :bytelen)
+          |> Map.put(:data_reader, :longlen)
 
         {type_info, rest}
 
-      data_type_code == @tds_data_type_variant ->
+      user_type == @tds_data_type_variant ->
         <<length::signed-32, rest::binary>> = tail
 
         type_info =
@@ -739,6 +744,7 @@ defmodule Tds.Types do
       :date -> encode_date_type(param)
       :time -> encode_time_type(param)
       :uuid -> encode_uuid_type(param)
+      :image -> encode_image_type(param)
       _ -> encode_string_type(param)
     end
   end
@@ -789,6 +795,19 @@ defmodule Tds.Types do
 
     type = @tds_data_type_uniqueidentifier
     data = <<type, length>>
+    {type, data, []}
+  end
+
+  def encode_image_type(%Parameter{value: value}) do
+    length =
+      if value == nil do
+        0x00
+      else
+        byte_size(value)
+      end
+
+    type = @tds_data_type_image
+    data = <<type, length::little-unsigned-32>>
     {type, data, []}
   end
 
@@ -1059,6 +1078,9 @@ defmodule Tds.Types do
         :boolean ->
           "bit"
 
+        :image ->
+          "image"
+
         _ ->
           # this should fix issues when column is varchar but parameter
           # is threated as nvarchar(..) since nothing defines parameter
@@ -1184,6 +1206,12 @@ defmodule Tds.Types do
       value_size when value_size > 8000 -> encode_plp(value)
       value_size -> <<value_size::little-unsigned-16>> <> value
     end
+  end
+
+  # image
+  def encode_data(@tds_data_type_image, value, _attr) do
+    image_size = byte_size(value)
+    <<image_size::little-unsigned-32>> <> value
   end
 
   # string
