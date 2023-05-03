@@ -1209,7 +1209,7 @@ defmodule Tds.Types do
   end
 
   # image
-  def encode_data(@tds_data_type_image, value, attr) do
+  def encode_data(@tds_data_type_image, value, _attr) do
     image_size = byte_size(value)
     <<image_size::little-unsigned-32>> <> value
   end
