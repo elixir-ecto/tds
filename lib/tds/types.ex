@@ -361,17 +361,14 @@ defmodule Tds.Types do
       user_type == @tds_data_type_image ->
         # TODO NumParts Reader
         <<length::little-unsigned-32, numparts::signed-8, rest::binary>> = tail
-        IO.puts("image length: #{length}")
-        IO.puts("image numparts: #{numparts}")
 
         rest =
           Enum.reduce(
             1..numparts,
             rest,
             fn _,
-               <<tsize::little-unsigned-16, table_name::binary-size(tsize)-unit(16),
+               <<tsize::little-unsigned-16, _table_name::binary-size(tsize)-unit(16),
                  next::binary>> ->
-              IO.puts("str: #{Tds.Encoding.UCS2.to_string(table_name)}")
               next
             end
           )
@@ -1209,6 +1206,9 @@ defmodule Tds.Types do
   end
 
   # image
+  def encode_data(@tds_data_type_image, nil, _attr),
+    do: <<@tds_plp_null::little-unsigned-32>>
+
   def encode_data(@tds_data_type_image, value, _attr) do
     image_size = byte_size(value)
     <<image_size::little-unsigned-32>> <> value
