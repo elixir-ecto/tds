@@ -363,11 +363,14 @@ defmodule Tds.Types do
         <<length::little-unsigned-32, numparts::signed-8, rest::binary>> = tail
         IO.puts("image length: #{length}")
         IO.puts("image numparts: #{numparts}")
+
         rest =
           Enum.reduce(
             1..numparts,
             rest,
-            fn _, <<tsize::little-unsigned-16, table_name::binary-size(tsize)-unit(16), next::binary>> ->
+            fn _,
+               <<tsize::little-unsigned-16, table_name::binary-size(tsize)-unit(16),
+                 next::binary>> ->
               IO.puts("str: #{Tds.Encoding.UCS2.to_string(table_name)}")
               next
             end
@@ -1210,7 +1213,6 @@ defmodule Tds.Types do
     image_size = byte_size(value)
     <<image_size::little-unsigned-32>> <> value
   end
-
 
   # string
   def encode_data(@tds_data_type_nvarchar, nil, _),
