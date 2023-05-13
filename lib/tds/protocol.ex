@@ -952,7 +952,6 @@ defmodule Tds.Protocol do
     [
       "SET ANSI_NULLS ON; ",
       "SET QUOTED_IDENTIFIER ON; ",
-      "SET CURSOR_CLOSE_ON_COMMIT OFF; ",
       "SET ANSI_NULL_DFLT_ON ON; ",
       "SET ANSI_PADDING ON; ",
       "SET ANSI_WARNINGS ON; ",
@@ -968,6 +967,7 @@ defmodule Tds.Protocol do
     |> append_opts(opts, :set_implicit_transactions)
     |> append_opts(opts, :set_transaction_isolation_level)
     |> append_opts(opts, :set_allow_snapshot_isolation)
+    |> append_opts(opts, :set_cursor_close_on_commit)
   end
 
   defp append_opts(conn, opts, :set_language) do
@@ -1131,6 +1131,24 @@ defmodule Tds.Protocol do
     end
   end
 
+  defp append_opts(conn, opts, :set_cursor_close_on_commit) do
+    case Keyword.get(opts, :set_cursor_close_on_commit) do
+      val when val in [:on, :off] ->
+        val = val |> Atom.to_string() |> String.upcase()
+        conn ++ ["SET CURSOR_CLOSE_ON_COMMIT #{val}; "]
+
+      nil ->
+        conn
+
+      val ->
+        raise(
+          ArgumentError,
+          "set_cursor_close_on_commit: #{inspect(val)} is an invalid value, " <>
+            "should be one of should be either :on, :off or nil"
+        )
+    end
+  end
+
   defp setopts({mod, sock}, options) do
     case mod do
       :gen_tcp -> :inet.setopts(sock, options)
@@ -1143,4 +1161,5 @@ defmodule Tds.Protocol do
     |> Keyword.values()
     |> Enum.max()
   end
+
 end

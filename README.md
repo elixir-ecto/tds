@@ -135,6 +135,7 @@ Since v1.0.16, additional connection parameters are:
   - `:set_implicit_transactions` - atom, one of `:on | :off`
   - `:set_transaction_isolation_level` - atom, one of `:read_uncommitted | :read_committed | :repeatable_read | :snapshot | :serializable`
   - `:set_allow_snapshot_isolation` - atom, one of `:on | :off`
+  - `:set_cursor_close_on_commit` - atom, one of `:on | :off`
   - `:set_read_committed_snapshot` - atom, one of `:on | :off`
 
 Set this option to enable snapshot isolation on the database level.
