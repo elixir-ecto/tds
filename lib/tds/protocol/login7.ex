@@ -23,41 +23,46 @@ defmodule Tds.Protocol.Login7 do
   # EN-US
   @language_code_id <<0x09, 0x04, 0x00, 0x00>>
 
+  @typedoc """
+  Login7 message definition
+
+  ## Fields
+  - `tds_version` - Highest TDS version used by the client
+  - `packet_size` - The packet size being requested by the client
+  - `client_version` - The version of the interface library (for example, ODBC or OLEDB) being used by the client.
+  - `client_pid` - The process ID of the client application.
+  - `connection_id` - The connection ID of the primary Server. Used when connecting to an "Always Up" backup server.
+  - `option_flags_1` - Options (currently not used)
+  - `option_flags_2` - More options (also not used)
+  - `type_flags` - The SQL type sent to the client
+  - `option_flags_3` - More options (also not used)
+  - `client_time_zone` - This field is not used and can be set to zero.
+  - `client_language_code_id` - The language code identifier (LCID) value for the client collation.
+    If ClientLCID is specified, the specified collation is set as the session collation.
+  - `username` - Client username
+  - `password` - Client password
+  - `servername` - Server name
+  - `app_name` - Application name
+  - `hostname` - Hostname of the SQL server
+  - `database` - Database to use (defaults to user database)
+  """
   defstruct [
-    # Highest TDS version used by the client
     :tds_version,
-    # The packet size being requested by the client
     :packet_size,
-    # The version of the interface library (for example, ODBC or OLEDB) being used by the client.
     :client_version,
-    # The process ID of the client application.
     :client_pid,
-    # The connection ID of the primary Server. Used when connecting to an "Always Up" backup server.
     :connection_id,
-    # Options (currently not used)
     :option_flags_1,
-    # More options (also not used)
     :option_flags_2,
-    # The SQL type sent to the client
     :type_flags,
-    # More options (also not used)
     :option_flags_3,
-    # This field is not used and can be set to zero.
     :client_time_zone,
-    # The language code identifier (LCID) value for the client collation.
-    # If ClientLCID is specified, the specified collation is set as the session collation.
     :client_language_code_id,
-    # Client username
     :username,
-    # Client password
     :password,
-    # Server name
     :servername,
-    # Application name
     :app_name,
-    # Hostname of the SQL server
     :hostname,
-    # Database to use (defaults to user database)
     :database
   ]
 

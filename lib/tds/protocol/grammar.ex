@@ -83,7 +83,7 @@ defmodule Tds.Protocol.Grammar do
 
   The range is 0 to 65535.
   """
-  defmacro ushortlen, do: quote(do: little - unsigned - integer - 16)
+  defmacro ushortlen(), do: quote(do: little - unsigned - integer - 16)
 
   @doc """
   An unsigned 2-byte (16-bit) value representing the length of the associated
@@ -161,4 +161,8 @@ defmodule Tds.Protocol.Grammar do
   defmacro unicodechar(n \\ 1), do: quote(do: size(unquote(n)) - unit(16))
 
   defmacro bigbinary(n), do: quote(do: binary - size(unquote(n)) - unit(8))
+
+  defmacro us_varchar(len \\ 1), do: quote(do: binary-size(unquote(len)))
+
+  defmacro b_varchar(len \\ 1), do: quote(do: binary-size(unquote(len)))
 end

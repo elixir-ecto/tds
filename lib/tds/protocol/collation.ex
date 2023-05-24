@@ -11,31 +11,52 @@ defmodule Tds.Protocol.Collation do
   """
 
   import Tds.Protocol.Grammar
+  import Bitwise
 
   defstruct codepage: "WINDOWS-1252",
             lcid: nil,
             sort_id: nil,
-            col_flags: nil,
+            colflags: nil,
             version: nil
 
   @type t :: %__MODULE__{
           codepage: String.t() | :RAW,
           lcid: nil | non_neg_integer,
           sort_id: non_neg_integer,
-          col_flags: non_neg_integer,
+          colflags: colflags,
           version: non_neg_integer
         }
 
-  @spec encode(t) :: {:ok, <<_::40>>}
-  def encode(%{codepage: :RAW}), do: {:ok, <<0x0::byte(5)>>}
+  @type colflags :: %{
+          ignore_case: boolean,
+          ignore_accent: boolean,
+          ignore_kana: boolean,
+          ignore_width: boolean,
+          binary: boolean,
+          binary2: boolean,
+          utf8: boolean
+        }
 
-  @spec decode(binary) :: {:ok, t} | {:error, :more} | {:error, any}
-  def decode(<<0x0::byte(5)>>) do
-    {:ok, %__MODULE__{codepage: :RAW}}
+  @spec encode(t()) :: {:ok, <<_::40>>}
+  def encode(%{codepage: :RAW}), do: {:ok, <<0x00, 0x00, 0x00, 0x00, 0x00>>}
+
+  @spec decode(<<_::40>>) :: {:ok, t()}
+  def decode(<<0x00, 0x00, 0x00, 0x00, 0x00>>) do
+    {:ok, %__MODULE__{codepage: :RAW, lcid: nil, sort_id: nil, colflags: nil, version: nil}}
   end
 
   def decode(<<lcid::bit(20), col_flags::bit(8), version::bit(4), sort_id::byte()>>) do
     codepage = decode_sortid(sort_id) || decode_lcid(lcid) || "WINDOWS-1252"
+
+    colflags = %{
+      ignore_case: (col_flags &&& 0b1000_0000) == 0b1000_0000,
+      ignore_accent: (col_flags &&& 0b0100_0000) == 0b0100_0000,
+      ignore_kana: (col_flags &&& 0b0010_0000) == 0b0010_0000,
+      ignore_width: (col_flags &&& 0b0001_0000) == 0b0001_0000,
+      binary: (col_flags &&& 0b0000_1000) == 0b0000_1000,
+      binary2: (col_flags &&& 0b0000_0100) == 0b0000_0100,
+      utf8: (col_flags &&& 0b0000_0010) == 0b0000_0010
+    }
 
     {:ok,
      %__MODULE__{
@@ -43,12 +64,13 @@ defmodule Tds.Protocol.Collation do
        lcid: lcid,
        sort_id: sort_id,
        version: version,
-       col_flags: col_flags
+       colflags: colflags
      }}
   end
 
   def decode(_), do: raise(Tds.Error, "Unrecognized collation")
 
+  # todo: find url for this
   @sort_ids %{
     "WINDOWS-437" => [0x1E, 0x1F, 0x20, 0x21, 0x22],
     "WINDOWS-850" => [
