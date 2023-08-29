@@ -185,18 +185,21 @@ defmodule QueryTest do
   end
 
   test "table reader integration", context do
-    assert {:ok, res} = query("SELECT * FROM (VALUES (1, 'a'), (2, 'b'), (3, 'c')) AS tab (x, y)", [])
+    result = query("SELECT * FROM (VALUES (1, 'a'), (2, 'b'), (3, 'c')) AS tab (x, y)", [])
 
-    assert res |> Table.to_rows() |> Enum.to_list() == [
+    assert [
              %{"x" => 1, "y" => "a"},
              %{"x" => 2, "y" => "b"},
              %{"x" => 3, "y" => "c"}
-           ]
+           ] ==
+             result
+             |> Table.to_rows()
+             |> Enum.to_list()
 
-    columns = Table.to_columns(res)
+    columns = Table.to_columns(result)
     assert Enum.to_list(columns["x"]) == [1, 2, 3]
     assert Enum.to_list(columns["y"]) == ["a", "b", "c"]
 
-    assert {_, %{count: 3}, _} = Table.Reader.init(res)
+    assert {_, %{count: 3}, _} = Table.Reader.init(result)
   end
 end
