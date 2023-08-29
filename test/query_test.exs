@@ -185,7 +185,7 @@ defmodule QueryTest do
   end
 
   test "table reader integration", context do
-    result = query("SELECT * FROM (VALUES (1, 'a'), (2, 'b'), (3, 'c')) AS tab (x, y)", [])
+    result = Tds.query(context[:pid], "SELECT * FROM (VALUES (1, 'a'), (2, 'b'), (3, 'c')) AS tab (x, y)", [])
 
     assert [
              %{"x" => 1, "y" => "a"},
