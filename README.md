@@ -19,7 +19,7 @@ Add `:tds` as a dependency in your `mix.exs` file.
 ```elixir
 def deps do
   [
-    {:tds, "~> 2.0"}
+    {:tds, "~> 2.3"}
   ]
 end
 ```
@@ -230,7 +230,7 @@ installation instructions here:
 * [Windows](https://docs.microsoft.com/en-us/sql/database-engine/install-windows/install-sql-server-from-the-installation-wizard-setup)
 * [Linux](https://docs.microsoft.com/en-us/sql/linux/sql-server-linux-setup)
 
-Make sure your SQL Server accepts the credentials defined in `config/test.exs`.
+Make sure your SQL Server accepts the credentials defined in `test/test_helper.exs`.
 
 You also will need to have the *sqlcmd* command line tools installed. Setup
 instructions can be found here:
