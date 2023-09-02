@@ -29,6 +29,7 @@ defmodule Tds do
           | {:password, String.t()}
           | {:timeout, timeout()}
           | {:connect_timeout, timeout()}
+          | {:execution_mode, :prepare_execute | :executesql}
           | DBConnection.start_option()
 
   @type isolation_level ::

@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## v2.3.4 (2023-09-02)
+### Improvements
+* Add set_cursor_close_on_commit connection parameter
+* Support per connection execution_mode settings
+* Support Table.Reader protocol
+
+## v2.3.3 (2023-05-03)
+### Improvements
+* Add support for image parameter and column type
+
 ## v2.3.2 (2022-10-04)
 ### Fixes
 * Fix error on redirect request from the server #140 (Thanks @zerobatu)
