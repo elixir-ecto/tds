@@ -34,8 +34,9 @@ defmodule Tds.Mixfile do
   defp deps do
     [
       {:decimal, "~> 1.9 or ~> 2.0"},
-      {:jason, "~> 1.0", optional: true},
       {:db_connection, "~> 2.0"},
+      {:jason, "~> 1.0", optional: true},
+      {:table, "~> 0.1.0", optional: true},
       {:ex_doc, "~> 0.19", only: :docs},
       {:excoding, "~> 0.1", optional: true, only: :test},
       {:tzdata, "~> 1.0", optional: true, only: :test}

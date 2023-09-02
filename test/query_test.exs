@@ -146,6 +146,33 @@ defmodule QueryTest do
     assert [[nil]] = query("SELECT CAST(NULL as nvarchar(255))", [])
   end
 
+  test "table reader integration", c do
+    assert {:ok, result} =
+             Tds.query(
+               c.pid,
+               """
+               SELECT 1 AS x, 'a' AS y
+               UNION
+               SELECT 2 AS x, 'b' AS y
+               UNION
+               SELECT 3 AS x, 'c' AS y
+               """,
+               []
+             )
+
+    assert result |> Table.to_rows() |> Enum.to_list() == [
+             %{"x" => 1, "y" => "a"},
+             %{"x" => 2, "y" => "b"},
+             %{"x" => 3, "y" => "c"}
+           ]
+
+    columns = Table.to_columns(result)
+    assert Enum.to_list(columns["x"]) == [1, 2, 3]
+    assert Enum.to_list(columns["y"]) == ["a", "b", "c"]
+
+    assert {_, %{count: 3}, _} = Table.Reader.init(result)
+  end
+
   describe "execution mode" do
     test ":prepare_execute" do
       opts = Keyword.put(opts(), :execution_mode, :prepare_execute)
