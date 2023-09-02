@@ -183,4 +183,28 @@ defmodule QueryTest do
              } = query("SELECT 1 WHERE 1 = @1", params, opts)
     end
   end
+
+  test "table reader integration", context do
+    assert {:ok, result} =
+             Tds.query(
+               context[:pid],
+               "SELECT * FROM (VALUES (1, 'a'), (2, 'b'), (3, 'c')) AS tab (x, y)",
+               []
+             )
+
+    assert [
+             %{"x" => 1, "y" => "a"},
+             %{"x" => 2, "y" => "b"},
+             %{"x" => 3, "y" => "c"}
+           ] ==
+             result
+             |> Table.to_rows()
+             |> Enum.to_list()
+
+    columns = Table.to_columns(result)
+    assert Enum.to_list(columns["x"]) == [1, 2, 3]
+    assert Enum.to_list(columns["y"]) == ["a", "b", "c"]
+
+    assert {_, %{count: 3}, _} = Table.Reader.init(result)
+  end
 end

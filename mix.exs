@@ -38,7 +38,8 @@ defmodule Tds.Mixfile do
       {:db_connection, "~> 2.0"},
       {:ex_doc, "~> 0.19", only: :docs},
       {:excoding, "~> 0.1", optional: true, only: :test},
-      {:tzdata, "~> 1.0", optional: true, only: :test}
+      {:tzdata, "~> 1.0", optional: true, only: :test},
+      {:table, "~> 0.1.0", optional: true}
     ]
   end
 

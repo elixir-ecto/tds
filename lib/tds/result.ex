@@ -18,4 +18,16 @@ defmodule Tds.Result do
         }
 
   defstruct columns: nil, rows: nil, num_rows: 0
+
+  if Code.ensure_loaded?(Table.Reader) do
+    defimpl Table.Reader, for: Tds.Result do
+      def init(%{columns: columns}) when columns in [nil, []] do
+        {:rows, %{columns: [], count: 0}, []}
+      end
+
+      def init(result) do
+        {:rows, %{columns: result.columns, count: result.num_rows}, result.rows}
+      end
+    end
+  end
 end
