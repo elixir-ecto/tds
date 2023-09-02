@@ -1161,5 +1161,4 @@ defmodule Tds.Protocol do
     |> Keyword.values()
     |> Enum.max()
   end
-
 end
