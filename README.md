@@ -57,7 +57,36 @@ iex> Tds.query!(pid, "INSERT INTO MyTable (MyColumn) VALUES (@my_value)",
 
 ## Configuration
 
-Example configuration
+### Ecto Repo
+
+See Ecto's [getting started guide](https://hexdocs.pm/ecto/getting-started.html) for details.  The gist of it is:
+
+Define an Ecto repo:
+
+```elixir
+defmodule YourApp.Repo do
+  use Ecto.Repo,
+    otp_app: :your_app,
+    adapter: Ecto.Adapters.Tds
+end
+```
+
+Configure the repo:
+
+```elixir
+import Mix.Config
+
+config :your_app, YourApp.Repo,
+  hostname: "localhost",
+  username: "test_user",
+  password: "test_password",
+  database: "test_db",
+  port: 1433
+```
+
+Then you can start it manually or add it as a child in your application's `start/2` function.  
+
+### Without an Ecto repo
 
 ```elixir
 import Mix.Config
