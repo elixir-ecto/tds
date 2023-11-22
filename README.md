@@ -102,6 +102,7 @@ The following encryption behaviours are currently supported:
 - `:required`: Requires the server to use TLS
 - `:on`: Same as required
 - `:not_supported`: Indicates to the server that encryption is not supported. If server requires encryption, the connection will not be established.
+- `:ssl_opts`: Allow pass options for ssl connection (this options are the same as ssl erlang standart library).
 
 Currently not supported:
 
