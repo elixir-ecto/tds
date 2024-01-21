@@ -505,7 +505,6 @@ defmodule Tds.Types do
           data != <<0x00>>
 
         data_type_code == @tds_data_type_floatn ->
-          data = data <> tail
           len = length * 8
           <<val::little-float-size(len), _::binary>> = data
           val
