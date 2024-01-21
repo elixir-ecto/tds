@@ -2,7 +2,7 @@ defmodule Tds.Mixfile do
   use Mix.Project
 
   @source_url "https://github.com/elixir-ecto/tds"
-  @version "2.3.4"
+  @version "2.3.5"
 
   def project do
     [
