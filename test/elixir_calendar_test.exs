@@ -72,6 +72,24 @@ defmodule ElixirCalendarTest do
     assert [[date]] == query("select @1", [%P{name: "@1", value: date}])
   end
 
+  test "Elixir.Date insert nil value", context do
+    :ok = query("CREATE TABLE #date_test (x date)", [])
+
+    :ok =
+      query("insert into #date_test values (@param1), (@param2)", [
+        %Tds.Parameter{
+          name: "@param1",
+          value: ~D[2024-01-01]
+        },
+        %Tds.Parameter{
+          name: "@param2",
+          value: nil
+        }
+      ])
+
+    assert [[~D[2024-01-01]], [nil]] = query("select x from #date_test", [])
+  end
+
   test "Elixir.NaiveDateTime type", context do
     # sql server datetime precision is not exacly 3 decimals precise, value is rader
     # round up to nearest .000, .003, .007. In case of near midnigh day is incremented
