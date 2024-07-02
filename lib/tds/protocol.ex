@@ -391,7 +391,7 @@ defmodule Tds.Protocol do
     server =
       data
       |> String.split(";;")
-      |> Enum.slice(0..-2)
+      |> Enum.slice(0..-2//-1)
       |> Enum.reduce([], fn str, acc ->
         server =
           str
