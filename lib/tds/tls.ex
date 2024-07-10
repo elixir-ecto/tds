@@ -206,7 +206,7 @@ defmodule Tds.Tls do
 
   def handle_info({tag, _} = msg, %{owner_pid: pid} = s) when tag in [:tcp_closed, :ssl_closed] do
     Kernel.send(pid, msg)
-    {:stop, tag, s}
+    {:noreply, s}
   end
 
   def handle_info({tag, _, _} = msg, %{owner_pid: pid} = s)
