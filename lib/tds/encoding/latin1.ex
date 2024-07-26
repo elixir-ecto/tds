@@ -29,7 +29,7 @@ defmodule Tds.Encoding.Latin1 do
   def encode(str, encoding) when is_binary(str) do
     raise Tds.Error,
           "`Tds.Encoding.Latin1` does not support encoding `#{encoding}`. " <>
-            "Please set `:text_encoder` in your config.exs to a module supports it."
+            "Please set `:text_encoder` in your config.exs to a module that supports it."
   end
 
   def decode(binary, "utf-16le") when is_binary(binary) do
