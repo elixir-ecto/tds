@@ -94,8 +94,8 @@ defmodule Tds do
   @spec query_multi(conn, iodata, list, [execute_option]) ::
           {:ok, resultset()}
           | {:error, Exception.t()}
-  def query_multi(conn, statemnt, params, opts \\ []) do
-    query = %Query{statement: statemnt}
+  def query_multi(conn, statement, params, opts \\ []) do
+    query = %Query{statement: statement}
 
     opts =
       opts

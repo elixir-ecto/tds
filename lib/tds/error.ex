@@ -11,7 +11,7 @@ defmodule Tds.Error do
   ## Usage
 
       iex> raise Tds.Error
-      ** (Tds.Error) An error occured.
+      ** (Tds.Error) An error occurred.
 
       iex> raise Tds.Error, "some error"
       ** (Tds.Error) some error
@@ -63,7 +63,7 @@ defmodule Tds.Error do
       regex = String.replace_trailing(regex, "\n", "")
 
       if code == nil do
-        raise CompileError, "Error code must be integer value"
+        raise CompileError, "Error code must be an integer value"
       end
 
       {code, {type, regex}}

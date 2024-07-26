@@ -41,7 +41,7 @@ defmodule Tds.Protocol.Prelogin do
   # @trace_id_token 0x05
   @fed_auth_required_token 0x06
   @nonce_opt_token 0x07
-  @termintator_token 0xFF
+  @terminator_token 0xFF
 
   # Encryption flags
   @encryption_off 0x00
@@ -69,7 +69,7 @@ defmodule Tds.Protocol.Prelogin do
 
     {iodata, _} =
       stream
-      |> Enum.reduce({[[], @termintator_token, []], start_offset}, fn
+      |> Enum.reduce({[[], @terminator_token, []], start_offset}, fn
         {token, option_data}, {[options, term, data], offset} ->
           data_length = byte_size(option_data)
 
@@ -265,7 +265,7 @@ defmodule Tds.Protocol.Prelogin do
   end
 
   defp decode_tokens(
-         <<@termintator_token, tail::binary>>,
+         <<@terminator_token, tail::binary>>,
          tokens,
          _s
        ) do
