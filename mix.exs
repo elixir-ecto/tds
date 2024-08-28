@@ -24,7 +24,7 @@ defmodule Tds.Mixfile do
 
   def application do
     [
-      extra_applications: [:logger, :crypto, :db_connection, :decimal, :ssl],
+      extra_applications: [:logger, :crypto, :ssl],
       env: [
         json_library: Jason
       ]
