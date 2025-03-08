@@ -687,12 +687,10 @@ defmodule Tds.Types do
 
   # Decimal
   def decode_decimal(precision, scale, <<sign::int8(), value::binary>>) do
+    set_decimal_precision(precision)
+
     size = byte_size(value)
     <<value::little-size(size)-unit(8)>> = value
-
-    Decimal.Context.get()
-    |> Map.put(:precision, precision)
-    |> Decimal.Context.set()
 
     case sign do
       0 -> Decimal.new(-1, value, -scale)
@@ -878,9 +876,7 @@ defmodule Tds.Types do
   end
 
   def encode_decimal_type(%Parameter{value: value}) do
-    d_ctx = Decimal.Context.get()
-    d_ctx = %{d_ctx | precision: 38}
-    Decimal.Context.set(d_ctx)
+    set_decimal_precision(38)
 
     value_list =
       value
@@ -933,9 +929,7 @@ defmodule Tds.Types do
   end
 
   def encode_float_type(%Parameter{value: %Decimal{} = value}) do
-    d_ctx = Decimal.Context.get()
-    d_ctx = %{d_ctx | precision: 38}
-    Decimal.Context.set(d_ctx)
+    set_decimal_precision(38)
 
     value_list =
       value
@@ -1124,9 +1118,7 @@ defmodule Tds.Types do
   end
 
   def encode_decimal_descriptor(%Parameter{value: %Decimal{} = dec}) do
-    d_ctx = Decimal.Context.get()
-    d_ctx = %{d_ctx | precision: 38}
-    Decimal.Context.set(d_ctx)
+    set_decimal_precision(38)
 
     value_list =
       dec
@@ -1284,9 +1276,7 @@ defmodule Tds.Types do
 
   # decimal
   def encode_data(@tds_data_type_decimaln, %Decimal{} = value, attr) do
-    d_ctx = Decimal.Context.get()
-    d_ctx = %{d_ctx | precision: 38}
-    Decimal.Context.set(d_ctx)
+    set_decimal_precision(38)
     precision = attr[:precision]
 
     d =
@@ -1882,5 +1872,11 @@ defmodule Tds.Types do
     type = @tds_data_type_datetimeoffsetn
     data = <<type, 0x07>>
     {type, data, scale: 7}
+  end
+
+  defp set_decimal_precision(precision) do
+    Decimal.Context.get()
+    |> Map.put(:precision, precision)
+    |> Decimal.Context.set()
   end
 end
