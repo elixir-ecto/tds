@@ -1300,12 +1300,12 @@ defmodule Tds.Types do
         -1 -> 0
       end
 
-    d_abs = Decimal.abs(d)
-
-    value = d_abs.coef
-
     value_binary =
       value
+      |> Decimal.abs()
+      |> Decimal.to_string(:normal)
+      |> String.replace(".", "")
+      |> String.to_integer()
       |> :binary.encode_unsigned(:little)
 
     value_size = byte_size(value_binary)
@@ -1318,8 +1318,8 @@ defmodule Tds.Types do
         precision <= 38 -> 16
       end
 
-    {byte_len, padding} = {len, len - value_size}
-    byte_len = byte_len + 1
+    padding = len - value_size
+    byte_len = len + 1
     value_binary = value_binary <> <<0::size(padding)-unit(8)>>
     <<byte_len>> <> <<sign>> <> value_binary
   end
