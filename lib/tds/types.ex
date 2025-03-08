@@ -696,7 +696,7 @@ defmodule Tds.Types do
 
     case sign do
       0 -> Decimal.new(-1, value, -scale)
-      _ -> Decimal.new(1, value, -scale)
+      1 -> Decimal.new(1, value, -scale)
     end
   end
 
