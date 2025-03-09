@@ -208,7 +208,7 @@ defmodule Tds.TypesTest do
       # %Tds.Error{message: nil, mssql: %{state: 8, number: 8115, line_number:
       # 1, msg_text: \"Arithmetic overflow error converting numeric to data type numeric.\",
       # server_name: \"04e0392f6c76\", class: 16, proc_name: \"\"}}
-      message = ~r/Axrithmetic overflow error converting numeric to data type numeric/
+      message = ~r/Arithmetic overflow error converting numeric to data type numeric/
       assert_raise MatchError, message, fn -> insert_decimal(value, context) end
     end
 
