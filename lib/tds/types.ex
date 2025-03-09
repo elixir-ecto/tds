@@ -695,6 +695,7 @@ defmodule Tds.Types do
     case sign do
       0 -> Decimal.new(-1, value, -scale)
       1 -> Decimal.new(1, value, -scale)
+      _ -> raise ArgumentError, "Sign value out of range. Expected 0 or 1, got #{inspect(sign)}"
     end
   end
 
