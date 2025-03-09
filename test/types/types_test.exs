@@ -28,10 +28,11 @@ defmodule Tds.TypesTest do
     end
 
     query("DROP TABLE IF EXISTS foo", [])
-    query("CREATE TABLE foo (col DECIMAL(#{precision}, #{scale}) NOT NULL)", [])
+    query("CREATE TABLE foo (col DECIMAL(#{precision}, #{scale}) NULL)", [])
   end
 
-  defp insert_decimal(%Decimal{} = value, context) do
+  @spec insert_decimal(Decimal.t() | nil, map) :: Decimal.t()
+  defp insert_decimal(value, context) do
     query("TRUNCATE TABLE foo", [])
 
     :ok =
@@ -153,6 +154,7 @@ defmodule Tds.TypesTest do
   describe "inserting decimal values into the database" do
     setup :create_table
 
+    @tag precision: 10, scale: 4
     test "inserts various decimal values", context do
       assert insert_decimal(Decimal.new("1000"), context) == Decimal.new("1000.0000")
       assert insert_decimal(Decimal.new("1000.0000"), context) == Decimal.new("1000.0000")
@@ -166,16 +168,65 @@ defmodule Tds.TypesTest do
       assert insert_decimal(Decimal.new("-1E+3"), context) == Decimal.new("-1000.0000")
     end
 
-    test "rounds decimals with more decimal places than column", context do
-      assert insert_decimal(Decimal.new("1000.12345678"), context) == Decimal.new("1000.1235")
+    @tag precision: 5, scale: 2
+    test "decodes decimal type with precision 5 and scale 2", context do
+      assert insert_decimal(Decimal.new("123.45"), context) == Decimal.new("123.45")
+      assert insert_decimal(Decimal.new("-123.45"), context) == Decimal.new("-123.45")
+    end
+
+    @tag precision: 10, scale: 5
+    test "decodes decimal type to 99999.99999", context do
+      assert insert_decimal(Decimal.new("99999.99999"), context) == Decimal.new("99999.99999")
+    end
+
+    @tag precision: 2, scale: 1
+    test "decodes decimal type to 9.9", context do
+      assert insert_decimal(Decimal.new("9.9"), context) == Decimal.new("9.9")
+    end
+
+    @tag precision: 38, scale: 0
+    test "decodes to exact value with 0 scale", context do
+      value = Decimal.new("99999999999999999999999999999999999999")
+      assert insert_decimal(value, context) == value
+    end
+
+    @tag precision: 5, scale: 2
+    test "decodes to NULL", context do
+      assert insert_decimal(nil, context) == nil
+    end
+
+    @tag precision: 5, scale: 2
+    test "rounds up fractional parts", context do
+      assert insert_decimal(Decimal.new("123.456"), context) == Decimal.new("123.46")
+      assert insert_decimal(Decimal.new("123.454"), context) == Decimal.new("123.45")
+      assert insert_decimal(Decimal.new("-0.00001"), context) == Decimal.new("0.00")
+    end
+
+    @tag precision: 2, scale: 1, capture_log: true
+    test "raises an error with truncated value (cannot round non-fractional parts)", context do
+      value = Decimal.new("9.99")
+      # %Tds.Error{message: nil, mssql: %{state: 8, number: 8115, line_number:
+      # 1, msg_text: \"Arithmetic overflow error converting numeric to data type numeric.\",
+      # server_name: \"04e0392f6c76\", class: 16, proc_name: \"\"}}
+      message = ~r/Axrithmetic overflow error converting numeric to data type numeric/
+      assert_raise MatchError, message, fn -> insert_decimal(value, context) end
     end
 
     # Maximum precision and scale for SQL Server
     # https://learn.microsoft.com/en-us/sql/t-sql/data-types/precision-scale-and-length-transact-sql?view=sql-server-ver16#remarks
     @tag precision: 38, scale: 18
     test "inserts very large decimal", context do
-      assert insert_decimal(Decimal.new("99999999999999999999.999999999999999999"), context) ==
-               Decimal.new("99999999999999999999.999999999999999999")
+      # 38 digits
+      value = Decimal.new("99999999999999999999.999999999999999999")
+      assert insert_decimal(value, context) == value
+    end
+
+    @tag precision: 38, scale: 18, capture_log: true
+    test "raises an error with value larger than SQL Server maximum", context do
+      # 39 digits
+      value = Decimal.new("999999999999999999999.9999999999999999999")
+      message = ~r/size \(39\) given to the type 'decimal' exceeds the maximum allowed \(38\)/
+      assert_raise(MatchError, message, fn -> insert_decimal(value, context) end)
     end
 
     test "inserts very small decimal", context do
