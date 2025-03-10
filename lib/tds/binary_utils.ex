@@ -175,22 +175,22 @@ defmodule Tds.BinaryUtils do
   defmacro int64, do: quote(do: signed - 64)
 
   @doc """
-  A 8-bit signed unsigned integer.
+  A 8-bit unsigned integer.
   """
   defmacro uint8, do: quote(do: unsigned - 8)
 
   @doc """
-  A 16-bit signed unsigned integer.
+  A 16-bit unsigned integer.
   """
   defmacro uint16, do: quote(do: unsigned - 16)
 
   @doc """
-  A 32-bit signed unsigned integer.
+  A 32-bit unsigned integer.
   """
   defmacro uint32, do: quote(do: unsigned - 32)
 
   @doc """
-  A 64-bit signed unsigned integer.
+  A 64-bit unsigned integer.
   """
   defmacro uint64, do: quote(do: unsigned - 64)
 
@@ -199,6 +199,9 @@ defmodule Tds.BinaryUtils do
   """
   defmacro float64, do: quote(do: signed - float - 64)
 
+  @doc """
+  A 32-bit signed float.
+  """
   defmacro float32, do: quote(do: signed - float - 32)
 
   defmacro binary(size), do: quote(do: binary - size(unquote(size)))
