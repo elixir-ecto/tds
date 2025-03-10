@@ -131,12 +131,13 @@ end
   CREATE TABLE [uniques] ([id] int NOT NULL, CONSTRAINT UIX_uniques_id UNIQUE([id]))
   """)
 
-{"Changed database context to 'test'." <> _, 0} =
+{"", 0} =
   Tds.TestHelper.sqlcmd(opts, """
-  USE test
-  GO
-  CREATE SCHEMA test;
+  IF NOT EXISTS (SELECT * FROM sys.schemas WHERE name = 'test')
+  EXEC('CREATE SCHEMA [test]')
   """)
+
+{"Changed database context to 'test'." <> _, 0} = Tds.TestHelper.sqlcmd(opts, "USE test;")
 
 # :dbg.start()
 # :dbg.tracer()
