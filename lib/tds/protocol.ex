@@ -186,7 +186,7 @@ defmodule Tds.Protocol do
   after
     Process.delete(:resultset)
 
-    unless is_nil(handle) do
+    if not is_nil(handle) do
       handle_close(query, opts, %{s | state: :executing})
     end
   end

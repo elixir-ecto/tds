@@ -9,7 +9,7 @@ defmodule Tds.Ucs2TableTest do
 
   test "should encode/decode correctly ucs2 strings", context do
     __DIR__
-    |> Path.join('ucs_2_table.txt')
+    |> Path.join(~c"ucs_2_table.txt")
     |> File.stream!([encoding: :utf8], :line)
     # note: `[ ]  00A0  NO-BREAK SPACE (skip)` since it fails for some reason
     |> Stream.filter(&(not (&1 =~ "(skip)")))

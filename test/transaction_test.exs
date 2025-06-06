@@ -37,7 +37,7 @@ defmodule Tds.TransactionTest do
                         []
                       )
 
-             assert {:ok, %Tds.Result{columns: [""], num_rows: 1, rows: ['*']}} =
+             assert {:ok, %Tds.Result{columns: [""], num_rows: 1, rows: [~c"*"]}} =
                       Tds.query(conn, "SELECT 42", [])
 
              :hi
@@ -60,7 +60,7 @@ defmodule Tds.TransactionTest do
                         []
                       )
 
-             assert {:ok, %Tds.Result{columns: [""], num_rows: 1, rows: ['*']}} =
+             assert {:ok, %Tds.Result{columns: [""], num_rows: 1, rows: [~c"*"]}} =
                       Tds.query(conn, "SELECT 42", [])
 
              Tds.rollback(conn, :oops)
@@ -95,7 +95,7 @@ defmodule Tds.TransactionTest do
 
                assert DBConnection.status(conn, opts) == :error
 
-               assert {:ok, %Tds.Result{columns: [""], num_rows: 1, rows: ['*']}} =
+               assert {:ok, %Tds.Result{columns: [""], num_rows: 1, rows: [~c"*"]}} =
                         Tds.query(conn, "SELECT 42", [], opts)
 
                assert DBConnection.status(conn, opts) == :error

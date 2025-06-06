@@ -3,7 +3,7 @@ defmodule TdsProtocolTest do
   require Logger
   use ExUnit.Case, async: true
 
-  @tag timeout: 50_000
+
   @moduletag :capture_log
 
   setup do

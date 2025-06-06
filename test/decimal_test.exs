@@ -5,8 +5,6 @@ defmodule DecimalTest do
 
   alias Tds.Parameter
 
-  @tag timeout: 50_000
-
   setup do
     {:ok, pid} = Tds.start_link(opts())
 

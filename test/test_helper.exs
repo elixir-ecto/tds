@@ -118,7 +118,9 @@ case Tds.TestHelper.sqlcmd(opts, """
      END;
      CREATE DATABASE [#{database}];
      """) do
-  {"", 0} -> :ok
+  {"", 0} ->
+    :ok
+
   {err, _} ->
     raise RuntimeError, "Failed to create database '#{database}' due #{err}"
 end
