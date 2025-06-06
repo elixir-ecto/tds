@@ -31,30 +31,34 @@ defmodule Tds.Tls do
   end
 
   def controlling_process(socket, tls_conn_pid) do
-    socket
-    |> assert_connected!()
-    |> GenServer.call({:controlling_process, tls_conn_pid})
+    case assert_connected!(socket) do
+      :closed -> {:error, :closed}
+      pid -> GenServer.call(pid, {:controlling_process, tls_conn_pid})
+    end
   end
 
   def send(socket, payload) do
-    socket
-    |> assert_connected!()
-    |> GenServer.call({:send, payload})
+    case assert_connected!(socket) do
+      :closed -> {:error, :closed}
+      pid -> GenServer.call(pid, {:send, payload})
+    end
   end
 
   def recv(socket, length, timeout \\ :infinity) do
-    socket
-    |> assert_connected!()
-    |> GenServer.call({:recv, length, timeout}, timeout)
+    case assert_connected!(socket) do
+      :closed -> {:error, :closed}
+      pid -> GenServer.call(pid, {:recv, length, timeout}, timeout)
+    end
   end
 
   defdelegate getopts(port, options), to: :inet
 
   # defdelegate setopts(socket, options), to: :inet
   def setopts(socket, options) do
-    socket
-    |> assert_connected!()
-    |> GenServer.call({:setopts, options})
+    case assert_connected!(socket) do
+      :closed -> {:error, :closed}
+      pid -> GenServer.call(pid, {:setopts, options})
+    end
   end
 
   defdelegate peername(socket), to: :inet
@@ -81,10 +85,12 @@ defmodule Tds.Tls do
       defdelegate unquote(name)(arg1, arg2, arg3, arg4), to: :gen_tcp
   end)
 
-  # Asserts that the port / socket is still open and returns its `pid`
+  # Asserts that the port / socket is still open and returns its `pid` or :error atom for closed connections
   defp assert_connected!(socket) do
-    {:connected, pid} = Port.info(socket, :connected)
-    pid
+    case Port.info(socket, :connected) do
+      {:connected, pid} -> pid
+      nil -> :closed
+    end
   end
 
   # SERVER
