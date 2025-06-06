@@ -9,7 +9,7 @@ on:
 jobs:
   tests:
     name: Unit Tests
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-22.04
     services:
       mssql:
         image: mcr.microsoft.com/${{ matrix.mssql.version }}
@@ -51,8 +51,10 @@ jobs:
     steps:
       - name: Install MSSql Client Tools
         run: |
+          curl https://packages.microsoft.com/keys/microsoft.asc | sudo tee /etc/apt/trusted.gpg.d/microsoft.asc
+          curl https://packages.microsoft.com/config/ubuntu/22.04/prod.list | sudo tee /etc/apt/sources.list.d/mssql-release.list
           sudo apt-get update
-          sudo apt-get install -y mssql-tools unixodbc-dev
+          sudo apt-get install mssql-tools18 unixodbc-dev
 
       - uses: actions/checkout@v2
 
@@ -87,5 +89,5 @@ jobs:
 
       - name: Run Tests
         run: |
-          export PATH=/opt/mssql-tools/bin:$PATH
+          export PATH=/opt/mssql-tools18/bin:$PATH
           mix test
