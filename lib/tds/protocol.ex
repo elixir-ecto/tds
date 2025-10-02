@@ -363,8 +363,30 @@ defmodule Tds.Protocol do
 
     s = %{s | opts: opts}
 
+    # SOCKS5 proxy support
+    proxy_host = Keyword.get(opts, :proxy_host)
+    proxy_port = Keyword.get(opts, :proxy_port, 1080)
+    proxy_username = Keyword.get(opts, :proxy_username)
+    proxy_password = Keyword.get(opts, :proxy_password)
+
+    connection_result =
+      if proxy_host do
+        socks_connect(
+          proxy_host,
+          proxy_port,
+          host,
+          port,
+          proxy_username,
+          proxy_password,
+          sock_opts,
+          timeout
+        )
+      else
+        :gen_tcp.connect(host, port, sock_opts, timeout)
+      end
+
     # Initalize TCP connection with the SQL Server
-    with {:ok, sock} <- :gen_tcp.connect(host, port, sock_opts, timeout),
+    with {:ok, sock} <- connection_result,
          {:ok, buffers} <- :inet.getopts(sock, [:sndbuf, :recbuf, :buffer]),
          :ok <- :inet.setopts(sock, buffer: max_buf_size(buffers)) do
       # Send Prelogin message to SQL Server
@@ -379,6 +401,59 @@ defmodule Tds.Protocol do
     else
       {:error, error} ->
         {:error, %Tds.Error{message: "tcp connect: #{error}"}}
+    end
+  end
+
+  defp socks_connect(
+         proxy_host,
+         proxy_port,
+         target_host,
+         target_port,
+         username,
+         password,
+         sock_opts,
+         timeout
+       ) do
+    with {:ok, sock} <-
+           :gen_tcp.connect(String.to_charlist(proxy_host), proxy_port, sock_opts, timeout) do
+      # SOCKS5 greeting: version 5, support no-auth (0x00) and user/pass (0x02)
+      :gen_tcp.send(sock, <<5, 2, 0, 2>>)
+      {:ok, <<5, method>>} = :gen_tcp.recv(sock, 2)
+
+      case method do
+        # User/pass auth
+        2 ->
+          user_bin = :erlang.iolist_to_binary(username || "")
+          pass_bin = :erlang.iolist_to_binary(password || "")
+
+          :gen_tcp.send(
+            sock,
+            <<1, byte_size(user_bin)>> <> user_bin <> <<byte_size(pass_bin)>> <> pass_bin
+          )
+
+          {:ok, <<1, status>>} = :gen_tcp.recv(sock, 2)
+          if status != 0, do: raise("SOCKS5 auth failed")
+
+        # No auth, proceed
+        0 ->
+          :ok
+
+        _ ->
+          raise "SOCKS5 unsupported method"
+      end
+
+      # Connect request: ver 5, cmd 1 (connect), rsv 0, addr type 3 (domain), addr len + addr, port
+      host_bin = :erlang.iolist_to_binary(target_host)
+
+      :gen_tcp.send(
+        sock,
+        <<5, 1, 0, 3, byte_size(host_bin)>> <>
+          host_bin <> <<div(target_port, 256), rem(target_port, 256)>>
+      )
+
+      # Read full reply
+      {:ok, <<5, rep, 0, _atype, _rest::binary>>} = :gen_tcp.recv(sock, 0)
+      if rep == 0, do: {:ok, sock}, else: raise("SOCKS5 connect failed: #{rep}")
     end
   end
 
