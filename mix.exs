@@ -18,6 +18,9 @@ defmodule Tds.Mixfile do
         tds_encoding: [
           mode: if(Mix.env() == :prod, do: :release, else: :debug)
         ]
+      ],
+      preferred_cli_env: [
+        test: :test
       ]
     ]
   end
@@ -39,7 +42,8 @@ defmodule Tds.Mixfile do
       {:ex_doc, "~> 0.19", only: :docs},
       {:excoding, "~> 0.1", optional: true, only: :test},
       {:tzdata, "~> 1.0", optional: true, only: :test},
-      {:table, "~> 0.1.0", optional: true}
+      {:table, "~> 0.1.0", optional: true},
+      {:credo, "~> 1.7", only: [:dev, :test], runtime: false}
     ]
   end
 

@@ -222,8 +222,19 @@ If you do not have specific requirements on how you would like to start sql serv
 in docker, you can use script for this repo.
 
 ```bash
-$ ./docker-mssql.sh
+$ docker compose up -d --profile=<check_profile_in_compose>
 ```
+
+👉🏻 OR  you can let mix task to detect platform you are using and chose best option for you.
+
+```
+mix docker.compose up
+```
+
+you can see more details about options for `mix docker.compose` taks by running help `mix help docker.compose`
+
+
+it will do but in some cases you may want to use `mix docker.compose up` so it detects for you which platform you are using, so it will use appropriate image.
 
 If you prefer to install SQL Server directly on your computer, you can find
 installation instructions here:
