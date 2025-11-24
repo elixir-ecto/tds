@@ -364,22 +364,22 @@ defmodule Tds.Protocol do
     s = %{s | opts: opts}
 
     # Initalize TCP connection with the SQL Server
-    with {:ok, sock} <- :gen_tcp.connect(host, port, sock_opts, timeout),
-         {:ok, buffers} <- :inet.getopts(sock, [:sndbuf, :recbuf, :buffer]),
-         :ok <- :inet.setopts(sock, buffer: max_buf_size(buffers)) do
-      # Send Prelogin message to SQL Server
-      case send_prelogin(%{s | sock: {:gen_tcp, sock}}) do
-        {:error, error, _state} ->
-          :gen_tcp.close(sock)
-          {:error, error}
+    case :gen_tcp.connect(host, port, sock_opts, timeout) do
+      {:ok, sock} ->
+         with {:ok, buffers} <- :inet.getopts(sock, [:sndbuf, :recbuf, :buffer]),
+              :ok <- :inet.setopts(sock, buffer: max_buf_size(buffers)),
+              {:ok, s} <- send_prelogin(%{s | sock: {:gen_tcp, sock}}) do
+           {:ok, s}
+         else
+           {:disconnect, exception, _state} ->
+             :gen_tcp.close(sock)
+             {:error, exception}
 
-        {:ok, _} = ret ->
-          ret
+            {:error, error} ->
+              :gen_tcp.close(sock)
+              {:error, %Tds.Error{message: "tcp connect: #{error}"}}
+          end
 
-        other ->
-          {:error, other}
-      end
-    else
       {:error, error} ->
         {:error, %Tds.Error{message: "tcp connect: #{error}"}}
     end
@@ -854,8 +854,6 @@ defmodule Tds.Protocol do
       buffer
       |> IO.iodata_to_binary()
       |> decode(s)
-    else
-      other -> other
     end
   end
 
