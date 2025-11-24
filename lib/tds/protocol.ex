@@ -855,7 +855,6 @@ defmodule Tds.Protocol do
       |> IO.iodata_to_binary()
       |> decode(s)
     else
-      {:disconnect, _ex, _s} = res -> {0, res}
       other -> other
     end
   end
