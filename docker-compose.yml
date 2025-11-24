@@ -1,0 +1,54 @@
+services:
+  tds-mssql-amd64:
+    profiles: ["mssql_amd64"]
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    platform: "linux/amd64"
+    container_name: tds-mssql-amd64
+    environment:
+      ACCEPT_EULA: "Y"
+      MSSQL_SA_PASSWORD: "some!Password"
+      MSSQL_PID: "Developer"
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "/opt/mssql-tools/bin/sqlcmd",
+          "-U",
+          "sa",
+          "-P",
+          "Password!",
+          "-Q",
+          "select 1",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    ports:
+      - "1433:1433"
+
+  tds-mssql-arm64:
+    profiles: ["mssql_arm64"]
+    image: mcr.microsoft.com/azure-sql-edge:latest
+    platform: "linux/arm64"
+    container_name: tds-mssql-arm64
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "/opt/mssql-tools/bin/sqlcmd",
+          "-U",
+          "sa",
+          "-P",
+          "Password!",
+          "-Q",
+          "select 1",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    environment:
+      ACCEPT_EULA: "1"
+      MSSQL_SA_PASSWORD: "some!Password"
+      MSSQL_PID: "Developer"
+    ports:
+      - "1433:1433"
