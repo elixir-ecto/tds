@@ -371,7 +371,7 @@ defmodule Tds.Protocol do
               {:ok, s} <- send_prelogin(%{s | sock: {:gen_tcp, sock}}) do
            {:ok, s}
          else
-           {:disconnect, exception, _state} ->
+           {_error_or_disconnect, exception, _state} ->
              :gen_tcp.close(sock)
              {:error, exception}
 
