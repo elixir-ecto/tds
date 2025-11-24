@@ -375,9 +375,9 @@ defmodule Tds.Protocol do
              :gen_tcp.close(sock)
              {:error, exception}
 
-            {:error, error} ->
-              :gen_tcp.close(sock)
-              {:error, %Tds.Error{message: "tcp connect: #{error}"}}
+           {:error, error} ->
+             :gen_tcp.close(sock)
+             {:error, %Tds.Error{message: "tcp connect: #{error}"}}
           end
 
       {:error, error} ->
