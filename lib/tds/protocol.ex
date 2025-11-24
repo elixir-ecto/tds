@@ -366,19 +366,19 @@ defmodule Tds.Protocol do
     # Initalize TCP connection with the SQL Server
     case :gen_tcp.connect(host, port, sock_opts, timeout) do
       {:ok, sock} ->
-         with {:ok, buffers} <- :inet.getopts(sock, [:sndbuf, :recbuf, :buffer]),
-              :ok <- :inet.setopts(sock, buffer: max_buf_size(buffers)),
-              {:ok, s} <- send_prelogin(%{s | sock: {:gen_tcp, sock}}) do
-           {:ok, s}
-         else
-           {_error_or_disconnect, exception, _state} ->
-             :gen_tcp.close(sock)
-             {:error, exception}
+        with {:ok, buffers} <- :inet.getopts(sock, [:sndbuf, :recbuf, :buffer]),
+             :ok <- :inet.setopts(sock, buffer: max_buf_size(buffers)),
+             {:ok, s} <- send_prelogin(%{s | sock: {:gen_tcp, sock}}) do
+          {:ok, s}
+        else
+          {_error_or_disconnect, exception, _state} ->
+            :gen_tcp.close(sock)
+            {:error, exception}
 
-           {:error, error} ->
-             :gen_tcp.close(sock)
-             {:error, %Tds.Error{message: "tcp connect: #{error}"}}
-         end
+          {:error, error} ->
+            :gen_tcp.close(sock)
+            {:error, %Tds.Error{message: "tcp connect: #{error}"}}
+        end
 
       {:error, error} ->
         {:error, %Tds.Error{message: "tcp connect: #{error}"}}
