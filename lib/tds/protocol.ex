@@ -373,8 +373,11 @@ defmodule Tds.Protocol do
           :gen_tcp.close(sock)
           {:error, error}
 
+        {:ok, _} = ret ->
+          ret
+
         other ->
-          other
+          {:error, other}
       end
     else
       {:error, error} ->
