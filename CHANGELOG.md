@@ -324,11 +324,7 @@ could not determine if binary is of uuid type, it interpreted such values as raw
 ### Enhancements
   * Added API for ATTN call
 
-<<<<<<< HEAD
-## v0.1.5
-=======
 ## v0.1.5 - 2015-02-19
->>>>>>> 1007dc1 (Misc doc changes)
 ### Bug Fixes
   * Fixed issue where driver would not call Connection.next when setting the state to :ready
   * Fixed UCS2 Encoding
