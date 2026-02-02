@@ -50,7 +50,7 @@ defmodule Tds.BinaryUtils do
   @doc """
   An unsigned 4-byte (32-bit) value. The range when used as a numeric value is 0 to (2^32)- 1.
   """
-  defmacro dword, do: quote(do: unsigned - 32)
+  defmacro dword, do: quote(do: little - unsigned - 32)
 
   @doc """
   An unsigned single byte (8-bit) value representing a character. The range is 0 to 255.
