@@ -197,16 +197,14 @@ defmodule Tds.Protocol.Login7 do
   # Return the current pid
   # If that fails return a "default" pid
   defp pid! do
-    value =
-      self()
-      |> :erlang.pid_to_list()
-      |> to_string()
-      |> String.split(".")
-      |> Enum.at(1)
-      |> String.to_integer()
+    System.pid()
+    |> Integer.parse()
+    |> case do
+      {pid, ""} ->
+        <<pid::dword()>>
 
-    <<value::dword()>>
-  rescue
-    _ -> @client_pid
+      _ ->
+        @client_pid
+    end
   end
 end
