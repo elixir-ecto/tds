@@ -32,3 +32,4 @@ tds-*.tar
 priv/native
 native/tds_encoding/target
 tds.iml
+docs/

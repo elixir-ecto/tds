@@ -2,7 +2,7 @@ defmodule Tds.Mixfile do
   use Mix.Project
 
   @source_url "https://github.com/elixir-ecto/tds"
-  @version "2.3.6"
+  @version "2.3.7"
 
   def project do
     [
@@ -18,9 +18,6 @@ defmodule Tds.Mixfile do
         tds_encoding: [
           mode: if(Mix.env() == :prod, do: :release, else: :debug)
         ]
-      ],
-      preferred_cli_env: [
-        test: :test
       ]
     ]
   end
@@ -39,7 +36,7 @@ defmodule Tds.Mixfile do
       {:decimal, "~> 1.9 or ~> 2.0"},
       {:jason, "~> 1.0", optional: true},
       {:db_connection, "~> 2.1"},
-      {:ex_doc, "~> 0.19", only: :docs},
+      {:ex_doc, "~> 0.40.1", only: :dev, runtime: false, warn_if_outdated: true},
       {:excoding, "~> 0.1", optional: true, only: :test},
       {:tzdata, "~> 1.0", optional: true, only: :test},
       {:table, "~> 0.1.0", optional: true},
