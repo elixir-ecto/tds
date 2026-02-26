@@ -216,7 +216,7 @@ use it for the first time.
 
 The tests require an SQL Server database to be available on localhost.
 If you are not using Windows OS you can start sql server instance using Docker.
-Official SQL Server Docker image can be found [here](https://hub.docker.com/r/microsoft/mssql-server-linux).
+Official SQL Server Docker image can be found [here](https://hub.docker.com/r/microsoft/mssql-server).
 
 If you do not have specific requirements on how you would like to start sql server
 in docker, you can use script for this repo.
