@@ -22,13 +22,16 @@ defmodule Tds.Protocol.Constants do
   # ---------------------------------------------------------------------------
 
   @packet_types %{
-    prelogin: 0x12,
     sql_batch: 0x01,
     rpc: 0x03,
     tabular_result: 0x04,
     attention: 0x06,
+    bulk: 0x07,
+    fedauth_token: 0x08,
     transaction_manager: 0x0E,
-    login7: 0x10
+    login7: 0x10,
+    sspi: 0x11,
+    prelogin: 0x12
   }
 
   @doc "Returns the numeric packet type code for the given atom."
@@ -102,6 +105,8 @@ defmodule Tds.Protocol.Constants do
     nchar: 0xEF,
     xml: 0xF1,
     udt: 0xF0,
+    json: 0xF4,
+    vector: 0xF5,
     text: 0x23,
     image: 0x22,
     ntext: 0x63,
@@ -148,19 +153,29 @@ defmodule Tds.Protocol.Constants do
   # ---------------------------------------------------------------------------
 
   @tokens %{
+    offset: 0x78,
+    returnstatus: 0x79,
     colmetadata: 0x81,
-    done: 0xFD,
-    doneproc: 0xFE,
-    doneinproc: 0xFF,
+    altmetadata: 0x88,
+    dataclassification: 0xA3,
+    tabname: 0xA4,
+    colinfo: 0xA5,
+    order: 0xA9,
     error: 0xAA,
     info: 0xAB,
-    envchange: 0xE3,
-    loginack: 0xAD,
-    returnstatus: 0x79,
     returnvalue: 0xAC,
-    order: 0xA9,
+    loginack: 0xAD,
+    featureextack: 0xAE,
+    row: 0xD1,
     nbcrow: 0xD2,
-    row: 0xD1
+    altrow: 0xD3,
+    envchange: 0xE3,
+    sessionstate: 0xE4,
+    sspi: 0xED,
+    fedauthinfo: 0xEE,
+    done: 0xFD,
+    doneproc: 0xFE,
+    doneinproc: 0xFF
   }
 
   @doc "Returns the numeric token code for the given atom."
@@ -288,5 +303,48 @@ defmodule Tds.Protocol.Constants do
   @doc "Returns the numeric isolation level for the given atom."
   defmacro isolation_level(name) do
     Map.fetch!(@isolation_levels, name)
+  end
+
+  # ---------------------------------------------------------------------------
+  # TDS Protocol Versions
+  # ---------------------------------------------------------------------------
+
+  @tds_versions %{
+    tds_7_0: 0x70000000,
+    tds_7_1: 0x71000001,
+    tds_7_2: 0x72090002,
+    tds_7_3a: 0x730A0003,
+    tds_7_3b: 0x730B0003,
+    tds_7_4: 0x74000004
+  }
+
+  @doc "Returns the 4-byte TDS version code for the given atom."
+  defmacro tds_version(name) do
+    Map.fetch!(@tds_versions, name)
+  end
+
+  # ---------------------------------------------------------------------------
+  # Login7 Feature Extension IDs
+  # ---------------------------------------------------------------------------
+
+  @feature_ids %{
+    sessionrecovery: 0x01,
+    fedauth: 0x02,
+    columnencryption: 0x04,
+    globaltransactions: 0x05,
+    azuresqlsupport: 0x08,
+    dataclassification: 0x09,
+    utf8_support: 0x0A,
+    azuresqldnscaching: 0x0B,
+    jsonsupport: 0x0D,
+    vectorsupport: 0x0E,
+    enhancedroutingsupport: 0x0F,
+    useragent: 0x10,
+    terminator: 0xFF
+  }
+
+  @doc "Returns the numeric feature extension ID for the given atom."
+  defmacro feature_id(name) do
+    Map.fetch!(@feature_ids, name)
   end
 end

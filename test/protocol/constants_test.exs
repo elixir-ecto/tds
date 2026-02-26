@@ -33,6 +33,18 @@ defmodule Tds.Protocol.ConstantsTest do
       assert Constants.packet_type(:login7) == 0x10
     end
 
+    test "bulk" do
+      assert Constants.packet_type(:bulk) == 0x07
+    end
+
+    test "fedauth_token" do
+      assert Constants.packet_type(:fedauth_token) == 0x08
+    end
+
+    test "sspi" do
+      assert Constants.packet_type(:sspi) == 0x11
+    end
+
     test "usable in binary pattern match" do
       packet = <<0x12, 0x01, 0x00, 0x08, 0x00, 0x00, 0x01, 0x00>>
       <<type::unsigned-8, _rest::binary>> = packet
@@ -169,6 +181,14 @@ defmodule Tds.Protocol.ConstantsTest do
       assert Constants.tds_type(:udt) == 0xF0
     end
 
+    test "json type code" do
+      assert Constants.tds_type(:json) == 0xF4
+    end
+
+    test "vector type code" do
+      assert Constants.tds_type(:vector) == 0xF5
+    end
+
     test "decimal legacy type code" do
       assert Constants.tds_type(:decimal) == 0x37
     end
@@ -234,8 +254,84 @@ defmodule Tds.Protocol.ConstantsTest do
   end
 
   describe "token/1" do
+    test "offset" do
+      assert Constants.token(:offset) == 0x78
+    end
+
+    test "returnstatus" do
+      assert Constants.token(:returnstatus) == 0x79
+    end
+
     test "colmetadata" do
       assert Constants.token(:colmetadata) == 0x81
+    end
+
+    test "altmetadata" do
+      assert Constants.token(:altmetadata) == 0x88
+    end
+
+    test "dataclassification" do
+      assert Constants.token(:dataclassification) == 0xA3
+    end
+
+    test "tabname" do
+      assert Constants.token(:tabname) == 0xA4
+    end
+
+    test "colinfo" do
+      assert Constants.token(:colinfo) == 0xA5
+    end
+
+    test "order" do
+      assert Constants.token(:order) == 0xA9
+    end
+
+    test "error" do
+      assert Constants.token(:error) == 0xAA
+    end
+
+    test "info" do
+      assert Constants.token(:info) == 0xAB
+    end
+
+    test "returnvalue" do
+      assert Constants.token(:returnvalue) == 0xAC
+    end
+
+    test "loginack" do
+      assert Constants.token(:loginack) == 0xAD
+    end
+
+    test "featureextack" do
+      assert Constants.token(:featureextack) == 0xAE
+    end
+
+    test "row" do
+      assert Constants.token(:row) == 0xD1
+    end
+
+    test "nbcrow" do
+      assert Constants.token(:nbcrow) == 0xD2
+    end
+
+    test "altrow" do
+      assert Constants.token(:altrow) == 0xD3
+    end
+
+    test "envchange" do
+      assert Constants.token(:envchange) == 0xE3
+    end
+
+    test "sessionstate" do
+      assert Constants.token(:sessionstate) == 0xE4
+    end
+
+    test "sspi" do
+      assert Constants.token(:sspi) == 0xED
+    end
+
+    test "fedauthinfo" do
+      assert Constants.token(:fedauthinfo) == 0xEE
     end
 
     test "done" do
@@ -248,42 +344,6 @@ defmodule Tds.Protocol.ConstantsTest do
 
     test "doneinproc" do
       assert Constants.token(:doneinproc) == 0xFF
-    end
-
-    test "error" do
-      assert Constants.token(:error) == 0xAA
-    end
-
-    test "info" do
-      assert Constants.token(:info) == 0xAB
-    end
-
-    test "envchange" do
-      assert Constants.token(:envchange) == 0xE3
-    end
-
-    test "loginack" do
-      assert Constants.token(:loginack) == 0xAD
-    end
-
-    test "returnstatus" do
-      assert Constants.token(:returnstatus) == 0x79
-    end
-
-    test "returnvalue" do
-      assert Constants.token(:returnvalue) == 0xAC
-    end
-
-    test "order" do
-      assert Constants.token(:order) == 0xA9
-    end
-
-    test "nbcrow" do
-      assert Constants.token(:nbcrow) == 0xD2
-    end
-
-    test "row" do
-      assert Constants.token(:row) == 0xD1
     end
 
     test "usable in binary pattern match" do
@@ -438,6 +498,92 @@ defmodule Tds.Protocol.ConstantsTest do
 
     test "serializable" do
       assert Constants.isolation_level(:serializable) == 0x05
+    end
+  end
+
+  describe "tds_version/1" do
+    test "tds_7_0" do
+      assert Constants.tds_version(:tds_7_0) == 0x70000000
+    end
+
+    test "tds_7_1" do
+      assert Constants.tds_version(:tds_7_1) == 0x71000001
+    end
+
+    test "tds_7_2" do
+      assert Constants.tds_version(:tds_7_2) == 0x72090002
+    end
+
+    test "tds_7_3a" do
+      assert Constants.tds_version(:tds_7_3a) == 0x730A0003
+    end
+
+    test "tds_7_3b" do
+      assert Constants.tds_version(:tds_7_3b) == 0x730B0003
+    end
+
+    test "tds_7_4" do
+      assert Constants.tds_version(:tds_7_4) == 0x74000004
+    end
+
+    test "usable in binary pattern match" do
+      data = <<0x74, 0x00, 0x00, 0x04>>
+      <<ver::unsigned-big-32>> = data
+      assert ver == Constants.tds_version(:tds_7_4)
+    end
+  end
+
+  describe "feature_id/1" do
+    test "sessionrecovery" do
+      assert Constants.feature_id(:sessionrecovery) == 0x01
+    end
+
+    test "fedauth" do
+      assert Constants.feature_id(:fedauth) == 0x02
+    end
+
+    test "columnencryption" do
+      assert Constants.feature_id(:columnencryption) == 0x04
+    end
+
+    test "globaltransactions" do
+      assert Constants.feature_id(:globaltransactions) == 0x05
+    end
+
+    test "azuresqlsupport" do
+      assert Constants.feature_id(:azuresqlsupport) == 0x08
+    end
+
+    test "dataclassification" do
+      assert Constants.feature_id(:dataclassification) == 0x09
+    end
+
+    test "utf8_support" do
+      assert Constants.feature_id(:utf8_support) == 0x0A
+    end
+
+    test "azuresqldnscaching" do
+      assert Constants.feature_id(:azuresqldnscaching) == 0x0B
+    end
+
+    test "jsonsupport" do
+      assert Constants.feature_id(:jsonsupport) == 0x0D
+    end
+
+    test "vectorsupport" do
+      assert Constants.feature_id(:vectorsupport) == 0x0E
+    end
+
+    test "enhancedroutingsupport" do
+      assert Constants.feature_id(:enhancedroutingsupport) == 0x0F
+    end
+
+    test "useragent" do
+      assert Constants.feature_id(:useragent) == 0x10
+    end
+
+    test "terminator" do
+      assert Constants.feature_id(:terminator) == 0xFF
     end
   end
 end
