@@ -104,43 +104,51 @@ defmodule Tds.Protocol.BinaryTest do
   end
 
   # ---------------------------------------------------------------------------
-  # Big-endian macros (Grammar baseline, for prelogin headers)
+  # Big-endian macros (for prelogin headers)
   # ---------------------------------------------------------------------------
 
-  test "ushort_be/0 works (big-endian unsigned 16-bit)" do
-    <<val::ushort_be()>> = <<0x00, 0x01>>
+  test "ushort(:big) works (big-endian unsigned 16-bit)" do
+    <<val::ushort(:big)>> = <<0x00, 0x01>>
     assert val == 1
   end
 
-  test "ulong_be/0 works (big-endian unsigned 32-bit)" do
-    <<val::ulong_be()>> = <<0x00, 0x00, 0x00, 0x01>>
+  test "ulong(:big) works (big-endian unsigned 32-bit)" do
+    <<val::ulong(:big)>> = <<0x00, 0x00, 0x00, 0x01>>
     assert val == 1
   end
 
-  test "dword_be/0 works (big-endian unsigned 32-bit)" do
-    <<val::dword_be()>> = <<0x00, 0x00, 0x00, 0x04>>
+  test "dword(:big) works (big-endian unsigned 32-bit)" do
+    <<val::dword(:big)>> = <<0x00, 0x00, 0x00, 0x04>>
     assert val == 4
   end
 
-  test "long_be/0 works (big-endian signed 32-bit)" do
-    <<val::long_be()>> = <<0xFF, 0xFF, 0xFF, 0xFF>>
+  test "long(:big) works (big-endian signed 32-bit)" do
+    <<val::long(:big)>> = <<0xFF, 0xFF, 0xFF, 0xFF>>
     assert val == -1
   end
 
-  test "longlong_be/0 works (big-endian signed 64-bit)" do
-    <<val::longlong_be()>> = <<0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF>>
+  test "longlong(:big) works (big-endian signed 64-bit)" do
+    <<val::longlong(:big)>> = <<0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF>>
     assert val == -1
   end
 
-  test "ulonglong_be/0 works (big-endian unsigned 64-bit)" do
-    <<val::ulonglong_be()>> = <<0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01>>
+  test "ulonglong(:big) works (big-endian unsigned 64-bit)" do
+    <<val::ulonglong(:big)>> = <<0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01>>
     assert val == 1
+  end
+
+  test "explicit :little matches default (no argument)" do
+    bytes = <<0x01, 0x00>>
+    <<default::ushort()>> = bytes
+    <<explicit::ushort(:little)>> = bytes
+    assert default == explicit
+    assert default == 1
   end
 
   test "big-endian and little-endian produce different results for same bytes" do
     bytes = <<0x01, 0x00>>
     <<le::ushort()>> = bytes
-    <<be::ushort_be()>> = bytes
+    <<be::ushort(:big)>> = bytes
     assert le == 1
     assert be == 256
   end

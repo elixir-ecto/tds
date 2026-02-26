@@ -8,11 +8,12 @@ defmodule Tds.Protocol.Binary do
 
   ## Byte Order Convention
 
-  Zero-arity macros (`ushort/0`, `ulong/0`, etc.) are **little-endian** —
-  the default for TDS data fields.
+  Multi-byte integer macros default to **little-endian** (the standard for
+  TDS data fields) and accept an optional `:big` or `:little` atom argument:
 
-  Big-endian variants have a `_be` suffix (`ushort_be/0`, `ulong_be/0`, etc.)
-  and are used for TDS prelogin header offsets/lengths per the MS-TDS spec.
+      <<val::ushort()>>        # little-endian (default)
+      <<val::ushort(:little)>> # explicit little-endian
+      <<val::ushort(:big)>>    # big-endian (for prelogin headers)
 
   ## Parameterized Macros
 
@@ -21,36 +22,72 @@ defmodule Tds.Protocol.Binary do
   """
 
   # ===========================================================================
-  # Unsigned integers — little-endian (from BinaryUtils)
+  # Unsigned integers — with optional endianness argument
   # ===========================================================================
 
   @doc "An unsigned single byte (8-bit) value. Range: 0..255."
   defmacro byte, do: quote(do: unsigned - 8)
 
-  @doc "An unsigned 2-byte (16-bit) little-endian value. Range: 0..65535."
-  defmacro ushort, do: quote(do: little - unsigned - 16)
+  @doc """
+  An unsigned 2-byte (16-bit) value. Range: 0..65535.
 
-  @doc "An unsigned 4-byte (32-bit) little-endian value. Range: 0..(2^32)-1."
-  defmacro ulong, do: quote(do: little - unsigned - 32)
+  Defaults to little-endian. Pass `:big` for big-endian.
+  """
+  defmacro ushort(endian \\ :little)
+  defmacro ushort(:little), do: quote(do: little - unsigned - 16)
+  defmacro ushort(:big), do: quote(do: unsigned - 16)
 
-  @doc "Alias for `ulong/0`."
-  defmacro dword, do: quote(do: little - unsigned - 32)
+  @doc """
+  An unsigned 4-byte (32-bit) value. Range: 0..(2^32)-1.
 
-  @doc "An unsigned 8-byte (64-bit) little-endian value. Range: 0..(2^64)-1."
-  defmacro ulonglong, do: quote(do: little - unsigned - 64)
+  Defaults to little-endian. Pass `:big` for big-endian.
+  """
+  defmacro ulong(endian \\ :little)
+  defmacro ulong(:little), do: quote(do: little - unsigned - 32)
+  defmacro ulong(:big), do: quote(do: unsigned - 32)
+
+  @doc """
+  An unsigned 4-byte (32-bit) value. Alias for `ulong`.
+
+  Defaults to little-endian. Pass `:big` for big-endian.
+  """
+  defmacro dword(endian \\ :little)
+  defmacro dword(:little), do: quote(do: little - unsigned - 32)
+  defmacro dword(:big), do: quote(do: unsigned - 32)
+
+  @doc """
+  An unsigned 8-byte (64-bit) value. Range: 0..(2^64)-1.
+
+  Defaults to little-endian. Pass `:big` for big-endian.
+  """
+  defmacro ulonglong(endian \\ :little)
+  defmacro ulonglong(:little), do: quote(do: little - unsigned - 64)
+  defmacro ulonglong(:big), do: quote(do: unsigned - 64)
 
   @doc "An unsigned single byte (8-bit) value representing a character."
   defmacro uchar, do: quote(do: unsigned - 8)
 
   # ===========================================================================
-  # Signed integers — little-endian (from BinaryUtils)
+  # Signed integers — with optional endianness argument
   # ===========================================================================
 
-  @doc "A signed 4-byte (32-bit) little-endian value."
-  defmacro long, do: quote(do: little - signed - 32)
+  @doc """
+  A signed 4-byte (32-bit) value.
 
-  @doc "A signed 8-byte (64-bit) little-endian value."
-  defmacro longlong, do: quote(do: little - signed - 64)
+  Defaults to little-endian. Pass `:big` for big-endian.
+  """
+  defmacro long(endian \\ :little)
+  defmacro long(:little), do: quote(do: little - signed - 32)
+  defmacro long(:big), do: quote(do: signed - 32)
+
+  @doc """
+  A signed 8-byte (64-bit) value.
+
+  Defaults to little-endian. Pass `:big` for big-endian.
+  """
+  defmacro longlong(endian \\ :little)
+  defmacro longlong(:little), do: quote(do: little - signed - 64)
+  defmacro longlong(:big), do: quote(do: signed - 64)
 
   @doc "A signed 8-bit integer."
   defmacro int8, do: quote(do: signed - 8)
@@ -166,28 +203,6 @@ defmodule Tds.Protocol.Binary do
   @doc "A little-endian UCS-2 binary of `size` 16-bit code units."
   defmacro unicode(size),
     do: quote(do: binary - little - size(unquote(size)) - unit(16))
-
-  # ===========================================================================
-  # Big-endian variants (from Grammar, for prelogin headers)
-  # ===========================================================================
-
-  @doc "An unsigned 2-byte (16-bit) big-endian value."
-  defmacro ushort_be, do: quote(do: unsigned - 16)
-
-  @doc "An unsigned 4-byte (32-bit) big-endian value."
-  defmacro ulong_be, do: quote(do: unsigned - 32)
-
-  @doc "Alias for `ulong_be/0`."
-  defmacro dword_be, do: quote(do: unsigned - 32)
-
-  @doc "A signed 4-byte (32-bit) big-endian value."
-  defmacro long_be, do: quote(do: signed - 32)
-
-  @doc "A signed 8-byte (64-bit) big-endian value."
-  defmacro longlong_be, do: quote(do: signed - 64)
-
-  @doc "An unsigned 8-byte (64-bit) big-endian value."
-  defmacro ulonglong_be, do: quote(do: unsigned - 64)
 
   # ===========================================================================
   # Parameterized macros (from Grammar, for collation and structured fields)
