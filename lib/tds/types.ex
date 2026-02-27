@@ -58,7 +58,7 @@ defmodule Tds.Types do
       tds_type(:tinyint) -> :tinyint
       tds_type(:bit) -> :bit
       tds_type(:smallint) -> :smallint
-      tds_type(:int)-> :int
+      tds_type(:int) -> :int
       tds_type(:smalldatetime) -> :smalldatetime
       tds_type(:real) -> :real
       tds_type(:money) -> :money

@@ -187,7 +187,8 @@ defmodule Tds.Protocol.Prelogin do
   end
 
   defp decode_tokens(
-         <<prelogin_token_type(:version), offset::ushort(:big), length::ushort(:big), tail::binary>>,
+         <<prelogin_token_type(:version), offset::ushort(:big), length::ushort(:big),
+           tail::binary>>,
          tokens,
          s
        ) do
@@ -196,7 +197,8 @@ defmodule Tds.Protocol.Prelogin do
   end
 
   defp decode_tokens(
-         <<prelogin_token_type(:encryption), offset::ushort(:big), length::ushort(:big), tail::binary>>,
+         <<prelogin_token_type(:encryption), offset::ushort(:big), length::ushort(:big),
+           tail::binary>>,
          tokens,
          s
        ) do
@@ -205,7 +207,8 @@ defmodule Tds.Protocol.Prelogin do
   end
 
   defp decode_tokens(
-         <<prelogin_token_type(:instopt), offset::ushort(:big), length::ushort(:big), tail::binary>>,
+         <<prelogin_token_type(:instopt), offset::ushort(:big), length::ushort(:big),
+           tail::binary>>,
          tokens,
          s
        ) do
@@ -214,7 +217,8 @@ defmodule Tds.Protocol.Prelogin do
   end
 
   defp decode_tokens(
-         <<prelogin_token_type(:thread_id), offset::ushort(:big), length::ushort(:big), tail::binary>>,
+         <<prelogin_token_type(:thread_id), offset::ushort(:big), length::ushort(:big),
+           tail::binary>>,
          tokens,
          s
        ) do
@@ -232,7 +236,8 @@ defmodule Tds.Protocol.Prelogin do
   end
 
   defp decode_tokens(
-         <<prelogin_token_type(:fed_auth_required), offset::ushort(:big), length::ushort(:big), tail::binary>>,
+         <<prelogin_token_type(:fed_auth_required), offset::ushort(:big), length::ushort(:big),
+           tail::binary>>,
          tokens,
          s
        ) do
@@ -241,7 +246,8 @@ defmodule Tds.Protocol.Prelogin do
   end
 
   defp decode_tokens(
-         <<prelogin_token_type(:nonce_opt), offset::ushort(:big), length::ushort(:big), tail::binary>>,
+         <<prelogin_token_type(:nonce_opt), offset::ushort(:big), length::ushort(:big),
+           tail::binary>>,
          tokens,
          s
        ) do
