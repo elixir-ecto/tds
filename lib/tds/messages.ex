@@ -3,6 +3,7 @@ defmodule Tds.Messages do
 
   import Record, only: [defrecord: 2]
   import Tds.Tokens, only: [decode_tokens: 1]
+  import Tds.Protocol.Constants
 
   alias Tds.Encoding.UCS2
   alias Tds.Parameter
@@ -47,21 +48,7 @@ defmodule Tds.Messages do
   # @tds_sp_prepexecrpc 14
   @tds_sp_unprepare 15
 
-  ## Packet Size
-  @tds_pack_data_size 4088
-  # @tds_pack_header_size 8
-  # @tds_pack_size @tds_pack_header_size + @tds_pack_data_size
-
-  ## Packet Types
-  # @tds_pack_sqlbatch    1
-  # @tds_pack_rpcRequest  3
-  @tds_pack_cancel 6
-  # @tds_pack_bulkloadbcp 7
-  # @tds_pack_transmgrreq 14
-  # @tds_pack_normal      15
-  # @tds_pack_login7      16
-  # @tds_pack_sspimessage 17
-  # @tds_pack_prelogin    18
+  # Packet sizes and types are sourced from Tds.Protocol.Constants via import.
 
   ## Parsers
   def parse(:prelogin, packet_data, s) do
@@ -254,7 +241,7 @@ defmodule Tds.Messages do
   end
 
   defp encode(msg_attn(), _s) do
-    encode_packets(@tds_pack_cancel, <<>>)
+    encode_packets(packet_type(:attention), <<>>)
   end
 
   defp encode(msg_sql(query: q), %{trans: trans}) do
@@ -277,7 +264,7 @@ defmodule Tds.Messages do
     total_length = byte_size(headers) + 4
     all_headers = <<total_length::little-size(32)>> <> headers
     data = all_headers <> q_ucs
-    encode_packets(0x01, data)
+    encode_packets(packet_type(:sql_batch), data)
   end
 
   defp encode(msg_rpc(proc: proc, params: params), %{trans: trans}) do
@@ -299,7 +286,7 @@ defmodule Tds.Messages do
 
     data = all_headers <> encode_rpc(proc, params)
     # layout Data
-    encode_packets(0x03, data)
+    encode_packets(packet_type(:rpc), data)
   end
 
   defp encode(msg_transmgr(command: "TM_BEGIN_XACT", isolation_level: isolation_level), %{
@@ -356,7 +343,7 @@ defmodule Tds.Messages do
 
     data = all_headers <> <<request_type::little-size(2)-unit(8), request_payload::binary>>
 
-    encode_packets(0x0E, data)
+    encode_packets(packet_type(:transaction_manager), data)
   end
 
   defp encode_rpc(:sp_executesql, params) do
@@ -434,7 +421,7 @@ defmodule Tds.Messages do
 
   def encode_packets(
         type,
-        <<data::binary-size(@tds_pack_data_size)-unit(8), tail::binary>>,
+        <<data::binary-size(packet_size(:max_data_size))-unit(8), tail::binary>>,
         id
       ) do
     status = if byte_size(tail) > 0, do: 0, else: 1

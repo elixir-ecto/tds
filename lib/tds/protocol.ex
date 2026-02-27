@@ -3,7 +3,8 @@ defmodule Tds.Protocol do
   Implements DBConnection behaviour for TDS protocol.
   """
   alias Tds.{Parameter, Query}
-  import Tds.{BinaryUtils, Messages, Utils}
+  import Tds.{Messages, Utils}
+  import Tds.Protocol.Binary
   require Logger
   use DBConnection
 
@@ -906,11 +907,11 @@ defmodule Tds.Protocol do
 
   defp next_tds_pkg(pkg, buffer) do
     case pkg do
-      <<0x04, 0x01, size::int16(), _::int32(), chunk::binary>> ->
+      <<0x04, 0x01, size::ushort(:big), _::ulong(:big), chunk::binary>> ->
         more = size - 8
         next_tds_pkg(chunk, buffer, more, true)
 
-      <<0x04, 0x00, size::int16(), _::int32(), chunk::binary>> ->
+      <<0x04, 0x00, size::ushort(:big), _::ulong(:big), chunk::binary>> ->
         more = size - 8
         next_tds_pkg(chunk, buffer, more, false)
 

@@ -4,7 +4,8 @@ defmodule Tds.Protocol.Prelogin do
 
   See: https://docs.microsoft.com/en-us/openspecs/windows_protocols/ms-tds/60f56408-0188-4cd5-8b90-25c6f2423868
   """
-  import Tds.Protocol.Grammar
+  import Tds.Protocol.Binary
+  import Tds.Protocol.Constants
   require Logger
 
   @type state :: Tds.Protocol.t()
@@ -30,24 +31,8 @@ defmodule Tds.Protocol.Prelogin do
           mars: boolean()
         }
 
-  @packet_header 0x12
-
-  # PL Options Tokens
-  @version_token 0x00
-  @encryption_token 0x01
-  @instopt_token 0x02
-  @thread_id_token 0x03
-  @mars_token 0x04
-  # @trace_id_token 0x05
-  @fed_auth_required_token 0x06
-  @nonce_opt_token 0x07
-  @terminator_token 0xFF
-
-  # Encryption flags
-  @encryption_off 0x00
-  @encryption_on 0x01
-  @encryption_not_supported 0x02
-  @encryption_required 0x03
+  # Packet type, prelogin token types, and encryption flags are now
+  # sourced from Tds.Protocol.Constants via import above.
 
   @version Mix.Project.config()[:version]
            |> String.split(".")
@@ -56,7 +41,7 @@ defmodule Tds.Protocol.Prelogin do
   @spec encode(maybe_improper_list()) :: [binary(), ...]
   def encode(opts) do
     stream = [
-      {@version_token, get_version()},
+      {prelogin_token_type(:version), get_version()},
       encode_encryption(opts),
       # when instance id check is sent, encryption is not negotiated
       # encode_instance(opts),
@@ -69,13 +54,13 @@ defmodule Tds.Protocol.Prelogin do
 
     {iodata, _} =
       stream
-      |> Enum.reduce({[[], @terminator_token, []], start_offset}, fn
+      |> Enum.reduce({[[], prelogin_token_type(:terminator), []], start_offset}, fn
         {token, option_data}, {[options, term, data], offset} ->
           data_length = byte_size(option_data)
 
           options = [
             options,
-            <<token, offset::ushort(), data_length::ushort()>>
+            <<token, offset::ushort(:big), data_length::ushort(:big)>>
           ]
 
           data = [data, option_data]
@@ -83,14 +68,14 @@ defmodule Tds.Protocol.Prelogin do
       end)
 
     data = IO.iodata_to_binary(iodata)
-    Tds.Messages.encode_packets(@packet_header, data)
+    Tds.Messages.encode_packets(packet_type(:prelogin), data)
   end
 
   defp get_version do
     @version
     |> case do
       [major, minor, build] ->
-        <<build::little-ushort(), minor, major, 0x00, 0x00>>
+        <<build::ushort(), minor, major, 0x00, 0x00>>
 
       [major, minor] ->
         <<0x00, 0x00, minor, major, 0x00, 0x00>>
@@ -106,13 +91,13 @@ defmodule Tds.Protocol.Prelogin do
     data =
       case ssl?(opts) do
         :on ->
-          <<@encryption_on::byte()>>
+          <<encryption(:on)::byte()>>
 
         :not_supported ->
-          <<@encryption_not_supported::byte()>>
+          <<encryption(:not_supported)::byte()>>
 
         :required ->
-          <<@encryption_required::byte()>>
+          <<encryption(:required)::byte()>>
 
         :off ->
           # TODO: Support ssl: :off
@@ -120,13 +105,13 @@ defmodule Tds.Protocol.Prelogin do
           # the other packages are send unencrypted over the wire.
           raise ArgumentError, ~s("ssl: :off" is currently not supported)
 
-        # <<@encryption_off::byte>>
+        # <<encryption(:off)::byte>>
 
         value ->
           raise ArgumentError, "invalid value for :ssl: #{inspect(value)}"
       end
 
-    {@encryption_token, data}
+    {prelogin_token_type(:encryption), data}
   end
 
   # defp encode_instance(opts) do
@@ -149,15 +134,15 @@ defmodule Tds.Protocol.Prelogin do
       |> Integer.parse()
       |> elem(0)
 
-    {@thread_id_token, <<pid_serial::ulong()>>}
+    {prelogin_token_type(:thread_id), <<pid_serial::ulong(:big)>>}
   end
 
   defp encode_mars(_opts) do
-    {@mars_token, <<0x00>>}
+    {prelogin_token_type(:mars), <<0x00>>}
   end
 
   defp encode_fed_auth_required(_opts) do
-    {@fed_auth_required_token, <<0x01>>}
+    {prelogin_token_type(:fed_auth_required), <<0x01>>}
   end
 
   # DECODE
@@ -177,23 +162,23 @@ defmodule Tds.Protocol.Prelogin do
         disconnect(msg, s)
 
       # Encryption is off. Allowed server response is :off or :not_supported
-      {:off, enc, _} when enc in [<<@encryption_off>>, <<@encryption_not_supported>>] ->
+      {:off, enc, _} when enc in [<<encryption(:off)>>, <<encryption(:not_supported)>>] ->
         {:login, s}
 
       # TODO: Encryption is off but server has encryption on. Should upgrade.
-      {:off, <<@encryption_required>>, _} ->
+      {:off, <<encryption(:required)>>, _} ->
         disconnect("Server does not allow the requested encryption level.", s)
 
       # Encryption is not supported. The server needs to respond with :not_supported
-      {:not_supported, <<@encryption_not_supported>>, _} ->
+      {:not_supported, <<encryption(:not_supported)>>, _} ->
         {:login, s}
 
       # Encryption is on. The server needs to respond with :on
-      {:on, <<@encryption_on>>, _} ->
+      {:on, <<encryption(:on)>>, _} ->
         {:encrypt, s}
 
       # Encryption is required. The server needs to respond with :on
-      {:required, <<@encryption_on>>, _} ->
+      {:required, <<encryption(:on)>>, _} ->
         {:encrypt, s}
 
       {_, _, _} ->
@@ -202,7 +187,7 @@ defmodule Tds.Protocol.Prelogin do
   end
 
   defp decode_tokens(
-         <<@version_token, offset::ushort(), length::ushort(), tail::binary>>,
+         <<prelogin_token_type(:version), offset::ushort(:big), length::ushort(:big), tail::binary>>,
          tokens,
          s
        ) do
@@ -211,7 +196,7 @@ defmodule Tds.Protocol.Prelogin do
   end
 
   defp decode_tokens(
-         <<@encryption_token, offset::ushort(), length::ushort(), tail::binary>>,
+         <<prelogin_token_type(:encryption), offset::ushort(:big), length::ushort(:big), tail::binary>>,
          tokens,
          s
        ) do
@@ -220,16 +205,16 @@ defmodule Tds.Protocol.Prelogin do
   end
 
   defp decode_tokens(
-         <<@instopt_token, offset::ushort(), length::ushort(), tail::binary>>,
+         <<prelogin_token_type(:instopt), offset::ushort(:big), length::ushort(:big), tail::binary>>,
          tokens,
          s
        ) do
-    tokens = [{:encryption, offset, length} | tokens]
+    tokens = [{:instance, offset, length} | tokens]
     decode_tokens(tail, tokens, s)
   end
 
   defp decode_tokens(
-         <<@thread_id_token, offset::ushort(), length::ushort(), tail::binary>>,
+         <<prelogin_token_type(:thread_id), offset::ushort(:big), length::ushort(:big), tail::binary>>,
          tokens,
          s
        ) do
@@ -238,7 +223,7 @@ defmodule Tds.Protocol.Prelogin do
   end
 
   defp decode_tokens(
-         <<@mars_token, offset::ushort(), length::ushort(), tail::binary>>,
+         <<prelogin_token_type(:mars), offset::ushort(:big), length::ushort(:big), tail::binary>>,
          tokens,
          s
        ) do
@@ -247,7 +232,7 @@ defmodule Tds.Protocol.Prelogin do
   end
 
   defp decode_tokens(
-         <<@fed_auth_required_token, offset::ushort(), length::ushort(), tail::binary>>,
+         <<prelogin_token_type(:fed_auth_required), offset::ushort(:big), length::ushort(:big), tail::binary>>,
          tokens,
          s
        ) do
@@ -256,7 +241,7 @@ defmodule Tds.Protocol.Prelogin do
   end
 
   defp decode_tokens(
-         <<@nonce_opt_token, offset::ushort(), length::ushort(), tail::binary>>,
+         <<prelogin_token_type(:nonce_opt), offset::ushort(:big), length::ushort(:big), tail::binary>>,
          tokens,
          s
        ) do
@@ -265,7 +250,7 @@ defmodule Tds.Protocol.Prelogin do
   end
 
   defp decode_tokens(
-         <<@terminator_token, tail::binary>>,
+         <<prelogin_token_type(:terminator), tail::binary>>,
          tokens,
          _s
        ) do

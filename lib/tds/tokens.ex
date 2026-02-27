@@ -1,7 +1,8 @@
 defmodule Tds.Tokens do
   @moduledoc false
 
-  import Tds.BinaryUtils
+  import Tds.Protocol.Binary
+  import Tds.Protocol.Constants
   import Bitwise
 
   require Logger
@@ -46,26 +47,26 @@ defmodule Tds.Tokens do
   def decode_tokens(<<token::unsigned-size(8), tail::binary>>, collmetadata) do
     {token_data, tail, collmetadata} =
       case token do
-        0x81 -> decode_colmetadata(tail, collmetadata)
-        # 0xA5 -> decode_colinfo(tail, collmetadata)
-        0xFD -> decode_done(tail, collmetadata)
-        0xFE -> decode_doneproc(tail, collmetadata)
-        0xFF -> decode_doneinproc(tail, collmetadata)
-        0xE3 -> decode_envchange(tail, collmetadata)
-        0xAA -> decode_error(tail, collmetadata)
-        # 0xAE -> decode_featureextack(tail, collmetadata)
-        # 0xEE -> decode_fedauthinfo(tail, collmetadata)
-        0xAB -> decode_info(tail, collmetadata)
-        0xAD -> decode_loginack(tail, collmetadata)
-        0xD2 -> decode_nbcrow(tail, collmetadata)
-        # 0x78 -> decode_offset(tail, collmetadata)
-        0xA9 -> decode_order(tail, collmetadata)
-        0x79 -> decode_returnstatus(tail, collmetadata)
-        0xAC -> decode_returnvalue(tail, collmetadata)
-        0xD1 -> decode_row(tail, collmetadata)
-        # 0xE4 -> decode_sessionstate(tail, collmetadata)
-        # 0xED -> decode_sspi(tail, collmetadata)
-        # 0xA4 -> decode_tablename(tail, collmetadata)
+        token(:colmetadata) -> decode_colmetadata(tail, collmetadata)
+        # token(:colinfo) -> decode_colinfo(tail, collmetadata)
+        token(:done) -> decode_done(tail, collmetadata)
+        token(:doneproc) -> decode_doneproc(tail, collmetadata)
+        token(:doneinproc) -> decode_doneinproc(tail, collmetadata)
+        token(:envchange) -> decode_envchange(tail, collmetadata)
+        token(:error) -> decode_error(tail, collmetadata)
+        # token(:featureextack) -> decode_featureextack(tail, collmetadata)
+        # token(:fedauthinfo) -> decode_fedauthinfo(tail, collmetadata)
+        token(:info) -> decode_info(tail, collmetadata)
+        token(:loginack) -> decode_loginack(tail, collmetadata)
+        token(:nbcrow) -> decode_nbcrow(tail, collmetadata)
+        # token(:offset) -> decode_offset(tail, collmetadata)
+        token(:order) -> decode_order(tail, collmetadata)
+        token(:returnstatus) -> decode_returnstatus(tail, collmetadata)
+        token(:returnvalue) -> decode_returnvalue(tail, collmetadata)
+        token(:row) -> decode_row(tail, collmetadata)
+        # token(:sessionstate) -> decode_sessionstate(tail, collmetadata)
+        # token(:sspi) -> decode_sspi(tail, collmetadata)
+        # token(:tabname) -> decode_tablename(tail, collmetadata)
         t -> raise_unsupported_token(t, collmetadata)
       end
 
@@ -382,7 +383,7 @@ defmodule Tds.Tokens do
 
         0x13 ->
           <<
-            size::little-uint16(),
+            size::uint16(),
             value::binary(size, 16),
             0x00,
             rest::binary
@@ -392,11 +393,11 @@ defmodule Tds.Tokens do
 
         0x14 ->
           <<
-            _routing_data_len::little-uint16(),
+            _routing_data_len::uint16(),
             # Protocol MUST be 0, specifying TCP-IP protocol
             0x00,
-            port::little-uint16(),
-            alt_host_len::little-uint16(),
+            port::uint16(),
+            alt_host_len::uint16(),
             alt_host::binary(alt_host_len, 16),
             0x00,
             0x00,
@@ -463,7 +464,7 @@ defmodule Tds.Tokens do
 
   defp decode_loginack(
          <<
-           _length::little-uint16(),
+           _length::uint16(),
            interface::size(8),
            tds_version::unsigned-32,
            prog_name_len::size(8),

@@ -5,13 +5,9 @@ defmodule Tds.Protocol.Login7 do
   See: https://docs.microsoft.com/en-us/openspecs/windows_protocols/ms-tds/773a62b6-ee89-4c02-9e5e-344882630aac
   """
   alias Tds.Encoding.UCS2
-  import Tds.BinaryUtils
+  import Tds.Protocol.Binary
+  import Tds.Protocol.Constants
 
-  @packet_header 0x10
-  ## Packet Size
-  @tds_pack_header_size 8
-  @tds_pack_data_size 4088
-  @tds_pack_size @tds_pack_header_size + @tds_pack_data_size
   @max_supported_tds_version <<0x04, 0x00, 0x00, 0x74>>
   @default_client_version <<0x04, 0x00, 0x00, 0x07>>
   @client_pid <<0x00, 0x10, 0x00, 0x00>>
@@ -67,7 +63,7 @@ defmodule Tds.Protocol.Login7 do
 
     %__MODULE__{
       tds_version: @max_supported_tds_version,
-      packet_size: <<@tds_pack_size::little-size(4)-unit(8)>>,
+      packet_size: <<packet_size(:max_packet_size)::little-size(4)-unit(8)>>,
       hostname: to_string(hostname),
       app_name: Keyword.get(opts, :app_name, @default_app_name),
       client_version: @default_client_version,
@@ -95,7 +91,7 @@ defmodule Tds.Protocol.Login7 do
     login7_len = byte_size(login7) + 4
     data = <<login7_len::little-size(32)>> <> login7
 
-    Tds.Messages.encode_packets(@packet_header, data)
+    Tds.Messages.encode_packets(packet_type(:login7), data)
   end
 
   defp fixed_login(login) do

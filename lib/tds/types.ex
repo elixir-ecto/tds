@@ -1,7 +1,8 @@
 defmodule Tds.Types do
   @moduledoc false
 
-  import Tds.BinaryUtils
+  import Tds.Protocol.Binary
+  import Tds.Protocol.Constants
   import Tds.Utils
 
   alias Tds.Encoding.UCS2
@@ -12,110 +13,40 @@ defmodule Tds.Types do
   @secs_in_hour 60 * @secs_in_min
   @max_time_scale 7
 
-  # Zero Length Data Types
-  @tds_data_type_null 0x1F
-
-  # Fixed Length Data Types
-  # See: https://docs.microsoft.com/en-us/openspecs/windows_protocols/ms-tds/859eb3d2-80d3-40f6-a637-414552c9c552
-  @tds_data_type_tinyint 0x30
-  @tds_data_type_bit 0x32
-  @tds_data_type_smallint 0x34
-  @tds_data_type_int 0x38
-  @tds_data_type_smalldatetime 0x3A
-  @tds_data_type_real 0x3B
-  @tds_data_type_money 0x3C
-  @tds_data_type_datetime 0x3D
-  @tds_data_type_float 0x3E
-  @tds_data_type_smallmoney 0x7A
-  @tds_data_type_bigint 0x7F
-
-  # Fixed Data Types with their length
-  @fixed_data_types %{
-    @tds_data_type_null => 0,
-    @tds_data_type_tinyint => 1,
-    @tds_data_type_bit => 1,
-    @tds_data_type_smallint => 2,
-    @tds_data_type_int => 4,
-    @tds_data_type_smalldatetime => 4,
-    @tds_data_type_real => 4,
-    @tds_data_type_money => 8,
-    @tds_data_type_datetime => 8,
-    @tds_data_type_float => 8,
-    @tds_data_type_smallmoney => 4,
-    @tds_data_type_bigint => 8
-  }
-
-  # Variable-Length Data Types
-  # See: https://docs.microsoft.com/en-us/openspecs/windows_protocols/ms-tds/ce3183a6-9d89-47e8-a02f-de5a1a1303de
-  @tds_data_type_uniqueidentifier 0x24
-  @tds_data_type_intn 0x26
-  # legacy
-  @tds_data_type_decimal 0x37
-  # legacy
-  @tds_data_type_numeric 0x3F
-  @tds_data_type_bitn 0x68
-  @tds_data_type_decimaln 0x6A
-  @tds_data_type_numericn 0x6C
-  @tds_data_type_floatn 0x6D
-  @tds_data_type_moneyn 0x6E
-  @tds_data_type_datetimen 0x6F
-  @tds_data_type_daten 0x28
-  @tds_data_type_timen 0x29
-  @tds_data_type_datetime2n 0x2A
-  @tds_data_type_datetimeoffsetn 0x2B
-  @tds_data_type_char 0x2F
-  @tds_data_type_varchar 0x27
-  @tds_data_type_binary 0x2D
-  @tds_data_type_varbinary 0x25
-  @tds_data_type_bigvarbinary 0xA5
-  @tds_data_type_bigvarchar 0xA7
-  @tds_data_type_bigbinary 0xAD
-  @tds_data_type_bigchar 0xAF
-  @tds_data_type_nvarchar 0xE7
-  @tds_data_type_nchar 0xEF
-  @tds_data_type_xml 0xF1
-  @tds_data_type_udt 0xF0
-  @tds_data_type_text 0x23
-  @tds_data_type_image 0x22
-  @tds_data_type_ntext 0x63
-  @tds_data_type_variant 0x62
-
+  # Fixed/variable type maps sourced from Tds.Protocol.Constants.
+  @fixed_data_types Tds.Protocol.Constants.fixed_data_types()
   @variable_data_types [
-    @tds_data_type_uniqueidentifier,
-    @tds_data_type_intn,
-    @tds_data_type_decimal,
-    @tds_data_type_numeric,
-    @tds_data_type_bitn,
-    @tds_data_type_decimaln,
-    @tds_data_type_numericn,
-    @tds_data_type_floatn,
-    @tds_data_type_moneyn,
-    @tds_data_type_datetimen,
-    @tds_data_type_daten,
-    @tds_data_type_timen,
-    @tds_data_type_datetime2n,
-    @tds_data_type_datetimeoffsetn,
-    @tds_data_type_char,
-    @tds_data_type_varchar,
-    @tds_data_type_binary,
-    @tds_data_type_varbinary,
-    @tds_data_type_bigvarbinary,
-    @tds_data_type_bigvarchar,
-    @tds_data_type_bigbinary,
-    @tds_data_type_bigchar,
-    @tds_data_type_nvarchar,
-    @tds_data_type_nchar,
-    @tds_data_type_xml,
-    @tds_data_type_udt,
-    @tds_data_type_text,
-    @tds_data_type_image,
-    @tds_data_type_ntext,
-    @tds_data_type_variant
+    tds_type(:uniqueidentifier),
+    tds_type(:intn),
+    tds_type(:decimal),
+    tds_type(:numeric),
+    tds_type(:bitn),
+    tds_type(:decimaln),
+    tds_type(:numericn),
+    tds_type(:floatn),
+    tds_type(:moneyn),
+    tds_type(:datetimen),
+    tds_type(:daten),
+    tds_type(:timen),
+    tds_type(:datetime2n),
+    tds_type(:datetimeoffsetn),
+    tds_type(:char),
+    tds_type(:varchar),
+    tds_type(:binary),
+    tds_type(:varbinary),
+    tds_type(:bigvarbinary),
+    tds_type(:bigvarchar),
+    tds_type(:bigbinary),
+    tds_type(:bigchar),
+    tds_type(:nvarchar),
+    tds_type(:nchar),
+    tds_type(:xml),
+    tds_type(:udt),
+    tds_type(:text),
+    tds_type(:image),
+    tds_type(:ntext),
+    tds_type(:variant)
   ]
-
-  # @tds_plp_marker 0xffff
-  @tds_plp_null 0xFFFFFFFFFFFFFFFF
-  # @tds_plp_unknown 0xfffffffffffffffe
 
   #
   #  Data Type Decoders
@@ -123,48 +54,48 @@ defmodule Tds.Types do
 
   def to_atom(token) do
     case token do
-      @tds_data_type_null -> :null
-      @tds_data_type_tinyint -> :tinyint
-      @tds_data_type_bit -> :bit
-      @tds_data_type_smallint -> :smallint
-      @tds_data_type_int -> :int
-      @tds_data_type_smalldatetime -> :smalldatetime
-      @tds_data_type_real -> :real
-      @tds_data_type_money -> :money
-      @tds_data_type_datetime -> :datetime
-      @tds_data_type_float -> :float
-      @tds_data_type_smallmoney -> :smallmoney
-      @tds_data_type_bigint -> :bigint
-      @tds_data_type_uniqueidentifier -> :uniqueidentifier
-      @tds_data_type_intn -> :intn
-      @tds_data_type_decimal -> :decimal
-      @tds_data_type_numeric -> :numeric
-      @tds_data_type_bitn -> :bitn
-      @tds_data_type_decimaln -> :decimaln
-      @tds_data_type_numericn -> :numericn
-      @tds_data_type_floatn -> :floatn
-      @tds_data_type_moneyn -> :moneyn
-      @tds_data_type_datetimen -> :datetimen
-      @tds_data_type_daten -> :daten
-      @tds_data_type_timen -> :timen
-      @tds_data_type_datetime2n -> :datetime2n
-      @tds_data_type_datetimeoffsetn -> :datetimeoffsetn
-      @tds_data_type_char -> :char
-      @tds_data_type_varchar -> :varchar
-      @tds_data_type_binary -> :binary
-      @tds_data_type_varbinary -> :varbinary
-      @tds_data_type_bigvarbinary -> :bigvarbinary
-      @tds_data_type_bigvarchar -> :bigvarchar
-      @tds_data_type_bigbinary -> :bigbinary
-      @tds_data_type_bigchar -> :bigchar
-      @tds_data_type_nvarchar -> :nvarchar
-      @tds_data_type_nchar -> :nchar
-      @tds_data_type_xml -> :xml
-      @tds_data_type_udt -> :udt
-      @tds_data_type_text -> :text
-      @tds_data_type_image -> :image
-      @tds_data_type_ntext -> :ntext
-      @tds_data_type_variant -> :variant
+      tds_type(:null) -> :null
+      tds_type(:tinyint) -> :tinyint
+      tds_type(:bit) -> :bit
+      tds_type(:smallint) -> :smallint
+      tds_type(:int)-> :int
+      tds_type(:smalldatetime) -> :smalldatetime
+      tds_type(:real) -> :real
+      tds_type(:money) -> :money
+      tds_type(:datetime) -> :datetime
+      tds_type(:float) -> :float
+      tds_type(:smallmoney) -> :smallmoney
+      tds_type(:bigint) -> :bigint
+      tds_type(:uniqueidentifier) -> :uniqueidentifier
+      tds_type(:intn) -> :intn
+      tds_type(:decimal) -> :decimal
+      tds_type(:numeric) -> :numeric
+      tds_type(:bitn) -> :bitn
+      tds_type(:decimaln) -> :decimaln
+      tds_type(:numericn) -> :numericn
+      tds_type(:floatn) -> :floatn
+      tds_type(:moneyn) -> :moneyn
+      tds_type(:datetimen) -> :datetimen
+      tds_type(:daten) -> :daten
+      tds_type(:timen) -> :timen
+      tds_type(:datetime2n) -> :datetime2n
+      tds_type(:datetimeoffsetn) -> :datetimeoffsetn
+      tds_type(:char) -> :char
+      tds_type(:varchar) -> :varchar
+      tds_type(:binary) -> :binary
+      tds_type(:varbinary) -> :varbinary
+      tds_type(:bigvarbinary) -> :bigvarbinary
+      tds_type(:bigvarchar) -> :bigvarchar
+      tds_type(:bigbinary) -> :bigbinary
+      tds_type(:bigchar) -> :bigchar
+      tds_type(:nvarchar) -> :nvarchar
+      tds_type(:nchar) -> :nchar
+      tds_type(:xml) -> :xml
+      tds_type(:udt) -> :udt
+      tds_type(:text) -> :text
+      tds_type(:image) -> :image
+      tds_type(:ntext) -> :ntext
+      tds_type(:variant) -> :variant
     end
   end
 
@@ -187,7 +118,7 @@ defmodule Tds.Types do
     }
 
     cond do
-      user_type == @tds_data_type_daten ->
+      user_type == tds_type(:daten) ->
         length = 3
 
         type_info =
@@ -198,9 +129,9 @@ defmodule Tds.Types do
         {type_info, tail}
 
       user_type in [
-        @tds_data_type_timen,
-        @tds_data_type_datetime2n,
-        @tds_data_type_datetimeoffsetn
+        tds_type(:timen),
+        tds_type(:datetime2n),
+        tds_type(:datetimeoffsetn)
       ] ->
         <<scale::unsigned-8, rest::binary>> = tail
 
@@ -214,8 +145,8 @@ defmodule Tds.Types do
 
         length =
           case user_type do
-            @tds_data_type_datetime2n -> length + 3
-            @tds_data_type_datetimeoffsetn -> length + 5
+            tds_type(:datetime2n) -> length + 3
+            tds_type(:datetimeoffsetn) -> length + 5
             _ -> length
           end
 
@@ -228,8 +159,8 @@ defmodule Tds.Types do
         {type_info, rest}
 
       user_type in [
-        @tds_data_type_numericn,
-        @tds_data_type_decimaln
+        tds_type(:numericn),
+        tds_type(:decimaln)
       ] ->
         <<
           length::little-unsigned-8,
@@ -248,16 +179,16 @@ defmodule Tds.Types do
         {type_info, rest}
 
       user_type in [
-        @tds_data_type_uniqueidentifier,
-        @tds_data_type_intn,
-        @tds_data_type_decimal,
-        @tds_data_type_numeric,
-        @tds_data_type_bitn,
-        @tds_data_type_floatn,
-        @tds_data_type_moneyn,
-        @tds_data_type_datetimen,
-        @tds_data_type_binary,
-        @tds_data_type_varbinary
+        tds_type(:uniqueidentifier),
+        tds_type(:intn),
+        tds_type(:decimal),
+        tds_type(:numeric),
+        tds_type(:bitn),
+        tds_type(:floatn),
+        tds_type(:moneyn),
+        tds_type(:datetimen),
+        tds_type(:binary),
+        tds_type(:varbinary)
       ] ->
         <<length::little-unsigned-8, rest::binary>> = tail
 
@@ -269,8 +200,8 @@ defmodule Tds.Types do
         {type_info, rest}
 
       user_type in [
-        @tds_data_type_char,
-        @tds_data_type_varchar
+        tds_type(:char),
+        tds_type(:varchar)
       ] ->
         <<length::little-unsigned-8, collation::binary-5, rest::binary>> = tail
         {:ok, collation} = decode_collation(collation)
@@ -283,7 +214,7 @@ defmodule Tds.Types do
 
         {type_info, rest}
 
-      user_type == @tds_data_type_xml ->
+      user_type == tds_type(:xml) ->
         {_schema_info, rest} = decode_schema_info(tail)
 
         type_info =
@@ -293,10 +224,10 @@ defmodule Tds.Types do
         {type_info, rest}
 
       user_type in [
-        @tds_data_type_bigvarchar,
-        @tds_data_type_bigchar,
-        @tds_data_type_nvarchar,
-        @tds_data_type_nchar
+        tds_type(:bigvarchar),
+        tds_type(:bigchar),
+        tds_type(:nvarchar),
+        tds_type(:nchar)
       ] ->
         <<length::little-unsigned-16, collation::binary-5, rest::binary>> = tail
         {:ok, collation} = decode_collation(collation)
@@ -313,9 +244,9 @@ defmodule Tds.Types do
         {type_info, rest}
 
       user_type in [
-        @tds_data_type_bigvarbinary,
-        @tds_data_type_bigbinary,
-        @tds_data_type_udt
+        tds_type(:bigvarbinary),
+        tds_type(:bigbinary),
+        tds_type(:udt)
       ] ->
         <<length::little-unsigned-16, rest::binary>> = tail
 
@@ -329,7 +260,7 @@ defmodule Tds.Types do
 
         {type_info, rest}
 
-      user_type in [@tds_data_type_text, @tds_data_type_ntext] ->
+      user_type in [tds_type(:text), tds_type(:ntext)] ->
         <<
           length::little-unsigned-32,
           collation::binary-5,
@@ -358,7 +289,7 @@ defmodule Tds.Types do
 
         {type_info, rest}
 
-      user_type == @tds_data_type_image ->
+      user_type == tds_type(:image) ->
         # TODO NumParts Reader
         <<length::little-unsigned-32, numparts::signed-8, rest::binary>> = tail
 
@@ -380,7 +311,7 @@ defmodule Tds.Types do
 
         {type_info, rest}
 
-      user_type == @tds_data_type_variant ->
+      user_type == tds_type(:variant) ->
         <<length::signed-32, rest::binary>> = tail
 
         type_info =
@@ -411,30 +342,30 @@ defmodule Tds.Types do
 
     value =
       case data_type_code do
-        @tds_data_type_null ->
+        tds_type(:null) ->
           nil
 
-        @tds_data_type_bit ->
+        tds_type(:bit) ->
           value_binary != <<0x00>>
 
-        @tds_data_type_smalldatetime ->
+        tds_type(:smalldatetime) ->
           decode_smalldatetime(value_binary)
 
-        @tds_data_type_smallmoney ->
+        tds_type(:smallmoney) ->
           decode_smallmoney(value_binary)
 
-        @tds_data_type_real ->
+        tds_type(:real) ->
           <<val::little-float-32>> = value_binary
           Float.round(val, 4)
 
-        @tds_data_type_datetime ->
+        tds_type(:datetime) ->
           decode_datetime(value_binary)
 
-        @tds_data_type_float ->
+        tds_type(:float) ->
           <<val::little-float-64>> = value_binary
           Float.round(val, 8)
 
-        @tds_data_type_money ->
+        tds_type(:money) ->
           decode_money(value_binary)
 
         _ ->
@@ -459,22 +390,22 @@ defmodule Tds.Types do
       ) do
     value =
       cond do
-        data_type_code == @tds_data_type_daten ->
+        data_type_code == tds_type(:daten) ->
           decode_date(data)
 
-        data_type_code == @tds_data_type_timen ->
+        data_type_code == tds_type(:timen) ->
           decode_time(data_info[:scale], data)
 
-        data_type_code == @tds_data_type_datetime2n ->
+        data_type_code == tds_type(:datetime2n) ->
           decode_datetime2(data_info[:scale], data)
 
-        data_type_code == @tds_data_type_datetimeoffsetn ->
+        data_type_code == tds_type(:datetimeoffsetn) ->
           decode_datetimeoffset(data_info[:scale], data)
 
-        data_type_code == @tds_data_type_uniqueidentifier ->
+        data_type_code == tds_type(:uniqueidentifier) ->
           decode_uuid(:binary.copy(data))
 
-        data_type_code == @tds_data_type_intn ->
+        data_type_code == tds_type(:intn) ->
           case length do
             1 ->
               <<val::unsigned-8, _tail::binary>> = data
@@ -494,42 +425,42 @@ defmodule Tds.Types do
           end
 
         data_type_code in [
-          @tds_data_type_decimal,
-          @tds_data_type_numeric,
-          @tds_data_type_decimaln,
-          @tds_data_type_numericn
+          tds_type(:decimal),
+          tds_type(:numeric),
+          tds_type(:decimaln),
+          tds_type(:numericn)
         ] ->
           decode_decimal(data_info[:precision], data_info[:scale], data)
 
-        data_type_code == @tds_data_type_bitn ->
+        data_type_code == tds_type(:bitn) ->
           data != <<0x00>>
 
-        data_type_code == @tds_data_type_floatn ->
+        data_type_code == tds_type(:floatn) ->
           len = length * 8
           <<val::little-float-size(len), _::binary>> = data
           val
 
-        data_type_code == @tds_data_type_moneyn ->
+        data_type_code == tds_type(:moneyn) ->
           case length do
             4 -> decode_smallmoney(data)
             8 -> decode_money(data)
           end
 
-        data_type_code == @tds_data_type_datetimen ->
+        data_type_code == tds_type(:datetimen) ->
           case length do
             4 -> decode_smalldatetime(data)
             8 -> decode_datetime(data)
           end
 
         data_type_code in [
-          @tds_data_type_char,
-          @tds_data_type_varchar
+          tds_type(:char),
+          tds_type(:varchar)
         ] ->
           decode_char(data_info, data)
 
         data_type_code in [
-          @tds_data_type_binary,
-          @tds_data_type_varbinary
+          tds_type(:binary),
+          tds_type(:varbinary)
         ] ->
           :binary.copy(data)
       end
@@ -548,24 +479,24 @@ defmodule Tds.Types do
     value =
       cond do
         data_type_code in [
-          @tds_data_type_bigvarchar,
-          @tds_data_type_bigchar
+          tds_type(:bigvarchar),
+          tds_type(:bigchar)
         ] ->
           decode_char(data_info, data)
 
         data_type_code in [
-          @tds_data_type_bigvarbinary,
-          @tds_data_type_bigbinary
+          tds_type(:bigvarbinary),
+          tds_type(:bigbinary)
         ] ->
           :binary.copy(data)
 
         data_type_code in [
-          @tds_data_type_nvarchar,
-          @tds_data_type_nchar
+          tds_type(:nvarchar),
+          tds_type(:nchar)
         ] ->
           decode_nchar(data_info, data)
 
-        data_type_code == @tds_data_type_udt ->
+        data_type_code == tds_type(:udt) ->
           decode_udt(data_info, :binary.copy(data))
       end
 
@@ -588,9 +519,9 @@ defmodule Tds.Types do
       ) do
     value =
       case data_type_code do
-        @tds_data_type_text -> decode_char(data_info, data)
-        @tds_data_type_ntext -> decode_nchar(data_info, data)
-        @tds_data_type_image -> :binary.copy(data)
+        tds_type(:text) -> decode_char(data_info, data)
+        tds_type(:ntext) -> decode_nchar(data_info, data)
+        tds_type(:image) -> :binary.copy(data)
         _ -> nil
       end
 
@@ -600,7 +531,7 @@ defmodule Tds.Types do
   # TODO Variant Types
 
   def decode_data(%{data_reader: :plp}, <<
-        @tds_plp_null::little-unsigned-64,
+        plp(:null)::little-unsigned-64,
         tail::binary
       >>),
       do: {nil, tail}
@@ -613,31 +544,31 @@ defmodule Tds.Types do
 
     value =
       cond do
-        data_type_code == @tds_data_type_xml ->
+        data_type_code == tds_type(:xml) ->
           decode_xml(data_info, data)
 
         data_type_code in [
-          @tds_data_type_bigvarchar,
-          @tds_data_type_bigchar,
-          @tds_data_type_text
+          tds_type(:bigvarchar),
+          tds_type(:bigchar),
+          tds_type(:text)
         ] ->
           decode_char(data_info, data)
 
         data_type_code in [
-          @tds_data_type_bigvarbinary,
-          @tds_data_type_bigbinary,
-          @tds_data_type_image
+          tds_type(:bigvarbinary),
+          tds_type(:bigbinary),
+          tds_type(:image)
         ] ->
           data
 
         data_type_code in [
-          @tds_data_type_nvarchar,
-          @tds_data_type_nchar,
-          @tds_data_type_ntext
+          tds_type(:nvarchar),
+          tds_type(:nchar),
+          tds_type(:ntext)
         ] ->
           decode_nchar(data_info, data)
 
-        data_type_code == @tds_data_type_udt ->
+        data_type_code == tds_type(:udt) ->
           decode_udt(data_info, data)
       end
 
@@ -759,7 +690,7 @@ defmodule Tds.Types do
 
   def encode_binary_type(%Parameter{value: value}) do
     length = length_for_binary(value)
-    type = @tds_data_type_bigvarbinary
+    type = tds_type(:bigvarbinary)
     data = <<type>> <> length
     {type, data, []}
   end
@@ -775,7 +706,7 @@ defmodule Tds.Types do
   end
 
   def encode_bit_type(%Parameter{}) do
-    type = @tds_data_type_bigvarbinary
+    type = tds_type(:bigvarbinary)
     data = <<type, 0x01>>
     {type, data, []}
   end
@@ -788,7 +719,7 @@ defmodule Tds.Types do
         0x10
       end
 
-    type = @tds_data_type_uniqueidentifier
+    type = tds_type(:uniqueidentifier)
     data = <<type, length>>
     {type, data, []}
   end
@@ -801,7 +732,7 @@ defmodule Tds.Types do
         byte_size(value)
       end
 
-    type = @tds_data_type_image
+    type = tds_type(:image)
     data = <<type, length::little-unsigned-32>>
     {type, data, []}
   end
@@ -823,7 +754,7 @@ defmodule Tds.Types do
         <<0xFF, 0xFF>>
       end
 
-    type = @tds_data_type_nvarchar
+    type = tds_type(:nvarchar)
     data = <<type>> <> length <> collation
     {type, data, [collation: collation]}
   end
@@ -835,7 +766,7 @@ defmodule Tds.Types do
 
   def encode_integer_type(%Parameter{value: value}) do
     attributes = []
-    type = @tds_data_type_intn
+    type = tds_type(:intn)
 
     {attributes, length} =
       if value == nil do
@@ -849,16 +780,16 @@ defmodule Tds.Types do
         value_size = int_type_size(value)
         # cond do
         #   value_size == 1 ->
-        #     data_type_code = @tds_data_type_tinyint
+        #     data_type_code = tds_type(:tinyint)
         # Enum.find(data_types, fn(x) -> x[:name] == :tinyint end)
         #   value_size == 2 ->
-        #     data_type_code = @tds_data_type_smallint
+        #     data_type_code = tds_type(:smallint)
         # Enum.find(data_types, fn(x) -> x[:name] == :smallint end)
         #   value_size > 2 and value_size <= 4 ->
         #     data_type_code = @tds_data_type_int
         # Enum.find(data_types, fn(x) -> x[:name] == :int end)
         #   value_size > 4 and value_size <= 8 ->
-        #     data_type_code = @tds_data_type_bigint
+        #     data_type_code = tds_type(:bigint)
         # Enum.find(data_types, fn(x) -> x[:name] == :bigint end)
         # end
         attributes =
@@ -915,7 +846,7 @@ defmodule Tds.Types do
     padding = len - value_size
     value_size = value_size + padding + 1
 
-    type = @tds_data_type_decimaln
+    type = tds_type(:decimaln)
     data = <<type, value_size, precision, scale>>
     {type, data, precision: precision, scale: scale}
   end
@@ -967,7 +898,7 @@ defmodule Tds.Types do
     padding = len - value_size
     value_size = value_size + padding
 
-    type = @tds_data_type_floatn
+    type = tds_type(:floatn)
     data = <<type, value_size>>
     {type, data, precision: precision, scale: scale}
   end
@@ -1182,14 +1113,14 @@ defmodule Tds.Types do
   """
 
   # binary
-  def encode_data(@tds_data_type_bigvarbinary, value, attr)
+  def encode_data(tds_type(:bigvarbinary), value, attr)
       when is_integer(value),
-      do: encode_data(@tds_data_type_bigvarbinary, <<value>>, attr)
+      do: encode_data(tds_type(:bigvarbinary), <<value>>, attr)
 
-  def encode_data(@tds_data_type_bigvarbinary, nil, _),
-    do: <<@tds_plp_null::little-unsigned-64>>
+  def encode_data(tds_type(:bigvarbinary), nil, _),
+    do: <<plp(:null)::little-unsigned-64>>
 
-  def encode_data(@tds_data_type_bigvarbinary, value, _) do
+  def encode_data(tds_type(:bigvarbinary), value, _) do
     case byte_size(value) do
       # varbinary(max) gets encoded in chunks
       value_size when value_size > 8000 -> encode_plp(value)
@@ -1198,19 +1129,19 @@ defmodule Tds.Types do
   end
 
   # image
-  def encode_data(@tds_data_type_image, nil, _attr),
-    do: <<@tds_plp_null::little-unsigned-32>>
+  def encode_data(tds_type(:image), nil, _attr),
+    do: <<plp(:null)::little-unsigned-32>>
 
-  def encode_data(@tds_data_type_image, value, _attr) do
+  def encode_data(tds_type(:image), value, _attr) do
     image_size = byte_size(value)
     <<image_size::little-unsigned-32>> <> value
   end
 
   # string
-  def encode_data(@tds_data_type_nvarchar, nil, _),
-    do: <<@tds_plp_null::little-unsigned-64>>
+  def encode_data(tds_type(:nvarchar), nil, _),
+    do: <<plp(:null)::little-unsigned-64>>
 
-  def encode_data(@tds_data_type_nvarchar, value, _) do
+  def encode_data(tds_type(:nvarchar), value, _) do
     value = UCS2.from_string(value)
     value_size = byte_size(value)
 
@@ -1232,20 +1163,20 @@ defmodule Tds.Types do
     <<size>> <> <<value::little-signed-size(size)-unit(8)>>
   end
 
-  def encode_data(@tds_data_type_intn, value, _) when value == nil do
+  def encode_data(tds_type(:intn), value, _) when value == nil do
     <<0>>
   end
 
-  def encode_data(@tds_data_type_tinyint, value, _) when value == nil do
+  def encode_data(tds_type(:tinyint), value, _) when value == nil do
     <<0>>
   end
 
   # float
-  def encode_data(@tds_data_type_floatn, nil, _) do
+  def encode_data(tds_type(:floatn), nil, _) do
     <<0>>
   end
 
-  def encode_data(@tds_data_type_floatn, value, _) do
+  def encode_data(tds_type(:floatn), value, _) do
     # d_ctx = Decimal.Context.get()
     # d_ctx = %{d_ctx | precision: 38}
     # Decimal.Context.set(d_ctx)
@@ -1276,7 +1207,7 @@ defmodule Tds.Types do
   end
 
   # decimal
-  def encode_data(@tds_data_type_decimaln, %Decimal{} = value, attr) do
+  def encode_data(tds_type(:decimaln), %Decimal{} = value, attr) do
     set_decimal_precision(38)
     precision = attr[:precision]
 
@@ -1315,16 +1246,16 @@ defmodule Tds.Types do
     <<byte_len>> <> <<sign>> <> value_binary
   end
 
-  def encode_data(@tds_data_type_decimaln, nil, _),
+  def encode_data(tds_type(:decimaln), nil, _),
     # <<0, 0, 0, 0>
     do: <<0x00::little-unsigned-32>>
 
-  def encode_data(@tds_data_type_decimaln = data_type, value, attr) do
+  def encode_data(tds_type(:decimaln) = data_type, value, attr) do
     encode_data(data_type, Decimal.new(value), attr)
   end
 
   # uuid
-  def encode_data(@tds_data_type_uniqueidentifier, value, _) do
+  def encode_data(tds_type(:uniqueidentifier), value, _) do
     if value != nil do
       <<0x10>> <> encode_uuid(value)
     else
@@ -1333,7 +1264,7 @@ defmodule Tds.Types do
   end
 
   # datetime
-  def encode_data(@tds_data_type_daten, value, _attr) do
+  def encode_data(tds_type(:daten), value, _attr) do
     data = encode_date(value)
 
     if data == nil do
@@ -1343,7 +1274,7 @@ defmodule Tds.Types do
     end
   end
 
-  def encode_data(@tds_data_type_timen, value, _attr) do
+  def encode_data(tds_type(:timen), value, _attr) do
     # Logger.debug"encode_data_timen"
     {data, scale} = encode_time(value)
     # Logger.debug "#{inspect data}"
@@ -1361,7 +1292,7 @@ defmodule Tds.Types do
     end
   end
 
-  def encode_data(@tds_data_type_datetimen, value, attr) do
+  def encode_data(tds_type(:datetimen), value, attr) do
     # Logger.debug "dtn #{inspect attr}"
     data =
       case attr[:length] do
@@ -1379,7 +1310,7 @@ defmodule Tds.Types do
     end
   end
 
-  def encode_data(@tds_data_type_datetime2n, value, _attr) do
+  def encode_data(tds_type(:datetime2n), value, _attr) do
     # Logger.debug "EncodeData #{inspect value}"
     {data, scale} = encode_datetime2(value)
 
@@ -1398,7 +1329,7 @@ defmodule Tds.Types do
     end
   end
 
-  def encode_data(@tds_data_type_datetimeoffsetn, value, _attr) do
+  def encode_data(tds_type(:datetimeoffsetn), value, _attr) do
     # Logger.debug "encode_data_datetimeoffsetn #{inspect value}"
     data = encode_datetimeoffset(value)
 
@@ -1805,27 +1736,27 @@ defmodule Tds.Types do
 
   def encode_datetime_type(%Parameter{}) do
     # Logger.debug "encode_datetime_type"
-    type = @tds_data_type_datetimen
+    type = tds_type(:datetimen)
     data = <<type, 0x08>>
     {type, data, length: 8}
   end
 
   def encode_smalldatetime_type(%Parameter{}) do
     # Logger.debug "encode_smalldatetime_type"
-    type = @tds_data_type_datetimen
+    type = tds_type(:datetimen)
     data = <<type, 0x04>>
     {type, data, length: 4}
   end
 
   def encode_date_type(%Parameter{}) do
-    type = @tds_data_type_daten
+    type = tds_type(:daten)
     data = <<type>>
     {type, data, []}
   end
 
   def encode_time_type(%Parameter{value: value}) do
     # Logger.debug "encode_time_type"
-    type = @tds_data_type_timen
+    type = tds_type(:timen)
 
     case value do
       nil ->
@@ -1849,14 +1780,14 @@ defmodule Tds.Types do
   def encode_datetime2_type(%Parameter{
         value: %NaiveDateTime{microsecond: {_, s}}
       }) do
-    type = @tds_data_type_datetime2n
+    type = tds_type(:datetime2n)
     data = <<type, s>>
     {type, data, scale: s}
   end
 
   def encode_datetime2_type(%Parameter{}) do
     # Logger.debug "encode_datetime2_type"
-    type = @tds_data_type_datetime2n
+    type = tds_type(:datetime2n)
     data = <<type, 0x07>>
     {type, data, scale: 7}
   end
@@ -1864,13 +1795,13 @@ defmodule Tds.Types do
   def encode_datetimeoffset_type(%Parameter{
         value: %DateTime{microsecond: {_, s}}
       }) do
-    type = @tds_data_type_datetimeoffsetn
+    type = tds_type(:datetimeoffsetn)
     data = <<type, s>>
     {type, data, scale: s}
   end
 
   def encode_datetimeoffset_type(%Parameter{}) do
-    type = @tds_data_type_datetimeoffsetn
+    type = tds_type(:datetimeoffsetn)
     data = <<type, 0x07>>
     {type, data, scale: 7}
   end
