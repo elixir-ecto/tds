@@ -40,8 +40,7 @@ defmodule Tds.Protocol.Packet do
 
   defp do_encode(
          type,
-         <<chunk::binary-size(packet_size(:max_data_size)),
-           rest::binary>>,
+         <<chunk::binary-size(packet_size(:max_data_size)), rest::binary>>,
          id
        ) do
     status =

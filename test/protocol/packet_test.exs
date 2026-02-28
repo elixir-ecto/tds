@@ -110,9 +110,11 @@ defmodule Tds.Protocol.PacketTest do
     end
 
     property "encode then strip headers recovers arbitrary payloads" do
-      check all size <- integer(0..50_000),
-                type <- member_of([0x01, 0x03, 0x06, 0x0E, 0x10, 0x12]),
-                byte_val <- integer(0..255) do
+      check all(
+              size <- integer(0..50_000),
+              type <- member_of([0x01, 0x03, 0x06, 0x0E, 0x10, 0x12]),
+              byte_val <- integer(0..255)
+            ) do
         payload = :binary.copy(<<byte_val>>, size)
         packets = Packet.encode(type, payload)
 
@@ -132,8 +134,7 @@ defmodule Tds.Protocol.PacketTest do
   describe "decode_header/1" do
     test "parses valid 8-byte header" do
       data =
-        <<0x04, 0x01, 0x00, 0x0D, 0x34, 0x00, 0x05, 0x00,
-          "hello">>
+        <<0x04, 0x01, 0x00, 0x0D, 0x34, 0x00, 0x05, 0x00, "hello">>
 
       assert {:ok, header, "hello"} = Packet.decode_header(data)
       assert header.type == 0x04
