@@ -22,6 +22,11 @@ defmodule Tds.Protocol.Packet do
           window: byte()
         }
 
+  @type sock ::
+          {module(), :gen_tcp.socket() | :ssl.sslsocket()}
+
+  @default_max_payload_size 200 * 1024 * 1024
+
   @doc """
   Encode a payload into one or more TDS packets.
 
@@ -97,11 +102,6 @@ defmodule Tds.Protocol.Packet do
   # Reassembly
   # ---------------------------------------------------------------------------
 
-  @type sock ::
-          {module(), :gen_tcp.socket() | :ssl.sslsocket()}
-
-  @default_max_payload_size 200 * 1024 * 1024
-
   @doc """
   Read and reassemble a complete TDS message from the socket.
 
@@ -113,7 +113,7 @@ defmodule Tds.Protocol.Packet do
   ## Options
 
     * `:max_payload_size` - maximum allowed payload in bytes
-      (default: #{@default_max_payload_size})
+      (default: 200 MB)
   """
   @spec reassemble(sock(), keyword()) ::
           {:ok, byte(), binary()} | {:error, term()}
@@ -189,7 +189,6 @@ defmodule Tds.Protocol.Packet do
               total,
               header,
               data_len,
-              expected_id,
               max
             )
 
@@ -207,7 +206,6 @@ defmodule Tds.Protocol.Packet do
          total,
          header,
          data_len,
-         _expected_id,
          max
        ) do
     case collect_chunk(sock, rest, data_len) do
@@ -259,42 +257,49 @@ defmodule Tds.Protocol.Packet do
   end
 
   defp finish_or_continue(
+         _sock,
+         _tail,
+         pkt_type,
+         buf,
+         _total,
+         @status_eom,
+         _next_id,
+         _max
+       ) do
+    payload = buf |> Enum.reverse() |> IO.iodata_to_binary()
+    {:ok, pkt_type, payload}
+  end
+
+  defp finish_or_continue(
          sock,
          tail,
          pkt_type,
          buf,
          total,
-         status,
+         @status_more,
          next_id,
          max
        ) do
-    if status == @status_eom do
-      payload =
-        buf |> Enum.reverse() |> IO.iodata_to_binary()
-
-      {:ok, pkt_type, payload}
+    if byte_size(tail) > 0 do
+      process_packets(
+        sock,
+        tail,
+        pkt_type,
+        buf,
+        total,
+        next_id,
+        max
+      )
     else
-      if byte_size(tail) > 0 do
-        process_packets(
-          sock,
-          tail,
-          pkt_type,
-          buf,
-          total,
-          next_id,
-          max
-        )
-      else
-        do_reassemble(
-          sock,
-          <<>>,
-          pkt_type,
-          buf,
-          total,
-          next_id,
-          max
-        )
-      end
+      do_reassemble(
+        sock,
+        <<>>,
+        pkt_type,
+        buf,
+        total,
+        next_id,
+        max
+      )
     end
   end
 
