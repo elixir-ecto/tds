@@ -92,4 +92,216 @@ defmodule Tds.Protocol.Packet do
   end
 
   def decode_header(_), do: {:error, :incomplete_header}
+
+  # ---------------------------------------------------------------------------
+  # Reassembly
+  # ---------------------------------------------------------------------------
+
+  @type sock ::
+          {module(), :gen_tcp.socket() | :ssl.sslsocket()}
+
+  @default_max_payload_size 200 * 1024 * 1024
+
+  @doc """
+  Read and reassemble a complete TDS message from the socket.
+
+  Reads one or more TDS packets, validates packet ID ordering,
+  strips headers, and concatenates the data payloads.
+
+  Returns `{:ok, type, payload}` on success.
+
+  ## Options
+
+    * `:max_payload_size` - maximum allowed payload in bytes
+      (default: #{@default_max_payload_size})
+  """
+  @spec reassemble(sock(), keyword()) ::
+          {:ok, byte(), binary()} | {:error, term()}
+  def reassemble(sock, opts \\ []) do
+    max =
+      Keyword.get(
+        opts,
+        :max_payload_size,
+        @default_max_payload_size
+      )
+
+    do_reassemble(sock, <<>>, nil, [], 0, nil, max)
+  end
+
+  defp do_reassemble(
+         {mod, port} = sock,
+         pending,
+         pkt_type,
+         buf,
+         total,
+         expected_id,
+         max
+       ) do
+    case mod.recv(port, 0) do
+      {:ok, data} ->
+        process_packets(
+          sock,
+          pending <> data,
+          pkt_type,
+          buf,
+          total,
+          expected_id,
+          max
+        )
+
+      {:error, reason} ->
+        {:error, {:recv_failed, reason}}
+    end
+  end
+
+  defp process_packets(
+         sock,
+         data,
+         pkt_type,
+         buf,
+         total,
+         expected_id,
+         max
+       ) do
+    case decode_header(data) do
+      {:error, :incomplete_header} ->
+        do_reassemble(
+          sock,
+          data,
+          pkt_type,
+          buf,
+          total,
+          expected_id,
+          max
+        )
+
+      {:ok, header, rest} ->
+        case validate_packet_id(expected_id, header.packet_id) do
+          :ok ->
+            type = pkt_type || header.type
+            data_len = header.length - packet_size(:header_size)
+
+            extract_and_continue(
+              sock,
+              rest,
+              type,
+              buf,
+              total,
+              header,
+              data_len,
+              expected_id,
+              max
+            )
+
+          {:error, _} = err ->
+            err
+        end
+    end
+  end
+
+  defp extract_and_continue(
+         sock,
+         rest,
+         pkt_type,
+         buf,
+         total,
+         header,
+         data_len,
+         _expected_id,
+         max
+       ) do
+    case collect_chunk(sock, rest, data_len) do
+      {:ok, chunk, tail} ->
+        new_total = total + byte_size(chunk)
+
+        if new_total > max do
+          {:error, {:payload_too_large, new_total, max}}
+        else
+          next_id = rem(header.packet_id + 1, 256)
+
+          finish_or_continue(
+            sock,
+            tail,
+            pkt_type,
+            [chunk | buf],
+            new_total,
+            header.status,
+            next_id,
+            max
+          )
+        end
+
+      {:error, _} = err ->
+        err
+    end
+  end
+
+  defp collect_chunk(sock, available, needed) do
+    available_len = byte_size(available)
+
+    if available_len >= needed do
+      <<chunk::binary-size(needed), tail::binary>> = available
+      {:ok, chunk, tail}
+    else
+      {mod, port} = sock
+      remaining = needed - available_len
+
+      case mod.recv(port, remaining) do
+        {:ok, more} ->
+          combined = available <> more
+          <<chunk::binary-size(needed), tail::binary>> = combined
+          {:ok, chunk, tail}
+
+        {:error, reason} ->
+          {:error, {:recv_failed, reason}}
+      end
+    end
+  end
+
+  defp finish_or_continue(
+         sock,
+         tail,
+         pkt_type,
+         buf,
+         total,
+         status,
+         next_id,
+         max
+       ) do
+    if status == @status_eom do
+      payload =
+        buf |> Enum.reverse() |> IO.iodata_to_binary()
+
+      {:ok, pkt_type, payload}
+    else
+      if byte_size(tail) > 0 do
+        process_packets(
+          sock,
+          tail,
+          pkt_type,
+          buf,
+          total,
+          next_id,
+          max
+        )
+      else
+        do_reassemble(
+          sock,
+          <<>>,
+          pkt_type,
+          buf,
+          total,
+          next_id,
+          max
+        )
+      end
+    end
+  end
+
+  defp validate_packet_id(nil, _actual), do: :ok
+  defp validate_packet_id(expected, expected), do: :ok
+
+  defp validate_packet_id(expected, actual) do
+    {:error, {:out_of_order, expected: expected, got: actual}}
+  end
 end

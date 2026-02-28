@@ -4,6 +4,22 @@ defmodule Tds.Protocol.PacketTest do
 
   alias Tds.Protocol.Packet
 
+  defmodule MockSocket do
+    def start(responses) do
+      {:ok, agent} = Agent.start_link(fn -> responses end)
+      agent
+    end
+
+    def recv(agent, _length) do
+      Agent.get_and_update(agent, fn
+        [] -> {{:error, :empty}, []}
+        [resp | rest] -> {resp, rest}
+      end)
+    end
+
+    def stop(agent), do: Agent.stop(agent)
+  end
+
   describe "encode/2" do
     test "empty payload returns empty list" do
       assert [] = Packet.encode(0x01, <<>>)
@@ -128,6 +144,132 @@ defmodule Tds.Protocol.PacketTest do
 
         assert reassembled == payload
       end
+    end
+  end
+
+  describe "reassemble/2" do
+    test "single packet response" do
+      payload = :binary.copy(<<0xAB>>, 100)
+      [packet] = Packet.encode(0x01, payload)
+      wire = IO.iodata_to_binary(packet)
+
+      agent = MockSocket.start([{:ok, wire}])
+
+      assert {:ok, 0x01, ^payload} =
+               Packet.reassemble({MockSocket, agent})
+
+      MockSocket.stop(agent)
+    end
+
+    test "multi-packet response" do
+      payload = :binary.copy(<<0xCD>>, 4088 * 2 + 500)
+      packets = Packet.encode(0x01, payload)
+
+      responses =
+        Enum.map(packets, fn p ->
+          {:ok, IO.iodata_to_binary(p)}
+        end)
+
+      agent = MockSocket.start(responses)
+
+      assert {:ok, 0x01, ^payload} =
+               Packet.reassemble({MockSocket, agent})
+
+      MockSocket.stop(agent)
+    end
+
+    test "returns error on recv failure" do
+      agent = MockSocket.start([{:error, :closed}])
+
+      assert {:error, {:recv_failed, :closed}} =
+               Packet.reassemble({MockSocket, agent})
+
+      MockSocket.stop(agent)
+    end
+
+    test "returns error when payload exceeds max size" do
+      payload = :binary.copy(<<0xAB>>, 200)
+      [packet] = Packet.encode(0x01, payload)
+      wire = IO.iodata_to_binary(packet)
+
+      agent = MockSocket.start([{:ok, wire}])
+
+      assert {:error, {:payload_too_large, _, 100}} =
+               Packet.reassemble(
+                 {MockSocket, agent},
+                 max_payload_size: 100
+               )
+
+      MockSocket.stop(agent)
+    end
+
+    test "returns error on out-of-order packet IDs" do
+      data1 = :binary.copy(<<0xAA>>, 100)
+      data2 = :binary.copy(<<0xBB>>, 50)
+
+      pkt1 =
+        <<0x01, 0x00, 108::16-big, 0::16, 1, 0, data1::binary>>
+
+      pkt2 =
+        <<0x01, 0x01, 58::16-big, 0::16, 5, 0, data2::binary>>
+
+      agent = MockSocket.start([{:ok, pkt1}, {:ok, pkt2}])
+
+      assert {:error, {:out_of_order, expected: 2, got: 5}} =
+               Packet.reassemble({MockSocket, agent})
+
+      MockSocket.stop(agent)
+    end
+
+    test "handles partial recv (data split across reads)" do
+      payload = :binary.copy(<<0xEE>>, 100)
+      [packet] = Packet.encode(0x01, payload)
+      wire = IO.iodata_to_binary(packet)
+
+      <<part1::binary-size(6), part2::binary>> = wire
+
+      agent =
+        MockSocket.start([{:ok, part1}, {:ok, part2}])
+
+      assert {:ok, 0x01, ^payload} =
+               Packet.reassemble({MockSocket, agent})
+
+      MockSocket.stop(agent)
+    end
+
+    test "handles two packets delivered in single recv" do
+      payload = :binary.copy(<<0xFF>>, 4088 + 100)
+      packets = Packet.encode(0x01, payload)
+
+      wire =
+        packets
+        |> Enum.map(&IO.iodata_to_binary/1)
+        |> IO.iodata_to_binary()
+
+      agent = MockSocket.start([{:ok, wire}])
+
+      assert {:ok, 0x01, ^payload} =
+               Packet.reassemble({MockSocket, agent})
+
+      MockSocket.stop(agent)
+    end
+
+    @tag :slow
+    test "validates packet ID wrap at 256" do
+      payload = :binary.copy(<<0xDD>>, 4088 * 256 + 1)
+      packets = Packet.encode(0x01, payload)
+
+      responses =
+        Enum.map(packets, fn p ->
+          {:ok, IO.iodata_to_binary(p)}
+        end)
+
+      agent = MockSocket.start(responses)
+
+      assert {:ok, 0x01, ^payload} =
+               Packet.reassemble({MockSocket, agent})
+
+      MockSocket.stop(agent)
     end
   end
 
