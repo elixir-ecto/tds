@@ -7,7 +7,7 @@ defmodule Tds.Messages do
 
   alias Tds.Encoding.UCS2
   alias Tds.Parameter
-  alias Tds.Protocol.{Login7, Prelogin}
+  alias Tds.Protocol.{Login7, Packet, Prelogin}
   alias Tds.Types
 
   require Bitwise
@@ -241,7 +241,7 @@ defmodule Tds.Messages do
   end
 
   defp encode(msg_attn(), _s) do
-    encode_packets(packet_type(:attention), <<>>)
+    Packet.encode(packet_type(:attention), <<>>)
   end
 
   defp encode(msg_sql(query: q), %{trans: trans}) do
@@ -264,7 +264,7 @@ defmodule Tds.Messages do
     total_length = byte_size(headers) + 4
     all_headers = <<total_length::little-size(32)>> <> headers
     data = all_headers <> q_ucs
-    encode_packets(packet_type(:sql_batch), data)
+    Packet.encode(packet_type(:sql_batch), data)
   end
 
   defp encode(msg_rpc(proc: proc, params: params), %{trans: trans}) do
@@ -286,7 +286,7 @@ defmodule Tds.Messages do
 
     data = all_headers <> encode_rpc(proc, params)
     # layout Data
-    encode_packets(packet_type(:rpc), data)
+    Packet.encode(packet_type(:rpc), data)
   end
 
   defp encode(msg_transmgr(command: "TM_BEGIN_XACT", isolation_level: isolation_level), %{
@@ -343,7 +343,7 @@ defmodule Tds.Messages do
 
     data = all_headers <> <<request_type::little-size(2)-unit(8), request_payload::binary>>
 
-    encode_packets(packet_type(:transaction_manager), data)
+    Packet.encode(packet_type(:transaction_manager), data)
   end
 
   defp encode_rpc(:sp_executesql, params) do
@@ -404,33 +404,5 @@ defmodule Tds.Messages do
     p_meta_data = <<byte_size(name)>> <> p_name <> p_flags <> type_data
 
     p_meta_data <> Types.encode_data(type_code, param.value, type_attr)
-  end
-
-  def encode_header(type, data, id, status) do
-    length = byte_size(data) + 8
-    # id::unsigned-size(8) below basicaly deals overflow e.g. rem(id, 255)
-    <<type, status, length::size(16), 0::size(16), id::unsigned-size(8), 0>>
-  end
-
-  @spec encode_packets(integer, binary, non_neg_integer) :: [binary, ...]
-  def encode_packets(type, binary, id \\ 1)
-
-  def encode_packets(_type, <<>>, _) do
-    []
-  end
-
-  def encode_packets(
-        type,
-        <<data::binary-size(packet_size(:max_data_size))-unit(8), tail::binary>>,
-        id
-      ) do
-    status = if byte_size(tail) > 0, do: 0, else: 1
-    packet = [encode_header(type, data, id, status), data]
-    [packet | encode_packets(type, tail, id + 1)]
-  end
-
-  def encode_packets(type, data, id) do
-    header = encode_header(type, data, id, 1)
-    [header <> data]
   end
 end

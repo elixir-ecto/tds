@@ -5,6 +5,7 @@ defmodule Tds.Protocol.Login7 do
   See: https://docs.microsoft.com/en-us/openspecs/windows_protocols/ms-tds/773a62b6-ee89-4c02-9e5e-344882630aac
   """
   alias Tds.Encoding.UCS2
+  alias Tds.Protocol.Packet
   import Tds.Protocol.Binary
   import Tds.Protocol.Constants
 
@@ -91,7 +92,7 @@ defmodule Tds.Protocol.Login7 do
     login7_len = byte_size(login7) + 4
     data = <<login7_len::little-size(32)>> <> login7
 
-    Tds.Messages.encode_packets(packet_type(:login7), data)
+    Packet.encode(packet_type(:login7), data)
   end
 
   defp fixed_login(login) do

@@ -4,6 +4,7 @@ defmodule Tds.Protocol.Prelogin do
 
   See: https://docs.microsoft.com/en-us/openspecs/windows_protocols/ms-tds/60f56408-0188-4cd5-8b90-25c6f2423868
   """
+  alias Tds.Protocol.Packet
   import Tds.Protocol.Binary
   import Tds.Protocol.Constants
   require Logger
@@ -68,7 +69,7 @@ defmodule Tds.Protocol.Prelogin do
       end)
 
     data = IO.iodata_to_binary(iodata)
-    Tds.Messages.encode_packets(packet_type(:prelogin), data)
+    Packet.encode(packet_type(:prelogin), data)
   end
 
   defp get_version do
