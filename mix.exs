@@ -40,7 +40,8 @@ defmodule Tds.Mixfile do
       {:excoding, "~> 0.1", optional: true, only: :test},
       {:tzdata, "~> 1.0", optional: true, only: :test},
       {:table, "~> 0.1.0", optional: true},
-      {:credo, "~> 1.7", only: [:dev, :test], runtime: false}
+      {:credo, "~> 1.7", only: [:dev, :test], runtime: false},
+      {:stream_data, "~> 1.0", only: [:test, :dev], runtime: false}
     ]
   end
 
