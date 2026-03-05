@@ -2,7 +2,7 @@ defmodule Tds.Type.DataReader do
   @moduledoc """
   Reads type-specific value bytes from the TDS token stream.
 
-  Handles five framing strategies. All strategies sever sub-binary
+  Handles six framing strategies. All strategies sever sub-binary
   references via `:binary.copy/1` or `IO.iodata_to_binary/1` to
   prevent packet buffer memory leaks.
   """
@@ -43,6 +43,13 @@ defmodule Tds.Type.DataReader do
         >>
       ),
       do: {:binary.copy(data), rest}
+
+  # Variant: 4-byte LE length prefix, 0x00000000 = NULL
+  def read(:variant, <<0::little-unsigned-32, rest::binary>>),
+    do: {nil, rest}
+
+  def read(:variant, <<size::little-unsigned-32, data::binary-size(size), rest::binary>>),
+    do: {:binary.copy(data), rest}
 
   # PLP: 8-byte NULL marker or chunked data
   def read(

@@ -135,4 +135,28 @@ defmodule Tds.Type.DataReaderTest do
       assert :binary.referenced_byte_size(data) == byte_size(data)
     end
   end
+
+  describe "read/2 :variant" do
+    test "zero length returns nil" do
+      assert {nil, <<0xAA>>} =
+               DataReader.read(:variant, <<0::little-unsigned-32, 0xAA>>)
+    end
+
+    test "reads n bytes after 4-byte LE length" do
+      assert {data, <<0xBB>>} =
+               DataReader.read(
+                 :variant,
+                 <<5::little-unsigned-32, 1, 2, 3, 4, 5, 0xBB>>
+               )
+
+      assert data == <<1, 2, 3, 4, 5>>
+    end
+
+    test "returned data is a copy (not sub-binary)" do
+      payload = :crypto.strong_rand_bytes(200)
+      input = <<200::little-unsigned-32>> <> payload <> <<0xFF>>
+      {data, _rest} = DataReader.read(:variant, input)
+      assert :binary.referenced_byte_size(data) == byte_size(data)
+    end
+  end
 end
