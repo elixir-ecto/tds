@@ -27,18 +27,26 @@ defmodule Tds.Type.DateTime do
   @secs_in_hour 60 * @secs_in_min
   @max_time_scale 7
 
+  @daten_code tds_type(:daten)
+  @timen_code tds_type(:timen)
+  @datetime2n_code tds_type(:datetime2n)
+  @datetimeoffsetn_code tds_type(:datetimeoffsetn)
+  @smalldatetime_code tds_type(:smalldatetime)
+  @datetime_code tds_type(:datetime)
+  @datetimen_code tds_type(:datetimen)
+
   # -- type_codes / type_names -----------------------------------------
 
   @impl true
   def type_codes do
     [
-      tds_type(:daten),
-      tds_type(:timen),
-      tds_type(:datetime2n),
-      tds_type(:datetimeoffsetn),
-      tds_type(:smalldatetime),
-      tds_type(:datetime),
-      tds_type(:datetimen)
+      @daten_code,
+      @timen_code,
+      @datetime2n_code,
+      @datetimeoffsetn_code,
+      @smalldatetime_code,
+      @datetime_code,
+      @datetimen_code
     ]
   end
 
@@ -50,38 +58,75 @@ defmodule Tds.Type.DateTime do
   # -- decode_metadata -------------------------------------------------
 
   @impl true
-  def decode_metadata(<<tds_type(:daten), rest::binary>>) do
-    {:ok, %{data_reader: :bytelen}, rest}
-  end
-
-  def decode_metadata(<<tds_type(:timen), scale::unsigned-8, rest::binary>>) do
-    {:ok, %{data_reader: :bytelen, scale: scale}, rest}
+  def decode_metadata(<<@daten_code, rest::binary>>) do
+    {:ok, %{data_reader: :bytelen, type_code: @daten_code}, rest}
   end
 
   def decode_metadata(
-        <<tds_type(:datetime2n), scale::unsigned-8, rest::binary>>
+        <<@timen_code, scale::unsigned-8, rest::binary>>
       ) do
-    {:ok, %{data_reader: :bytelen, scale: scale}, rest}
+    meta = %{
+      data_reader: :bytelen,
+      scale: scale,
+      type_code: @timen_code
+    }
+
+    {:ok, meta, rest}
   end
 
   def decode_metadata(
-        <<tds_type(:datetimeoffsetn), scale::unsigned-8, rest::binary>>
+        <<@datetime2n_code, scale::unsigned-8, rest::binary>>
       ) do
-    {:ok, %{data_reader: :bytelen, scale: scale}, rest}
-  end
+    meta = %{
+      data_reader: :bytelen,
+      scale: scale,
+      type_code: @datetime2n_code
+    }
 
-  def decode_metadata(<<tds_type(:smalldatetime), rest::binary>>) do
-    {:ok, %{data_reader: {:fixed, 4}}, rest}
-  end
-
-  def decode_metadata(<<tds_type(:datetime), rest::binary>>) do
-    {:ok, %{data_reader: {:fixed, 8}}, rest}
+    {:ok, meta, rest}
   end
 
   def decode_metadata(
-        <<tds_type(:datetimen), length::unsigned-8, rest::binary>>
+        <<@datetimeoffsetn_code, scale::unsigned-8,
+          rest::binary>>
       ) do
-    {:ok, %{data_reader: :bytelen, length: length}, rest}
+    meta = %{
+      data_reader: :bytelen,
+      scale: scale,
+      type_code: @datetimeoffsetn_code
+    }
+
+    {:ok, meta, rest}
+  end
+
+  def decode_metadata(<<@smalldatetime_code, rest::binary>>) do
+    meta = %{
+      data_reader: {:fixed, 4},
+      type_code: @smalldatetime_code
+    }
+
+    {:ok, meta, rest}
+  end
+
+  def decode_metadata(<<@datetime_code, rest::binary>>) do
+    meta = %{
+      data_reader: {:fixed, 8},
+      type_code: @datetime_code
+    }
+
+    {:ok, meta, rest}
+  end
+
+  def decode_metadata(
+        <<@datetimen_code, length::unsigned-8, rest::binary>>
+      ) do
+    meta = %{
+      data_reader: :bytelen,
+      length: length,
+      type_code: @datetimen_code
+    }
+
+    {:ok, meta, rest}
   end
 
   # -- decode ----------------------------------------------------------
@@ -89,21 +134,28 @@ defmodule Tds.Type.DateTime do
   @impl true
   def decode(nil, _metadata), do: nil
 
-  def decode(data, %{type_code: 0x28}), do: decode_date(data)
-  def decode(data, %{type_code: 0x29} = m), do: decode_time(m.scale, data)
-  def decode(data, %{type_code: 0x3A}), do: decode_smalldatetime(data)
-  def decode(data, %{type_code: 0x3D}), do: decode_datetime(data)
+  def decode(data, %{type_code: @daten_code}),
+    do: decode_date(data)
 
-  def decode(data, %{type_code: 0x6F, length: 4}),
+  def decode(data, %{type_code: @timen_code} = m),
+    do: decode_time(m.scale, data)
+
+  def decode(data, %{type_code: @smalldatetime_code}),
     do: decode_smalldatetime(data)
 
-  def decode(data, %{type_code: 0x6F, length: 8}),
+  def decode(data, %{type_code: @datetime_code}),
     do: decode_datetime(data)
 
-  def decode(data, %{type_code: 0x2A} = m),
+  def decode(data, %{type_code: @datetimen_code, length: 4}),
+    do: decode_smalldatetime(data)
+
+  def decode(data, %{type_code: @datetimen_code, length: 8}),
+    do: decode_datetime(data)
+
+  def decode(data, %{type_code: @datetime2n_code} = m),
     do: decode_datetime2(m.scale, data)
 
-  def decode(data, %{type_code: 0x2B} = m),
+  def decode(data, %{type_code: @datetimeoffsetn_code} = m),
     do: decode_datetimeoffset(m.scale, data)
 
   # -- encode ----------------------------------------------------------
@@ -339,34 +391,12 @@ defmodule Tds.Type.DateTime do
     dt2_len = tlen + 3
 
     <<dt2_bin::binary-size(dt2_len),
-      offset_min::little-signed-16>> = data
+      _offset_min::little-signed-16>> = data
 
-    naive = decode_datetime2(scale, dt2_bin)
-    offset_sec = offset_min * 60
-
-    local =
-      naive
-      |> NaiveDateTime.add(offset_sec)
-      |> NaiveDateTime.to_iso8601()
-
-    sign = if offset_min >= 0, do: "+", else: "-"
-
-    h = div(offset_min, 60)
-
-    m_str =
-      (offset_min - h * 60)
-      |> Integer.to_string()
-      |> String.pad_leading(2, "0")
-
-    h_str =
-      abs(h)
-      |> Integer.to_string()
-      |> String.pad_leading(2, "0")
-
-    {:ok, datetime, ^offset_sec} =
-      DateTime.from_iso8601("#{local}#{sign}#{h_str}:#{m_str}")
-
-    datetime
+    # Wire stores UTC time + offset. Return UTC DateTime
+    # (same as old Tds.Types behavior) so roundtrip is stable.
+    naive_utc = decode_datetime2(scale, dt2_bin)
+    DateTime.from_naive!(naive_utc, "Etc/UTC")
   end
 
   defp encode_datetimeoffset(%DateTime{utc_offset: offset} = dt, scale) do

@@ -479,45 +479,43 @@ defmodule Packet.TokenStreamTest do
     0x00
   >>
 
-  @token_stream [
-    colmetadata: [
-      %{
-        collation: %Tds.Protocol.Collation{
-          codepage: "WINDOWS-1252",
-          col_flags: 0,
-          lcid: 36_941,
-          sort_id: 52,
-          version: 0
-        },
-        data_reader: :shortlen,
-        data_type: :variable,
-        data_type_code: 167,
-        length: 3,
-        name: "bar",
-        sql_type: :bigvarchar
-      }
-    ],
-    row: ["foo"],
-    done: %{
-      cmd: 193,
-      rows: 1,
-      status: %{
-        atnn?: false,
-        count?: true,
-        error?: false,
-        final?: true,
-        inxact?: false,
-        more?: false,
-        rpc_in_batch?: false,
-        srverror?: false
-      }
-    }
-  ]
-
   @tag capture_log: true
   test "should decode SqlBatch Server Response" do
     <<_::binary-8, package_data::binary>> = @package_data
-    assert @token_stream == Tds.Tokens.decode_tokens(package_data, nil)
+    tokens = Tds.Tokens.decode_tokens(package_data, nil)
+
+    assert [
+             colmetadata: [col_meta],
+             row: ["foo"],
+             done: %{
+               cmd: 193,
+               rows: 1,
+               status: %{
+                 atnn?: false,
+                 count?: true,
+                 error?: false,
+                 final?: true,
+                 inxact?: false,
+                 more?: false,
+                 rpc_in_batch?: false,
+                 srverror?: false
+               }
+             }
+           ] = tokens
+
+    assert col_meta.name == "bar"
+    assert col_meta.data_reader == :shortlen
+    assert col_meta.length == 3
+    assert col_meta.handler == Tds.Type.String
+    assert col_meta.encoding == :single_byte
+
+    assert col_meta.collation == %Tds.Protocol.Collation{
+             codepage: "WINDOWS-1252",
+             col_flags: 0,
+             lcid: 36_941,
+             sort_id: 52,
+             version: 0
+           }
   end
 
   @package_data <<

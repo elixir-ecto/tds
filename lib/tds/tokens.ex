@@ -8,7 +8,10 @@ defmodule Tds.Tokens do
   require Logger
 
   alias Tds.Encoding.UCS2
+  alias Tds.Type.{DataReader, Registry}
   alias Tds.Types
+
+  @registry Registry.new()
 
   def retval_typ_size(38) do
     # 0x26 - SYBINTN - 1
@@ -44,30 +47,53 @@ defmodule Tds.Tokens do
     []
   end
 
-  def decode_tokens(<<token::unsigned-size(8), tail::binary>>, collmetadata) do
+  def decode_tokens(
+        <<token::unsigned-size(8), tail::binary>>,
+        collmetadata
+      ) do
     {token_data, tail, collmetadata} =
       case token do
-        token(:colmetadata) -> decode_colmetadata(tail, collmetadata)
-        # token(:colinfo) -> decode_colinfo(tail, collmetadata)
-        token(:done) -> decode_done(tail, collmetadata)
-        token(:doneproc) -> decode_doneproc(tail, collmetadata)
-        token(:doneinproc) -> decode_doneinproc(tail, collmetadata)
-        token(:envchange) -> decode_envchange(tail, collmetadata)
-        token(:error) -> decode_error(tail, collmetadata)
-        # token(:featureextack) -> decode_featureextack(tail, collmetadata)
-        # token(:fedauthinfo) -> decode_fedauthinfo(tail, collmetadata)
-        token(:info) -> decode_info(tail, collmetadata)
-        token(:loginack) -> decode_loginack(tail, collmetadata)
-        token(:nbcrow) -> decode_nbcrow(tail, collmetadata)
-        # token(:offset) -> decode_offset(tail, collmetadata)
-        token(:order) -> decode_order(tail, collmetadata)
-        token(:returnstatus) -> decode_returnstatus(tail, collmetadata)
-        token(:returnvalue) -> decode_returnvalue(tail, collmetadata)
-        token(:row) -> decode_row(tail, collmetadata)
-        # token(:sessionstate) -> decode_sessionstate(tail, collmetadata)
-        # token(:sspi) -> decode_sspi(tail, collmetadata)
-        # token(:tabname) -> decode_tablename(tail, collmetadata)
-        t -> raise_unsupported_token(t, collmetadata)
+        token(:colmetadata) ->
+          decode_colmetadata(tail, collmetadata)
+
+        token(:done) ->
+          decode_done(tail, collmetadata)
+
+        token(:doneproc) ->
+          decode_doneproc(tail, collmetadata)
+
+        token(:doneinproc) ->
+          decode_doneinproc(tail, collmetadata)
+
+        token(:envchange) ->
+          decode_envchange(tail, collmetadata)
+
+        token(:error) ->
+          decode_error(tail, collmetadata)
+
+        token(:info) ->
+          decode_info(tail, collmetadata)
+
+        token(:loginack) ->
+          decode_loginack(tail, collmetadata)
+
+        token(:nbcrow) ->
+          decode_nbcrow(tail, collmetadata)
+
+        token(:order) ->
+          decode_order(tail, collmetadata)
+
+        token(:returnstatus) ->
+          decode_returnstatus(tail, collmetadata)
+
+        token(:returnvalue) ->
+          decode_returnvalue(tail, collmetadata)
+
+        token(:row) ->
+          decode_row(tail, collmetadata)
+
+        t ->
+          raise_unsupported_token(t, collmetadata)
       end
 
     [token_data | decode_tokens(tail, collmetadata)]
@@ -75,7 +101,8 @@ defmodule Tds.Tokens do
 
   defp raise_unsupported_token(token, _) do
     raise RuntimeError,
-          "Unsupported Token code #{inspect(token, base: :hex)} in Token Stream"
+          "Unsupported Token code " <>
+            "#{inspect(token, base: :hex)} in Token Stream"
   end
 
   defp decode_returnvalue(bin, collmetadata) do
@@ -90,8 +117,8 @@ defmodule Tds.Tokens do
     >> = bin
 
     name = UCS2.to_string(name)
-    {type_info, tail} = Tds.Types.decode_info(data)
-    {value, tail} = Tds.Types.decode_data(type_info, tail)
+    {meta, tail} = decode_type_metadata(data)
+    {value, tail} = decode_type_value(meta, tail)
     param = %Tds.Parameter{name: name, value: value, direction: :output}
     {{:returnvalue, param}, tail, collmetadata}
   end
@@ -113,7 +140,10 @@ defmodule Tds.Tokens do
   end
 
   # ORDER
-  defp decode_order(<<length::little-unsigned-16, tail::binary>>, collmetadata) do
+  defp decode_order(
+         <<length::little-unsigned-16, tail::binary>>,
+         collmetadata
+       ) do
     length = trunc(length / 2)
     {columns, tail} = decode_column_order(tail, length)
     {{:order, columns}, tail, collmetadata}
@@ -121,7 +151,8 @@ defmodule Tds.Tokens do
 
   # ERROR
   defp decode_error(
-         <<l::little-size(16), data::binary-size(l), tail::binary>>,
+         <<l::little-size(16), data::binary-size(l),
+           tail::binary>>,
          collmetadata
        ) do
     <<
@@ -147,13 +178,12 @@ defmodule Tds.Tokens do
       line_number: line_number
     }
 
-    # TODO Need to concat errors for delivery
-    # Logger.debug "SQL Error: #{inspect e}"
     {{:error, e}, tail, collmetadata}
   end
 
   defp decode_info(
-         <<l::little-size(16), data::binary-size(l), tail::binary>>,
+         <<l::little-size(16), data::binary-size(l),
+           tail::binary>>,
          collmetadata
        ) do
     <<
@@ -191,7 +221,6 @@ defmodule Tds.Tokens do
       |> IO.iodata_to_binary()
     end)
 
-    # tokens = Keyword.update(tokens, :info, [i], &[i | &1])
     {{:info, info}, tail, collmetadata}
   end
 
@@ -291,12 +320,6 @@ defmodule Tds.Tokens do
 
           {{:packetsize, new_packetsize, old_packetsize}, rest}
 
-        # 0x05
-        # @tds_envtype_unicode_data_storing_local_id ->
-
-        # 0x06
-        # @tds_envtype_uncode_data_string_comparison_flag ->
-
         0x07 ->
           <<
             new_value_size::unsigned-8,
@@ -341,9 +364,6 @@ defmodule Tds.Tokens do
 
           trans = :binary.copy(old_value)
           {{:transaction_rollback, <<0x00>>, trans}, rest}
-
-        # 0x0B
-        # @tds_envtype_enlist_dtc_transaction ->
 
         0x0C ->
           <<
@@ -394,7 +414,6 @@ defmodule Tds.Tokens do
         0x14 ->
           <<
             _routing_data_len::uint16(),
-            # Protocol MUST be 0, specifying TCP-IP protocol
             0x00,
             port::uint16(),
             alt_host_len::uint16(),
@@ -408,7 +427,7 @@ defmodule Tds.Tokens do
             UCS2.to_string(alt_host)
             |> String.split("\\")
             |> case do
-              [host, instance] -> {host, instance}
+              [host, inst] -> {host, inst}
               [host] -> {host, nil}
             end
 
@@ -426,8 +445,12 @@ defmodule Tds.Tokens do
 
   ## DONE
   defp decode_done(
-         <<status::little-unsigned-size(2)-unit(8), cur_cmd::little-unsigned-size(2)-unit(8),
-           row_count::little-size(8)-unit(8), tail::binary>>,
+         <<
+           status::little-unsigned-size(2)-unit(8),
+           cur_cmd::little-unsigned-size(2)-unit(8),
+           row_count::little-size(8)-unit(8),
+           tail::binary
+         >>,
          collmetadata
        ) do
     status = %{
@@ -481,7 +504,8 @@ defmodule Tds.Tokens do
       t_sql_only: interface == 1,
       tds_version: tds_version,
       program: UCS2.to_string(prog_name),
-      version: "#{major_ver}.#{minor_ver}.#{build_hi}.#{build_low}"
+      version:
+        "#{major_ver}.#{minor_ver}.#{build_hi}.#{build_low}"
     }
 
     {{:loginack, token}, tail, collmetadata}
@@ -493,7 +517,11 @@ defmodule Tds.Tokens do
     {Enum.reverse(acc), tail}
   end
 
-  defp decode_column_order(<<col_id::little-unsigned-16, tail::binary>>, n, acc) do
+  defp decode_column_order(
+         <<col_id::little-unsigned-16, tail::binary>>,
+         n,
+         acc
+       ) do
     decode_column_order(tail, n - 1, [col_id | acc])
   end
 
@@ -504,7 +532,8 @@ defmodule Tds.Tokens do
   end
 
   defp bitmap_list(
-         <<b8::1, b7::1, b6::1, b5::1, b4::1, b3::1, b2::1, b1::1, tail::binary>>,
+         <<b8::1, b7::1, b6::1, b5::1, b4::1, b3::1, b2::1,
+           b1::1, tail::binary>>,
          n
        ) do
     {bits, tail} = bitmap_list(tail, n - 1)
@@ -522,18 +551,20 @@ defmodule Tds.Tokens do
     decode_columns(tail, n - 1, [column | acc])
   end
 
-  defp decode_column(<<_usertype::int32(), _flags::int16(), tail::binary>>) do
-    {info, tail} = Types.decode_info(tail)
+  defp decode_column(
+         <<_usertype::int32(), _flags::int16(), tail::binary>>
+       ) do
+    {info, tail} = decode_type_metadata(tail)
     {name, tail} = decode_column_name(tail)
 
-    info =
-      info
-      |> Map.put(:name, name)
-
+    info = Map.put(info, :name, name)
     {info, tail}
   end
 
-  defp decode_column_name(<<length::int8(), name::binary-size(length)-unit(16), tail::binary>>) do
+  defp decode_column_name(
+         <<length::int8(), name::binary-size(length)-unit(16),
+           tail::binary>>
+       ) do
     name = UCS2.to_string(name)
     {name, tail}
   end
@@ -544,31 +575,76 @@ defmodule Tds.Tokens do
     {Enum.reverse(acc), tail}
   end
 
-  defp decode_row_columns(<<data::binary>>, [column_meta | colmetadata], acc) do
-    {column, tail} = decode_row_column(data, column_meta)
+  defp decode_row_columns(
+         <<data::binary>>,
+         [column_meta | colmetadata],
+         acc
+       ) do
+    {column, tail} = decode_type_value(column_meta, data)
     decode_row_columns(tail, colmetadata, [column | acc])
   end
 
-  defp decode_nbcrow_columns(binary, colmetadata, bitmap, acc \\ [])
+  defp decode_nbcrow_columns(
+         binary,
+         colmetadata,
+         bitmap,
+         acc \\ []
+       )
 
   defp decode_nbcrow_columns(<<tail::binary>>, [], _bitmap, acc) do
     {Enum.reverse(acc), tail}
   end
 
-  defp decode_nbcrow_columns(<<tail::binary>>, colmetadata, bitmap, acc) do
+  defp decode_nbcrow_columns(
+         <<tail::binary>>,
+         colmetadata,
+         bitmap,
+         acc
+       ) do
     [column_meta | colmetadata] = colmetadata
     [bit | bitmap] = bitmap
 
     {column, tail} =
       case bit do
-        0 -> decode_row_column(tail, column_meta)
+        0 -> decode_type_value(column_meta, tail)
         _ -> {nil, tail}
       end
 
-    decode_nbcrow_columns(tail, colmetadata, bitmap, [column | acc])
+    decode_nbcrow_columns(
+      tail,
+      colmetadata,
+      bitmap,
+      [column | acc]
+    )
   end
 
-  defp decode_row_column(<<tail::binary>>, column_meta) do
-    Types.decode_data(column_meta, tail)
+  # -- New type system pipeline ----------------------------------------
+
+  # Decodes type metadata from binary using Registry + handler.
+  # Returns {metadata_with_handler, rest}.
+  defp decode_type_metadata(
+         <<type_code::unsigned-8, _::binary>> = bin
+       ) do
+    case Registry.handler_for_code(@registry, type_code) do
+      {:ok, handler} ->
+        {:ok, meta, rest} = handler.decode_metadata(bin)
+        {Map.put(meta, :handler, handler), rest}
+
+      :error ->
+        {info, rest} = Types.decode_info(bin)
+        {info, rest}
+    end
+  end
+
+  # Decodes a column value using DataReader + handler.decode.
+  # Falls back to Types.decode_data for unrecognized metadata.
+  defp decode_type_value(%{handler: handler} = meta, bin) do
+    {raw, rest} = DataReader.read(meta.data_reader, bin)
+    value = handler.decode(raw, meta)
+    {value, rest}
+  end
+
+  defp decode_type_value(meta, bin) do
+    Types.decode_data(meta, bin)
   end
 end

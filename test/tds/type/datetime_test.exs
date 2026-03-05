@@ -429,10 +429,9 @@ defmodule Tds.Type.DateTimeTest do
       assert result.utc_offset == 0
     end
 
-    test "decodes positive offset (+05:30 = 330 min)" do
-      # Wire stores UTC time (07:00:45 UTC) + offset 330
-      # DateTime.from_iso8601 converts to UTC, so the result
-      # is stored as 07:00:45 UTC with utc_offset=0
+    test "decodes positive offset (+05:30 = 330 min) as UTC" do
+      # Wire stores UTC time (07:00:45 UTC) + offset 330 min
+      # Decode returns UTC DateTime (offset discarded)
       time_fsec = 7 * 3600 + 0 * 60 + 45
       time_bytes = <<time_fsec::little-unsigned-24>>
 
@@ -446,7 +445,7 @@ defmodule Tds.Type.DateTimeTest do
 
       result = DTType.decode(wire, meta)
       assert %DateTime{} = result
-      # Elixir DateTime.from_iso8601 stores in UTC
+      # Returns UTC time, not local time
       assert result.hour == 7
       assert result.minute == 0
       assert result.second == 45

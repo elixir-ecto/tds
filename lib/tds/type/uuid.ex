@@ -32,12 +32,13 @@ defmodule Tds.Type.UUID do
 
   # -- decode ----------------------------------------------------------
 
+  # NOTE: Byte reordering is disabled during the transition period.
+  # The old encode path (Tds.Types) sends bytes without reordering,
+  # so decode must also skip reordering to preserve roundtrip.
+  # Enable reorder(data) when encode is switched to this handler.
   @impl true
   def decode(nil, _metadata), do: nil
-
-  def decode(data, _metadata) do
-    reorder(data)
-  end
+  def decode(data, _metadata), do: :binary.copy(data)
 
   # -- encode ----------------------------------------------------------
 

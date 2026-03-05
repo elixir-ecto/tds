@@ -134,7 +134,7 @@ defmodule Tds.Type.Registry do
       Tds.Type.UUID,
       Tds.Type.Xml,
       Tds.Type.Variant,
-      Tds.Type.UDT
+      Tds.Type.Udt
     ]
   end
 end

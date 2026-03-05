@@ -54,21 +54,23 @@ defmodule QueryTest do
       []
     )
 
-    assert [
-             [
-               1,
-               false,
-               12,
-               100,
-               {{2014, 01, 10}, {12, 30, 0, 0}},
-               0.5,
-               -822_337_203_685_477.5808,
-               {{2014, 01, 11}, {11, 34, 25, 0}},
-               5.6,
-               -214_748.3648,
-               1000
-             ]
-           ] == query("SELECT TOP(1) * FROM FixedLength", [])
+    [[
+      tiny, bit_val, small, int_val, sdt,
+      real_val, money_val, dt, float_val,
+      small_money, big_int
+    ]] = query("SELECT TOP(1) * FROM FixedLength", [])
+
+    assert tiny == 1
+    assert bit_val == false
+    assert small == 12
+    assert int_val == 100
+    assert sdt == ~N[2014-01-10 12:30:00]
+    assert real_val == 0.5
+    assert Decimal.equal?(money_val, Decimal.new("-822337203685477.5808"))
+    assert dt == ~N[2014-01-11 11:34:25.000]
+    assert float_val == 5.6
+    assert Decimal.equal?(small_money, Decimal.new("-214748.3648"))
+    assert big_int == 1000
 
     query("DROP TABLE FixedLength", [])
   end
@@ -79,7 +81,11 @@ defmodule QueryTest do
     assert [[1, 1]] = query("SELECT 1, 1", [])
     assert [[-1]] = query("SELECT -1", [])
 
-    assert [[10_000_000_000_000]] = query("select CAST(10000000000000 AS bigint)", [])
+    assert [[10_000_000_000_000]] =
+             query(
+               "select CAST(10000000000000 AS bigint)",
+               []
+             )
 
     assert [["string"]] = query("SELECT 'string'", [])
 
@@ -87,18 +93,28 @@ defmodule QueryTest do
     assert [["ẽstring"]] = query("SELECT N'ẽstring'", [])
     Application.delete_env(:tds, :text_encoder)
 
-    assert [[true, false]] = query("SELECT CAST(1 AS BIT), CAST(0 AS BIT)", [])
-    uuid = Tds.Types.UUID.bingenerate()
-    {:ok, uuid_string} = Tds.Types.UUID.load(uuid)
-
-    assert [[^uuid]] =
+    assert [[true, false]] =
              query(
-               """
-               SELECT
-               CAST('#{uuid_string}' AS uniqueidentifier)
-               """,
+               "SELECT CAST(1 AS BIT), CAST(0 AS BIT)",
                []
              )
+
+    # UUID roundtrip: bingenerate creates mixed-endian bytes.
+    # load() converts to RFC 4122 string. SQL Server parses
+    # the string and stores mixed-endian. Decode returns
+    # the wire bytes as-is during transition.
+    wire_uuid = Tds.Types.UUID.bingenerate()
+    {:ok, uuid_string} = Tds.Types.UUID.load(wire_uuid)
+
+    [[decoded_uuid]] =
+      query(
+        "SELECT CAST('#{uuid_string}' AS uniqueidentifier)",
+        []
+      )
+
+    assert is_binary(decoded_uuid)
+    assert byte_size(decoded_uuid) == 16
+    assert decoded_uuid == wire_uuid
   end
 
   test "Decode NULL", context do
