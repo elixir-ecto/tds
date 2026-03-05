@@ -121,5 +121,20 @@ defmodule Tds.Type.Registry do
     end
   end
 
-  defp default_builtins, do: []
+  defp default_builtins do
+    [
+      Tds.Type.Boolean,
+      Tds.Type.Integer,
+      Tds.Type.Float,
+      Tds.Type.Decimal,
+      Tds.Type.Money,
+      Tds.Type.String,
+      Tds.Type.Binary,
+      Tds.Type.DateTime,
+      Tds.Type.UUID,
+      Tds.Type.Xml,
+      Tds.Type.Variant,
+      Tds.Type.UDT
+    ]
+  end
 end
