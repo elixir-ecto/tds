@@ -41,7 +41,8 @@ defmodule Tds.Mixfile do
       {:tzdata, "~> 1.0", optional: true, only: :test},
       {:table, "~> 0.1.0", optional: true},
       {:credo, "~> 1.7", only: [:dev, :test], runtime: false},
-      {:stream_data, "~> 1.0", only: [:test, :dev], runtime: false}
+      {:stream_data, "~> 1.0", only: [:test, :dev], runtime: false},
+      {:benchee, "~> 1.3", only: :dev, runtime: false}
     ]
   end
 
