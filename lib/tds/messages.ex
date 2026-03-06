@@ -9,7 +9,6 @@ defmodule Tds.Messages do
   alias Tds.Parameter
   alias Tds.Protocol.{Login7, Packet, Prelogin}
   alias Tds.Type.Registry
-  alias Tds.Types
 
   require Bitwise
   require Logger
@@ -401,71 +400,52 @@ defmodule Tds.Messages do
     p_name = UCS2.from_string(name)
     p_flags = param |> Parameter.option_flags()
 
-    case encode_via_handler(param) do
-      {:ok, _type_code, meta_bin, value_bin} ->
-        IO.iodata_to_binary([
-          <<byte_size(name)>>,
-          p_name,
-          p_flags,
-          meta_bin,
-          value_bin
-        ])
+    {_type_code, meta_bin, value_bin} =
+      encode_via_handler(param)
 
-      :fallback ->
-        {type_code, type_data, type_attr} =
-          Types.encode_data_type(param)
-
-        p_meta_data =
-          <<byte_size(name)>> <> p_name <> p_flags <> type_data
-
-        p_meta_data <>
-          Types.encode_data(type_code, param.value, type_attr)
-    end
+    IO.iodata_to_binary([
+      <<byte_size(name)>>,
+      p_name,
+      p_flags,
+      meta_bin,
+      value_bin
+    ])
   end
 
   @default_registry Registry.new()
-
-  # UUID handler reorders bytes but old decode doesn't yet.
-  # Fall back to old encode until decode also reorders.
-  defp encode_via_handler(%Tds.Parameter{type: :uuid}),
-    do: :fallback
 
   defp encode_via_handler(%Tds.Parameter{
          type: type,
          value: value
        })
        when not is_nil(type) do
-    case Registry.handler_for_name(@default_registry, type) do
-      {:ok, handler} ->
-        meta = handler_metadata(handler, value, type)
-        try_handler_encode(handler, value, meta)
-
-      :error ->
-        :fallback
-    end
+    handler = resolve_handler(@default_registry, type)
+    meta = handler_metadata(handler, value, type)
+    handler.encode(value, meta)
   end
 
   defp encode_via_handler(%Tds.Parameter{value: value}) do
-    case Registry.infer(@default_registry, value) do
-      {:ok, handler, meta} ->
-        try_handler_encode(handler, value, meta)
+    {:ok, handler, meta} =
+      Registry.infer(@default_registry, value)
+
+    handler.encode(value, meta)
+  end
+
+  defp resolve_handler(registry, type) do
+    case Registry.handler_for_name(registry, type) do
+      {:ok, handler} ->
+        handler
 
       :error ->
-        :fallback
+        # Unknown types (e.g. {:array, :string}) default
+        # to string encoding, matching legacy behavior.
+        {:ok, handler} =
+          Registry.handler_for_name(registry, :string)
+
+        handler
     end
   end
 
-  defp try_handler_encode(handler, value, meta) do
-    {type_code, meta_bin, value_bin} =
-      handler.encode(value, meta)
-
-    {:ok, type_code, meta_bin, value_bin}
-  rescue
-    FunctionClauseError -> :fallback
-  end
-
-  # When type is explicit, always use it in metadata.
-  # Infer only fills in non-type metadata (e.g. scale).
   defp handler_metadata(handler, value, type) do
     case handler.infer(value) do
       {:ok, meta} -> Map.put(meta, :type, type)

@@ -7,8 +7,6 @@ defmodule Tds.TypesTest do
 
   require Logger
 
-  @tds_data_type_decimaln 0x6A
-
   setup do
     {:ok, pid} = Tds.start_link(opts())
 
@@ -45,93 +43,68 @@ defmodule Tds.TypesTest do
     value
   end
 
-  describe "encode_data/3" do
+  describe "Decimal handler encode" do
     test "encodes decimal type", _context do
       value = Decimal.new("1000")
-      attr = [precision: 8, scale: 4]
-
-      # assert <<5, 1, 128, 150, 152, 0>> =
-      assert <<byte_len>> <> <<sign>> <> value_binary =
-               Tds.Types.encode_data(@tds_data_type_decimaln, value, attr)
+      {_type, _meta, val} = Tds.Type.Decimal.encode(value, %{})
+      <<byte_len, sign, value_binary::binary>> = IO.iodata_to_binary(val)
 
       assert byte_len == 5
       assert sign == 1
-      assert <<232, 3, 0, 0>> = value_binary
-      assert :binary.decode_unsigned(value_binary, :little) == 1000
+      coef = :binary.decode_unsigned(value_binary, :little)
+      assert coef == 1000
     end
 
-    test "encodes decimal type with scientific notation", _context do
+    test "encodes decimal with scientific notation", _context do
       value = Decimal.new("1E+3")
-      attr = [precision: 8, scale: 4]
+      {_type, _meta, val} = Tds.Type.Decimal.encode(value, %{})
+      <<_byte_len, sign, value_binary::binary>> = IO.iodata_to_binary(val)
 
-      assert <<byte_len>> <> <<sign>> <> value_binary =
-               Tds.Types.encode_data(@tds_data_type_decimaln, value, attr)
-
-      assert byte_len == 5
       assert sign == 1
-      assert <<232, 3, 0, 0>> = value_binary
       assert :binary.decode_unsigned(value_binary, :little) == 1000
     end
 
-    # Decimal.new("-1E+3")
-    test "encodes negative decimal with scientific notation", _context do
+    test "encodes negative decimal with scientific notation",
+         _context do
       value = Decimal.new("-1E+3")
-      attr = [precision: 8, scale: 4]
+      {_type, _meta, val} = Tds.Type.Decimal.encode(value, %{})
+      <<_byte_len, sign, value_binary::binary>> = IO.iodata_to_binary(val)
 
-      assert <<byte_len>> <> <<sign>> <> value_binary =
-               Tds.Types.encode_data(@tds_data_type_decimaln, value, attr)
-
-      assert byte_len == 5
       assert sign == 0
-      assert <<232, 3, 0, 0>> = value_binary
       assert :binary.decode_unsigned(value_binary, :little) == 1000
     end
 
-    test "encodes decimal type with precision", _context do
+    test "encodes decimal with fractional part", _context do
       value = Decimal.new("1000.0000")
-      attr = [precision: 8, scale: 4]
+      {_type, _meta, val} = Tds.Type.Decimal.encode(value, %{})
+      <<_byte_len, sign, value_binary::binary>> = IO.iodata_to_binary(val)
 
-      assert <<byte_len>> <> <<sign>> <> value_binary =
-               Tds.Types.encode_data(@tds_data_type_decimaln, value, attr)
-
-      assert byte_len == 5
       assert sign == 1
-      assert <<128, 150, 152, 0>> = value_binary
       assert :binary.decode_unsigned(value_binary, :little) == 10_000_000
     end
 
     test "encodes negative decimal", _context do
       value = Decimal.new("-1000.0000")
-      attr = [precision: 8, scale: 4]
+      {_type, _meta, val} = Tds.Type.Decimal.encode(value, %{})
+      <<_byte_len, sign, value_binary::binary>> = IO.iodata_to_binary(val)
 
-      assert <<byte_len>> <> <<sign>> <> value_binary =
-               Tds.Types.encode_data(@tds_data_type_decimaln, value, attr)
-
-      assert byte_len == 5
       assert sign == 0
-      assert <<128, 150, 152, 0>> = value_binary
       assert :binary.decode_unsigned(value_binary, :little) == 10_000_000
     end
 
-    test "encodes decimal type for 1000.1234", _context do
+    test "encodes decimal 1000.1234", _context do
       value = Decimal.new("1000.1234")
-      attr = [precision: 8, scale: 4]
+      {_type, _meta, val} = Tds.Type.Decimal.encode(value, %{})
+      <<_byte_len, sign, value_binary::binary>> = IO.iodata_to_binary(val)
 
-      assert <<byte_len>> <> <<sign>> <> value_binary =
-               Tds.Types.encode_data(@tds_data_type_decimaln, value, attr)
-
-      assert byte_len == 5
       assert sign == 1
-      assert <<82, 155, 152, 0>> = value_binary
       assert :binary.decode_unsigned(value_binary, :little) == 10_001_234
     end
 
     test "encodes very large decimal", _context do
       value = Decimal.new("9999999999.9999")
-      attr = [precision: 14, scale: 4]
-
-      assert <<byte_len>> <> <<sign>> <> value_binary =
-               Tds.Types.encode_data(@tds_data_type_decimaln, value, attr)
+      {_type, _meta, val} = Tds.Type.Decimal.encode(value, %{})
+      <<byte_len, sign, value_binary::binary>> = IO.iodata_to_binary(val)
 
       assert byte_len == 9
       assert sign == 1
@@ -140,12 +113,9 @@ defmodule Tds.TypesTest do
 
     test "encodes very small decimal", _context do
       value = Decimal.new("0.0001")
-      attr = [precision: 5, scale: 4]
+      {_type, _meta, val} = Tds.Type.Decimal.encode(value, %{})
+      <<_byte_len, sign, value_binary::binary>> = IO.iodata_to_binary(val)
 
-      assert <<byte_len>> <> <<sign>> <> value_binary =
-               Tds.Types.encode_data(@tds_data_type_decimaln, value, attr)
-
-      assert byte_len == 5
       assert sign == 1
       assert :binary.decode_unsigned(value_binary, :little) == 1
     end

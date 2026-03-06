@@ -2,7 +2,6 @@ defmodule Tds.Parameter do
   @moduledoc false
 
   alias Tds.Type.Registry
-  alias Tds.Types
 
   @type t :: %__MODULE__{
           name: String.t() | nil,
@@ -186,30 +185,24 @@ defmodule Tds.Parameter do
     fix_data_type(%__MODULE__{name: "@#{acc}", value: raw_param})
   end
 
-  # Build param descriptor using new handler system with
-  # fallback to old Types module.
-  # UUID handler uses byte reordering not yet matched by
-  # decode. Fall back to old encode until decode also reorders.
-  defp param_descriptor(
-         %__MODULE__{type: :uuid} = param,
-         _registry
-       ) do
-    Types.encode_param_descriptor(param)
+  @doc """
+  Generates a SQL parameter descriptor for a single parameter.
+
+  Returns a string like `"@name int"` or `"@name nvarchar(2000)"`.
+  """
+  def encode_param_descriptor(%__MODULE__{} = param) do
+    param_descriptor(param, default_registry())
   end
 
   defp param_descriptor(
-         %__MODULE__{name: name, type: type, value: value} = param,
+         %__MODULE__{name: name, type: type, value: value},
          registry
        )
        when not is_nil(type) do
-    case resolve_handler(registry, type, value) do
-      {:ok, handler, meta} ->
-        desc = handler.param_descriptor(value, meta)
-        "#{name} #{desc}"
-
-      :fallback ->
-        Types.encode_param_descriptor(param)
-    end
+    handler = resolve_handler(registry, type)
+    meta = infer_metadata(handler, value, type)
+    desc = handler.param_descriptor(value, meta)
+    "#{name} #{desc}"
   end
 
   defp param_descriptor(%__MODULE__{} = param, registry) do
@@ -218,26 +211,19 @@ defmodule Tds.Parameter do
     |> param_descriptor(registry)
   end
 
-  defp resolve_handler(registry, type, value) do
+  defp resolve_handler(registry, type) do
     case Registry.handler_for_name(registry, type) do
       {:ok, handler} ->
-        meta = infer_metadata(handler, value, type)
-        try_handler_descriptor(handler, value, meta)
+        handler
 
       :error ->
-        :fallback
+        {:ok, handler} =
+          Registry.handler_for_name(registry, :string)
+
+        handler
     end
   end
 
-  defp try_handler_descriptor(handler, value, meta) do
-    _desc = handler.param_descriptor(value, meta)
-    {:ok, handler, meta}
-  rescue
-    FunctionClauseError -> :fallback
-  end
-
-  # When type is explicit, always use it in metadata.
-  # Infer only fills in non-type metadata (e.g. scale).
   defp infer_metadata(handler, value, type) do
     case handler.infer(value) do
       {:ok, meta} -> Map.put(meta, :type, type)

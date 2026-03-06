@@ -16,8 +16,8 @@ defmodule Tds.Type.DecimalTest do
   end
 
   describe "type_names/0" do
-    test "returns :decimal" do
-      assert DecType.type_names() == [:decimal]
+    test "returns :decimal and :numeric" do
+      assert DecType.type_names() == [:decimal, :numeric]
     end
   end
 

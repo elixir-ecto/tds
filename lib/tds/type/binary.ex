@@ -29,7 +29,7 @@ defmodule Tds.Type.Binary do
   end
 
   @impl true
-  def type_names, do: [:binary]
+  def type_names, do: [:binary, :image]
 
   # -- decode_metadata ------------------------------------------------
 

@@ -207,6 +207,69 @@ defmodule Tds.Type.DateTime do
     {type, <<type, scale>>, [<<len>>, data]}
   end
 
+  # Legacy datetime (8-byte datetimen)
+  def encode(nil, %{type: :datetime}) do
+    type = tds_type(:datetimen)
+    {type, <<type, 0x08>>, <<0x00>>}
+  end
+
+  def encode(value, %{type: :datetime}) do
+    ndt = to_naive_datetime(value)
+    type = tds_type(:datetimen)
+    data = encode_legacy_datetime(ndt)
+    {type, <<type, 0x08>>, [<<0x08>>, data]}
+  end
+
+  # Legacy smalldatetime (4-byte datetimen)
+  def encode(nil, %{type: :smalldatetime}) do
+    type = tds_type(:datetimen)
+    {type, <<type, 0x04>>, <<0x00>>}
+  end
+
+  def encode(value, %{type: :smalldatetime}) do
+    ndt = to_naive_datetime(value)
+    type = tds_type(:datetimen)
+    data = encode_smalldatetime(ndt)
+    {type, <<type, 0x04>>, [<<0x04>>, data]}
+  end
+
+  # Tuple format: {y,m,d}
+  def encode({_, _, _} = date_tuple, %{type: :date} = meta) do
+    encode(Date.from_erl!(date_tuple), meta)
+  end
+
+  # Tuple format: {h,m,s} -> default scale 7
+  def encode({h, m, s}, %{type: :time}) do
+    encode_time_tuple({h, m, s, 0}, @max_time_scale)
+  end
+
+  # Tuple format: {h,m,s,fsec} -> scale 7 (100ns units)
+  def encode({h, m, s, fsec}, %{type: :time}) do
+    encode_time_tuple({h, m, s, fsec}, @max_time_scale)
+  end
+
+  # Tuple format: {{y,m,d},{h,m,s}} or {{y,m,d},{h,m,s,fsec}}
+  def encode({date, time}, %{type: :datetime2})
+      when is_tuple(date) do
+    encode_dt2_tuple(date, time, @max_time_scale)
+  end
+
+  # Tuple format: {{y,m,d},{h,m,s|{h,m,s,us}},offset_min}
+  # Replicates old Tds.Types behavior: sends time/date as-is
+  # with the offset appended, no UTC conversion.
+  def encode(
+        {{_, _, _} = d, time, offset_min},
+        %{type: :datetimeoffset}
+      ) do
+    type = tds_type(:datetimeoffsetn)
+    time_tuple = normalize_time_tuple(time)
+    {time_bin, scale} = encode_time_raw(time_tuple, @max_time_scale)
+    date_bin = encode_date(Date.from_erl!(d))
+    data = time_bin <> date_bin <> <<offset_min::little-signed-16>>
+    len = time_byte_length(scale) + 3 + 2
+    {type, <<type, scale>>, [<<len>>, data]}
+  end
+
   # -- param_descriptor ------------------------------------------------
 
   @impl true
@@ -248,6 +311,52 @@ defmodule Tds.Type.DateTime do
   def infer(%DateTime{}), do: {:ok, %{type: :datetimeoffset}}
   def infer(_value), do: :skip
 
+  # -- private: tuple encoding -----------------------------------------
+
+  defp encode_time_tuple(time_tuple, scale) do
+    type = tds_type(:timen)
+    {data, scale} = encode_time_raw(time_tuple, scale)
+    len = time_byte_length(scale)
+    {type, <<type, scale>>, [<<len>>, data]}
+  end
+
+  defp encode_dt2_tuple(date, time, scale) do
+    type = tds_type(:datetime2n)
+    time_tuple = normalize_time_tuple(time)
+    {time_bin, scale} = encode_time_raw(time_tuple, scale)
+    date_bin = encode_date(Date.from_erl!(date))
+    len = time_byte_length(scale) + 3
+    {type, <<type, scale>>, [<<len>>, time_bin <> date_bin]}
+  end
+
+  defp normalize_time_tuple({h, m, s}), do: {h, m, s, 0}
+  defp normalize_time_tuple({_, _, _, _} = t), do: t
+
+  # Convert NaiveDateTime to tuple format for legacy datetime
+  defp to_naive_datetime(%NaiveDateTime{} = ndt), do: ndt
+
+  defp to_naive_datetime({{y, m, d}, {h, mi, s}}) do
+    NaiveDateTime.from_erl!({{y, m, d}, {h, mi, s}})
+  end
+
+  defp to_naive_datetime({{y, m, d}, {h, mi, s, us}})
+       when us < 1_000_000 do
+    NaiveDateTime.from_erl!(
+      {{y, m, d}, {h, mi, s}},
+      {us, 6}
+    )
+  end
+
+  # fsec >= 1_000_000 means 100ns units (scale 7), convert
+  defp to_naive_datetime({{y, m, d}, {h, mi, s, fsec}}) do
+    us = div(fsec, 10)
+
+    NaiveDateTime.from_erl!(
+      {{y, m, d}, {h, mi, s}},
+      {us, 6}
+    )
+  end
+
   # -- private: date ---------------------------------------------------
 
   defp decode_date(<<days::little-24>>) do
@@ -276,6 +385,13 @@ defmodule Tds.Type.DateTime do
     NaiveDateTime.from_erl!({date, {hour, min, 0}})
   end
 
+  defp encode_smalldatetime(%NaiveDateTime{} = ndt) do
+    {date, {hour, min, _}} = NaiveDateTime.to_erl(ndt)
+    days = :calendar.date_to_gregorian_days(date) - @year_1900_days
+    mins = hour * 60 + min
+    <<days::little-unsigned-16, mins::little-unsigned-16>>
+  end
+
   # -- private: datetime -----------------------------------------------
 
   defp decode_datetime(
@@ -292,6 +408,23 @@ defmodule Tds.Type.DateTime do
       {usec * 1_000, 3},
       Calendar.ISO
     )
+  end
+
+  defp encode_legacy_datetime(%NaiveDateTime{} = ndt) do
+    {date, {h, m, s}} = NaiveDateTime.to_erl(ndt)
+    {us, _} = ndt.microsecond
+    days = :calendar.date_to_gregorian_days(date) - @year_1900_days
+    milliseconds = ((h * 60 + m) * 60 + s) * 1_000 + us / 1_000
+    secs_300 = round(milliseconds / (10 / 3))
+
+    {days, secs_300} =
+      if secs_300 == 25_920_000 do
+        {days + 1, 0}
+      else
+        {days, secs_300}
+      end
+
+    <<days::little-signed-32, secs_300::little-unsigned-32>>
   end
 
   # -- private: time ---------------------------------------------------

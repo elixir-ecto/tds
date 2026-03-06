@@ -4,14 +4,15 @@ defmodule Tds.Type.IntegerTest do
   alias Tds.Type.Integer
 
   describe "type_codes/0" do
-    test "returns all five integer type codes" do
+    test "returns integer and null type codes" do
       codes = Integer.type_codes()
+      assert 0x1F in codes
       assert 0x30 in codes
       assert 0x34 in codes
       assert 0x38 in codes
       assert 0x7F in codes
       assert 0x26 in codes
-      assert length(codes) == 5
+      assert length(codes) == 6
     end
   end
 

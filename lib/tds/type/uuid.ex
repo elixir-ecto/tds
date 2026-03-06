@@ -2,10 +2,9 @@ defmodule Tds.Type.UUID do
   @moduledoc """
   TDS type handler for UUID (uniqueidentifier) values.
 
-  MSSQL stores UUIDs in mixed-endian format: groups 1 (4B), 2 (2B),
-  3 (2B) are byte-reversed (little-endian), groups 4-5 (8B) are
-  big-endian. This handler reorders bytes so that Elixir code works
-  with standard RFC 4122 binary representation.
+  Tds.Types.UUID generates and works with mixed-endian bytes.
+  This handler sends and receives bytes as-is to preserve
+  roundtrip compatibility with that module.
   """
 
   @behaviour Tds.Type
@@ -32,16 +31,16 @@ defmodule Tds.Type.UUID do
 
   # -- decode ----------------------------------------------------------
 
-  # NOTE: Byte reordering is disabled during the transition period.
-  # The old encode path (Tds.Types) sends bytes without reordering,
-  # so decode must also skip reordering to preserve roundtrip.
-  # Enable reorder(data) when encode is switched to this handler.
+  # Tds.Types.UUID works in mixed-endian format. Bytes are stored
+  # and returned without reordering to preserve existing roundtrip.
   @impl true
   def decode(nil, _metadata), do: nil
   def decode(data, _metadata), do: :binary.copy(data)
 
   # -- encode ----------------------------------------------------------
 
+  # Bytes are sent as-is (no reorder) to match Tds.Types.UUID
+  # which generates mixed-endian bytes.
   @impl true
   def encode(nil, _metadata) do
     type = tds_type(:uniqueidentifier)
@@ -50,8 +49,7 @@ defmodule Tds.Type.UUID do
 
   def encode(<<_::128>> = bin, _metadata) do
     type = tds_type(:uniqueidentifier)
-    wire = reorder(bin)
-    {type, <<type, 0x10>>, <<0x10>> <> wire}
+    {type, <<type, 0x10>>, <<0x10>> <> bin}
   end
 
   def encode(
@@ -73,19 +71,6 @@ defmodule Tds.Type.UUID do
   def infer(_value), do: :skip
 
   # -- private helpers -------------------------------------------------
-
-  defp reorder(
-         <<a::binary-4, b::binary-2, c::binary-2, rest::binary-8>>
-       ) do
-    reverse(a) <> reverse(b) <> reverse(c) <> rest
-  end
-
-  defp reverse(bin) do
-    bin
-    |> :binary.bin_to_list()
-    |> Enum.reverse()
-    |> :binary.list_to_bin()
-  end
 
   defp parse_uuid_string(
          <<a1, a2, a3, a4, a5, a6, a7, a8, ?-,

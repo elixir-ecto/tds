@@ -9,7 +9,6 @@ defmodule Tds.Tokens do
 
   alias Tds.Encoding.UCS2
   alias Tds.Type.{DataReader, Registry}
-  alias Tds.Types
 
   @registry Registry.new()
 
@@ -621,30 +620,20 @@ defmodule Tds.Tokens do
   # -- New type system pipeline ----------------------------------------
 
   # Decodes type metadata from binary using Registry + handler.
-  # Returns {metadata_with_handler, rest}.
   defp decode_type_metadata(
          <<type_code::unsigned-8, _::binary>> = bin
        ) do
-    case Registry.handler_for_code(@registry, type_code) do
-      {:ok, handler} ->
-        {:ok, meta, rest} = handler.decode_metadata(bin)
-        {Map.put(meta, :handler, handler), rest}
+    {:ok, handler} =
+      Registry.handler_for_code(@registry, type_code)
 
-      :error ->
-        {info, rest} = Types.decode_info(bin)
-        {info, rest}
-    end
+    {:ok, meta, rest} = handler.decode_metadata(bin)
+    {Map.put(meta, :handler, handler), rest}
   end
 
   # Decodes a column value using DataReader + handler.decode.
-  # Falls back to Types.decode_data for unrecognized metadata.
   defp decode_type_value(%{handler: handler} = meta, bin) do
     {raw, rest} = DataReader.read(meta.data_reader, bin)
     value = handler.decode(raw, meta)
     {value, rest}
-  end
-
-  defp decode_type_value(meta, bin) do
-    Types.decode_data(meta, bin)
   end
 end

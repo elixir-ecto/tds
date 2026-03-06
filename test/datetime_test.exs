@@ -4,7 +4,6 @@ defmodule DatetimeTest do
   use ExUnit.Case, async: true
 
   alias Tds.Parameter
-  alias Tds.Types
 
   @tag timeout: 50_000
 
@@ -39,20 +38,6 @@ defmodule DatetimeTest do
         []
       )
 
-    assert nil == Types.encode_datetime(nil)
-
-    # Old Tds.Types encode/decode roundtrip (still tuple format)
-    assert {@date, {15, 16, 23, 0}} ==
-             @datetime
-             |> Types.encode_datetime()
-             |> Types.decode_datetime()
-
-    assert {@date, {15, 16, 23, 123}} ==
-             @datetime_us
-             |> Types.encode_datetime()
-             |> Types.decode_datetime()
-
-    # New pipeline returns NaiveDateTime structs
     assert [[nil]] ==
              "SELECT CAST(NULL AS datetime)"
              |> query([])
@@ -106,13 +91,6 @@ defmodule DatetimeTest do
   end
 
   test "smalldatetime", context do
-    assert nil == Types.encode_smalldatetime(nil)
-
-    assert {@date, {15, 16, 0, 0}} ==
-             @datetime
-             |> Types.encode_smalldatetime()
-             |> Types.decode_smalldatetime()
-
     assert [[nil]] ==
              "SELECT CAST(NULL AS smalldatetime)"
              |> query([])
@@ -153,10 +131,6 @@ defmodule DatetimeTest do
   end
 
   test "date", context do
-    assert nil == Types.encode_date(nil)
-    enc = Types.encode_date(@date)
-    assert @date == Types.decode_date(enc)
-
     assert [[nil]] == query("SELECT CAST(NULL AS date)", [])
 
     assert [[~D[2014-06-20]]] ==
@@ -178,21 +152,6 @@ defmodule DatetimeTest do
   end
 
   test "time", context do
-    assert {nil, 0} == Types.encode_time(nil)
-
-    # Old Tds.Types encode/decode roundtrip (still tuple format)
-    {bin, scale} = Types.encode_time(@time)
-    assert {15, 16, 23, 0} == Types.decode_time(scale, bin)
-
-    {bin, scale} = Types.encode_time(@time_fsec, 7)
-
-    assert {15, 16, 23, 1_234_567} ==
-             Types.decode_time(scale, bin)
-
-    {bin, scale} = Types.encode_time(@time_us, 6)
-    assert {15, 16, 23, 123_456} == Types.decode_time(scale, bin)
-
-    # New pipeline returns Time structs
     assert [[nil]] == query("SELECT CAST(NULL AS time)", [])
     assert [[nil]] == query("SELECT CAST(NULL AS time(0))", [])
     assert [[nil]] == query("SELECT CAST(NULL AS time(6))", [])
@@ -267,23 +226,6 @@ defmodule DatetimeTest do
   end
 
   test "datetime2", context do
-    assert {nil, 0} == Types.encode_datetime2(nil)
-
-    {dt, scale} = Types.encode_datetime2(@datetime)
-
-    assert {@date, {15, 16, 23, 0}} ==
-             Types.decode_datetime2(scale, dt)
-
-    {dt, scale} = Types.encode_datetime2(@datetime_fsec)
-    assert @datetime_fsec == Types.decode_datetime2(scale, dt)
-
-    {dt, scale} =
-      Types.encode_datetime2({@date, {131, 56, 23, 0}}, 0)
-
-    assert {@date, {131, 56, 23, 0}} ==
-             Types.decode_datetime2(scale, dt)
-
-    # New pipeline returns NaiveDateTime structs
     assert [[nil]] ==
              query("SELECT CAST(NULL AS datetime2)", [])
 

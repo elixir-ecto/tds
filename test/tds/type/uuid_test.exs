@@ -3,20 +3,19 @@ defmodule Tds.Type.UUIDTest do
 
   alias Tds.Type.UUID
 
-  # MSSQL stores UUIDs in mixed-endian format:
-  # Groups 1 (4B), 2 (2B), 3 (2B) are byte-reversed (little-endian).
-  # Groups 4-5 (8B) are as-is (big-endian).
-  #
-  # RFC 4122:   01020304-0506-0708-090a-0b0c0d0e0f10
-  # Wire/MSSQL: 04030201-0605-0807-090a-0b0c0d0e0f10
+  # Tds.Types.UUID works in mixed-endian format. Bytes are
+  # stored and returned without reordering to preserve existing
+  # roundtrip behavior with bingenerate/load/dump.
 
-  @rfc_binary <<1, 2, 3, 4, 5, 6, 7, 8,
-    9, 10, 11, 12, 13, 14, 15, 16>>
-
-  @wire_binary <<4, 3, 2, 1, 6, 5, 8, 7,
+  @test_binary <<1, 2, 3, 4, 5, 6, 7, 8,
     9, 10, 11, 12, 13, 14, 15, 16>>
 
   @uuid_string "01020304-0506-0708-090a-0b0c0d0e0f10"
+
+  # parse_uuid_string produces hex bytes in order (no reorder)
+  @parsed_string_binary <<0x01, 0x02, 0x03, 0x04, 0x05, 0x06,
+    0x07, 0x08, 0x09, 0x0A, 0x0B, 0x0C, 0x0D, 0x0E, 0x0F,
+    0x10>>
 
   describe "type_codes/0" do
     test "returns uniqueidentifier code 0x24" do
@@ -51,23 +50,18 @@ defmodule Tds.Type.UUIDTest do
 
   # -- decode ----------------------------------------------------------
 
-  # NOTE: During transition (old encode, new decode), byte
-  # reordering is disabled to preserve roundtrip integrity.
-  # Once the encode path is switched, decode will reorder
-  # and these tests should be updated to verify reordering.
-
   describe "decode/2" do
     test "nil returns nil" do
       assert UUID.decode(nil, %{}) == nil
     end
 
     test "returns the raw 16-byte binary as-is" do
-      result = UUID.decode(@wire_binary, %{})
-      assert result == @wire_binary
+      result = UUID.decode(@test_binary, %{})
+      assert result == @test_binary
     end
 
     test "returns independent copy of the data" do
-      big = @wire_binary <> :crypto.strong_rand_bytes(100)
+      big = @test_binary <> :crypto.strong_rand_bytes(100)
       <<chunk::binary-16, _::binary>> = big
       result = UUID.decode(chunk, %{})
       assert byte_size(result) == 16
@@ -87,18 +81,18 @@ defmodule Tds.Type.UUIDTest do
       assert value == <<0x00>>
     end
 
-    test "binary UUID reorders to wire format" do
+    test "binary UUID is sent as-is (no reorder)" do
       {type_code, meta_bin, value_bin} =
-        UUID.encode(@rfc_binary, %{})
+        UUID.encode(@test_binary, %{})
 
       assert type_code == 0x24
       meta = IO.iodata_to_binary(meta_bin)
       assert meta == <<0x24, 0x10>>
       value = IO.iodata_to_binary(value_bin)
-      assert value == <<0x10>> <> @wire_binary
+      assert value == <<0x10>> <> @test_binary
     end
 
-    test "string UUID is parsed and reordered to wire format" do
+    test "string UUID is parsed to binary" do
       {type_code, meta_bin, value_bin} =
         UUID.encode(@uuid_string, %{})
 
@@ -106,7 +100,7 @@ defmodule Tds.Type.UUIDTest do
       meta = IO.iodata_to_binary(meta_bin)
       assert meta == <<0x24, 0x10>>
       value = IO.iodata_to_binary(value_bin)
-      assert value == <<0x10>> <> @wire_binary
+      assert value == <<0x10>> <> @parsed_string_binary
     end
 
     test "string UUID is case-insensitive" do
@@ -114,7 +108,7 @@ defmodule Tds.Type.UUIDTest do
       {_type, _meta, value_bin} = UUID.encode(upper, %{})
 
       value = IO.iodata_to_binary(value_bin)
-      assert value == <<0x10>> <> @wire_binary
+      assert value == <<0x10>> <> @parsed_string_binary
     end
   end
 
@@ -122,7 +116,7 @@ defmodule Tds.Type.UUIDTest do
 
   describe "param_descriptor/2" do
     test "returns uniqueidentifier for any value" do
-      assert UUID.param_descriptor(@rfc_binary, %{}) ==
+      assert UUID.param_descriptor(@test_binary, %{}) ==
                "uniqueidentifier"
 
       assert UUID.param_descriptor(nil, %{}) ==
@@ -137,7 +131,7 @@ defmodule Tds.Type.UUIDTest do
 
   describe "infer/1" do
     test "16-byte binary infers as uuid" do
-      assert {:ok, %{}} = UUID.infer(@rfc_binary)
+      assert {:ok, %{}} = UUID.infer(@test_binary)
     end
 
     test "string UUID skips (must use explicit type: :uuid)" do
@@ -164,16 +158,16 @@ defmodule Tds.Type.UUIDTest do
   # -- roundtrip -------------------------------------------------------
 
   describe "encode/decode roundtrip" do
-    test "encode then decode preserves wire bytes" do
+    test "encode then decode preserves input bytes" do
       {_type, _meta, value_bin} =
-        UUID.encode(@rfc_binary, %{})
+        UUID.encode(@test_binary, %{})
 
       value = IO.iodata_to_binary(value_bin)
 
       # Strip the 1-byte length prefix to get wire bytes
       <<0x10, wire::binary-16>> = value
-      # During transition, decode returns wire bytes as-is
-      assert UUID.decode(wire, %{}) == @wire_binary
+      # No reorder: wire bytes == input bytes
+      assert UUID.decode(wire, %{}) == @test_binary
     end
 
     test "random 16-byte binary roundtrips through decode" do

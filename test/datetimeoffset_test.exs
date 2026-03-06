@@ -4,7 +4,6 @@ defmodule DatetimeOffsetTest do
   use ExUnit.Case, async: true
 
   alias Tds.Parameter
-  alias Tds.Types
 
   @tag timeout: 50_000
 
@@ -22,9 +21,6 @@ defmodule DatetimeOffsetTest do
   @datetimeoffset_fsec {@date, @time_fsec, @offset}
 
   test "datetimeoffset", context do
-    # Old Types encode/decode still works in tuple format
-    assert nil == Types.encode_datetimeoffset(nil)
-
     assert [[nil]] ==
              query("SELECT CAST(NULL AS datetimeoffset)", [])
 

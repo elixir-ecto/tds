@@ -18,8 +18,8 @@ defmodule Tds.Type.BinaryTest do
   end
 
   describe "type_names/0" do
-    test "returns :binary" do
-      assert BinType.type_names() == [:binary]
+    test "returns :binary and :image" do
+      assert BinType.type_names() == [:binary, :image]
     end
   end
 

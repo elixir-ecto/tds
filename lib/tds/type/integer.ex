@@ -14,6 +14,7 @@ defmodule Tds.Type.Integer do
   @impl true
   def type_codes do
     [
+      tds_type(:null),
       tds_type(:tinyint),
       tds_type(:smallint),
       tds_type(:int),
@@ -28,6 +29,10 @@ defmodule Tds.Type.Integer do
   # -- decode_metadata -----------------------------------------------
 
   @impl true
+  def decode_metadata(<<tds_type(:null), rest::binary>>) do
+    {:ok, %{data_reader: {:fixed, 0}}, rest}
+  end
+
   def decode_metadata(<<tds_type(:tinyint), rest::binary>>) do
     {:ok, %{data_reader: {:fixed, 1}}, rest}
   end
@@ -54,6 +59,7 @@ defmodule Tds.Type.Integer do
 
   @impl true
   def decode(nil, _metadata), do: nil
+  def decode(<<>>, _metadata), do: nil
 
   def decode(<<val::unsigned-8>>, _metadata), do: val
 

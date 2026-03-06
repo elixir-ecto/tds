@@ -25,7 +25,7 @@ defmodule Tds.Type.Decimal do
   end
 
   @impl true
-  def type_names, do: [:decimal]
+  def type_names, do: [:decimal, :numeric]
 
   # -- decode_metadata -----------------------------------------------
 
@@ -139,4 +139,10 @@ defmodule Tds.Type.Decimal do
   defp data_length(precision) when precision <= 19, do: 8
   defp data_length(precision) when precision <= 28, do: 12
   defp data_length(precision) when precision <= 38, do: 16
+
+  defp data_length(precision) do
+    raise ArgumentError,
+          "size (#{precision}) given to the type " <>
+            "'decimal' exceeds the maximum allowed (38)"
+  end
 end
