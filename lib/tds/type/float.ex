@@ -50,11 +50,13 @@ defmodule Tds.Type.Float do
 
   @impl true
   def encode(nil, _metadata) do
-    {tds_type(:floatn), <<0x08>>, <<0x00>>}
+    type = tds_type(:floatn)
+    {type, <<type, 0x08>>, <<0x00>>}
   end
 
   def encode(value, _metadata) when is_float(value) do
-    {tds_type(:floatn), <<0x08>>, <<0x08, value::little-float-64>>}
+    type = tds_type(:floatn)
+    {type, <<type, 0x08>>, <<0x08, value::little-float-64>>}
   end
 
   # -- param_descriptor ----------------------------------------------

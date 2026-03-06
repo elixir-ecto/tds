@@ -56,7 +56,7 @@ defmodule Tds.Type.BooleanTest do
       {type_code, meta, value} = Boolean.encode(nil, %{})
 
       assert type_code == 0x68
-      assert IO.iodata_to_binary(meta) == <<0x01>>
+      assert IO.iodata_to_binary(meta) == <<0x68, 0x01>>
       assert IO.iodata_to_binary(value) == <<0x00>>
     end
 
@@ -64,7 +64,7 @@ defmodule Tds.Type.BooleanTest do
       {type_code, meta, value} = Boolean.encode(true, %{})
 
       assert type_code == 0x68
-      assert IO.iodata_to_binary(meta) == <<0x01>>
+      assert IO.iodata_to_binary(meta) == <<0x68, 0x01>>
       assert IO.iodata_to_binary(value) == <<0x01, 0x01>>
     end
 
@@ -72,7 +72,7 @@ defmodule Tds.Type.BooleanTest do
       {type_code, meta, value} = Boolean.encode(false, %{})
 
       assert type_code == 0x68
-      assert IO.iodata_to_binary(meta) == <<0x01>>
+      assert IO.iodata_to_binary(meta) == <<0x68, 0x01>>
       assert IO.iodata_to_binary(value) == <<0x01, 0x00>>
     end
   end

@@ -34,12 +34,14 @@ defmodule Tds.Type.Boolean do
 
   @impl true
   def encode(nil, _metadata) do
-    {tds_type(:bitn), <<0x01>>, <<0x00>>}
+    type = tds_type(:bitn)
+    {type, <<type, 0x01>>, <<0x00>>}
   end
 
   def encode(value, _metadata) when is_boolean(value) do
+    type = tds_type(:bitn)
     byte = if value, do: 0x01, else: 0x00
-    {tds_type(:bitn), <<0x01>>, <<0x01, byte>>}
+    {type, <<type, 0x01>>, <<0x01, byte>>}
   end
 
   @impl true

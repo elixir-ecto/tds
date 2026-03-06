@@ -53,29 +53,31 @@ defmodule Tds.Type.Udt do
 
   @impl true
   def encode(nil, _metadata) do
-    meta_bin = <<0xFF, 0xFF>>
+    type = tds_type(:bigvarbinary)
+    meta_bin = <<type, 0xFF, 0xFF>>
     value_bin = <<plp(:null)::little-unsigned-64>>
-    {tds_type(:bigvarbinary), meta_bin, value_bin}
+    {type, meta_bin, value_bin}
   end
 
   def encode(value, _metadata) when is_binary(value) do
+    type = tds_type(:bigvarbinary)
     size = byte_size(value)
 
     cond do
       size == 0 ->
-        meta_bin = <<0xFF, 0xFF>>
+        meta_bin = <<type, 0xFF, 0xFF>>
         value_bin = <<0::unsigned-64, 0::unsigned-32>>
-        {tds_type(:bigvarbinary), meta_bin, value_bin}
+        {type, meta_bin, value_bin}
 
       size > 8000 ->
-        meta_bin = <<0xFF, 0xFF>>
+        meta_bin = <<type, 0xFF, 0xFF>>
         value_bin = encode_plp(value)
-        {tds_type(:bigvarbinary), meta_bin, value_bin}
+        {type, meta_bin, value_bin}
 
       true ->
-        meta_bin = <<size::little-unsigned-16>>
+        meta_bin = <<type, size::little-unsigned-16>>
         value_bin = <<size::little-unsigned-16>> <> value
-        {tds_type(:bigvarbinary), meta_bin, value_bin}
+        {type, meta_bin, value_bin}
     end
   end
 

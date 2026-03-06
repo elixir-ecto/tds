@@ -80,7 +80,7 @@ defmodule Tds.Type.UdtTest do
 
       assert type_code == 0xA5
       meta = IO.iodata_to_binary(meta_bin)
-      assert meta == <<0xFF, 0xFF>>
+      assert meta == <<0xA5, 0xFF, 0xFF>>
 
       value = IO.iodata_to_binary(value_bin)
       assert value == <<0xFFFFFFFFFFFFFFFF::little-unsigned-64>>
@@ -92,7 +92,7 @@ defmodule Tds.Type.UdtTest do
 
       assert type_code == 0xA5
       meta = IO.iodata_to_binary(meta_bin)
-      assert meta == <<5::little-unsigned-16>>
+      assert meta == <<0xA5, 5::little-unsigned-16>>
 
       value = IO.iodata_to_binary(value_bin)
       assert value == <<5::little-unsigned-16, 1, 2, 3, 4, 5>>
@@ -103,7 +103,7 @@ defmodule Tds.Type.UdtTest do
 
       assert type_code == 0xA5
       meta = IO.iodata_to_binary(meta_bin)
-      assert meta == <<0xFF, 0xFF>>
+      assert meta == <<0xA5, 0xFF, 0xFF>>
 
       value = IO.iodata_to_binary(value_bin)
       assert value == <<0::unsigned-64, 0::unsigned-32>>
@@ -115,7 +115,7 @@ defmodule Tds.Type.UdtTest do
 
       assert type_code == 0xA5
       meta = IO.iodata_to_binary(meta_bin)
-      assert meta == <<0xFF, 0xFF>>
+      assert meta == <<0xA5, 0xFF, 0xFF>>
 
       value = IO.iodata_to_binary(value_bin)
       <<total_size::little-unsigned-64, _rest::binary>> = value

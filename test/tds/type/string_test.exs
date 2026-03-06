@@ -210,8 +210,8 @@ defmodule Tds.Type.StringTest do
 
       assert type_code == 0xE7
       meta = IO.iodata_to_binary(meta_bin)
-      # nvarchar(max): 0xFFFF + null collation
-      assert meta == <<0xFF, 0xFF>> <> @null_collation
+      # type_code + nvarchar(max): 0xFFFF + null collation
+      assert meta == <<0xE7, 0xFF, 0xFF>> <> @null_collation
 
       value = IO.iodata_to_binary(value_bin)
       # PLP null: 0xFFFFFFFFFFFFFFFF
@@ -227,7 +227,7 @@ defmodule Tds.Type.StringTest do
       ucs2_size = byte_size(ucs2)
 
       meta = IO.iodata_to_binary(meta_bin)
-      assert meta == <<ucs2_size::little-unsigned-16>> <> @null_collation
+      assert meta == <<0xE7, ucs2_size::little-unsigned-16>> <> @null_collation
 
       value = IO.iodata_to_binary(value_bin)
       assert value == <<ucs2_size::little-unsigned-16>> <> ucs2
@@ -239,8 +239,8 @@ defmodule Tds.Type.StringTest do
       assert type_code == 0xE7
 
       meta = IO.iodata_to_binary(meta_bin)
-      # nvarchar(max) header for empty string
-      assert meta == <<0xFF, 0xFF>> <> @null_collation
+      # type_code + nvarchar(max) header for empty string
+      assert meta == <<0xE7, 0xFF, 0xFF>> <> @null_collation
 
       value = IO.iodata_to_binary(value_bin)
       # PLP empty: size=0 (8 bytes) + terminator 0x00000000
@@ -255,8 +255,8 @@ defmodule Tds.Type.StringTest do
       assert type_code == 0xE7
 
       meta = IO.iodata_to_binary(meta_bin)
-      # nvarchar(max)
-      assert meta == <<0xFF, 0xFF>> <> @null_collation
+      # type_code + nvarchar(max)
+      assert meta == <<0xE7, 0xFF, 0xFF>> <> @null_collation
 
       value = IO.iodata_to_binary(value_bin)
       ucs2 = UCS2.from_string(long_str)
@@ -278,8 +278,8 @@ defmodule Tds.Type.StringTest do
 
       meta = IO.iodata_to_binary(meta_bin)
       ucs2_size = byte_size(UCS2.from_string(str))
-      # Should use shortlen, not PLP
-      assert meta == <<ucs2_size::little-unsigned-16>> <> @null_collation
+      # type_code + shortlen, not PLP
+      assert meta == <<0xE7, ucs2_size::little-unsigned-16>> <> @null_collation
     end
   end
 

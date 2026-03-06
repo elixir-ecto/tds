@@ -163,7 +163,7 @@ defmodule Tds.Type.MoneyTest do
       {type_code, meta, value} = Money.encode(nil, %{})
 
       assert type_code == 0x6E
-      assert IO.iodata_to_binary(meta) == <<0x08>>
+      assert IO.iodata_to_binary(meta) == <<0x6E, 0x08>>
       assert IO.iodata_to_binary(value) == <<0x00>>
     end
 
@@ -172,7 +172,7 @@ defmodule Tds.Type.MoneyTest do
       {type_code, meta, value} = Money.encode(dec, %{})
 
       assert type_code == 0x6E
-      assert IO.iodata_to_binary(meta) == <<0x08>>
+      assert IO.iodata_to_binary(meta) == <<0x6E, 0x08>>
 
       value_bin = IO.iodata_to_binary(value)
       # length prefix + 8 bytes of money data

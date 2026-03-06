@@ -223,9 +223,9 @@ defmodule Tds.TypesTest do
 
     @tag precision: 38, scale: 18, capture_log: true
     test "raises an error with value larger than SQL Server maximum", context do
-      # 39 digits
+      # 40 digits total (21 integer + 19 fractional)
       value = Decimal.new("999999999999999999999.9999999999999999999")
-      message = ~r/size \(39\) given to the type 'decimal' exceeds the maximum allowed \(38\)/
+      message = ~r/size \(40\) given to the type 'decimal' exceeds the maximum allowed \(38\)/
       assert_raise(MatchError, message, fn -> insert_decimal(value, context) end)
     end
 

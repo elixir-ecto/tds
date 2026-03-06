@@ -1,6 +1,7 @@
 defmodule Tds.Parameter do
   @moduledoc false
 
+  alias Tds.Type.Registry
   alias Tds.Types
 
   @type t :: %__MODULE__{
@@ -33,20 +34,20 @@ defmodule Tds.Parameter do
     <<0::size(6), fDefaultValue::size(1), fByRefValue::size(1)>>
   end
 
-  def prepared_params(params) do
+  def prepared_params(params, registry \\ nil) do
+    reg = registry || default_registry()
+
     params
     |> List.wrap()
     |> name(0)
     |> Enum.map_join(", ", fn param ->
-      param
-      |> fix_data_type()
-      |> Types.encode_param_descriptor()
+      param_descriptor(param, reg)
     end)
   end
 
   @doc """
-  Prepares parameters by giving them names, define missing type, encoding value
-  if necessary.
+  Prepares parameters by giving them names, define missing type,
+  encoding value if necessary.
   """
   def prepare_params(params) do
     params
@@ -64,9 +65,14 @@ defmodule Tds.Parameter do
 
     param =
       case param do
-        %__MODULE__{name: nil} -> fix_data_type(%{param | name: "@#{name}"})
-        %__MODULE__{} -> fix_data_type(param)
-        raw_param -> fix_data_type(raw_param, name)
+        %__MODULE__{name: nil} ->
+          fix_data_type(%{param | name: "@#{name}"})
+
+        %__MODULE__{} ->
+          fix_data_type(param)
+
+        raw_param ->
+          fix_data_type(raw_param, name)
       end
 
     do_name(tail, name, [param | acc])
@@ -82,8 +88,6 @@ defmodule Tds.Parameter do
   end
 
   def fix_data_type(%__MODULE__{type: nil, value: nil} = param) do
-    # should fix Ecto has_one, on_change :nullify issue where type is not known when Ecto
-    # builds query/statement for on_change callback
     %{param | type: :binary}
   end
 
@@ -108,11 +112,6 @@ defmodule Tds.Parameter do
 
   def fix_data_type(%__MODULE__{value: value} = param)
       when is_integer(value) do
-    # if -2_147_483_648 >= value and value <= 2_147_483_647 do
-    #   %{param | type: :integer}
-    # else
-    #   %{param | type: :bigint}
-    # end
     %{param | type: :integer}
   end
 
@@ -141,18 +140,23 @@ defmodule Tds.Parameter do
     %{param | type: :time}
   end
 
-  def fix_data_type(%__MODULE__{value: {{_, _, _}, {_, _, _}}} = param) do
+  def fix_data_type(
+        %__MODULE__{value: {{_, _, _}, {_, _, _}}} = param
+      ) do
     %{param | type: :datetime}
   end
 
-  def fix_data_type(%__MODULE__{value: %NaiveDateTime{microsecond: {_, s}}} = param) do
+  def fix_data_type(
+        %__MODULE__{value: %NaiveDateTime{microsecond: {_, s}}} =
+          param
+      ) do
     type = if s > 3, do: :datetime2, else: :datetime
     %{param | type: type}
   end
 
-  def fix_data_type(%__MODULE__{value: {{_, _, _}, {_, _, _, fsec}}} = param) do
-    # todo: enable warning and introduce Tds.Types.DateTime2 and Tds.Types.DateTime
-    # Logger.warn(fn -> "Datetime as tuple is obsolete, please use NaiveDateTime." end)
+  def fix_data_type(
+        %__MODULE__{value: {{_, _, _}, {_, _, _, fsec}}} = param
+      ) do
     type = if rem(fsec, 1000) > 0, do: :datetime2, else: :datetime
     %{param | type: type}
   end
@@ -161,7 +165,9 @@ defmodule Tds.Parameter do
     %{param | type: :datetimeoffset}
   end
 
-  def fix_data_type(%__MODULE__{value: {{_y, _m, _d}, _time, _offset}} = param) do
+  def fix_data_type(
+        %__MODULE__{value: {{_y, _m, _d}, _time, _offset}} = param
+      ) do
     %{param | type: :datetimeoffset}
   end
 
@@ -178,5 +184,68 @@ defmodule Tds.Parameter do
 
   def fix_data_type(raw_param, acc) do
     fix_data_type(%__MODULE__{name: "@#{acc}", value: raw_param})
+  end
+
+  # Build param descriptor using new handler system with
+  # fallback to old Types module.
+  # UUID handler uses byte reordering not yet matched by
+  # decode. Fall back to old encode until decode also reorders.
+  defp param_descriptor(
+         %__MODULE__{type: :uuid} = param,
+         _registry
+       ) do
+    Types.encode_param_descriptor(param)
+  end
+
+  defp param_descriptor(
+         %__MODULE__{name: name, type: type, value: value} = param,
+         registry
+       )
+       when not is_nil(type) do
+    case resolve_handler(registry, type, value) do
+      {:ok, handler, meta} ->
+        desc = handler.param_descriptor(value, meta)
+        "#{name} #{desc}"
+
+      :fallback ->
+        Types.encode_param_descriptor(param)
+    end
+  end
+
+  defp param_descriptor(%__MODULE__{} = param, registry) do
+    param
+    |> fix_data_type()
+    |> param_descriptor(registry)
+  end
+
+  defp resolve_handler(registry, type, value) do
+    case Registry.handler_for_name(registry, type) do
+      {:ok, handler} ->
+        meta = infer_metadata(handler, value, type)
+        try_handler_descriptor(handler, value, meta)
+
+      :error ->
+        :fallback
+    end
+  end
+
+  defp try_handler_descriptor(handler, value, meta) do
+    _desc = handler.param_descriptor(value, meta)
+    {:ok, handler, meta}
+  rescue
+    FunctionClauseError -> :fallback
+  end
+
+  # When type is explicit, always use it in metadata.
+  # Infer only fills in non-type metadata (e.g. scale).
+  defp infer_metadata(handler, value, type) do
+    case handler.infer(value) do
+      {:ok, meta} -> Map.put(meta, :type, type)
+      :skip -> %{type: type}
+    end
+  end
+
+  defp default_registry do
+    Registry.new()
   end
 end

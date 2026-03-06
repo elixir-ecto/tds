@@ -4,6 +4,7 @@ defmodule Tds.Protocol do
   """
   alias Tds.{Parameter, Query}
   alias Tds.Protocol.Packet
+  alias Tds.Type.Registry
   import Tds.{Messages, Utils}
   require Logger
   use DBConnection
@@ -43,7 +44,8 @@ defmodule Tds.Protocol do
           result: nil | list(),
           query: nil | String.t(),
           transaction: transaction,
-          env: env
+          env: env,
+          registry: Registry.t()
         }
 
   defstruct sock: nil,
@@ -60,7 +62,8 @@ defmodule Tds.Protocol do
               savepoint: 0,
               collation: %Tds.Protocol.Collation{},
               packetsize: 4096
-            }
+            },
+            registry: nil
 
   @spec connect(opts :: Keyword.t()) :: {:ok, state :: t()} | {:error, Exception.t()}
   def connect(opts) do
@@ -72,7 +75,8 @@ defmodule Tds.Protocol do
       |> Keyword.put_new(:hostname, System.get_env("MSSQLHOST") || "localhost")
       |> Enum.reject(fn {_k, v} -> is_nil(v) end)
 
-    s = %__MODULE__{}
+    registry = Registry.new(opts[:extra_types] || [])
+    s = %__MODULE__{registry: registry}
 
     case opts[:instance] do
       nil ->
@@ -202,7 +206,7 @@ defmodule Tds.Protocol do
       :prepare_execute ->
         params =
           opts[:parameters]
-          |> Parameter.prepared_params()
+          |> Parameter.prepared_params(s.registry)
 
         send_prepare(statement, params, %{s | state: :prepare})
 
@@ -610,7 +614,7 @@ defmodule Tds.Protocol do
   defp send_param_query(
          %Query{handle: handle, statement: statement} = _,
          params,
-         %{transaction: :started} = s
+         %{transaction: :started, registry: registry} = s
        ) do
     msg =
       case handle do
@@ -626,7 +630,7 @@ defmodule Tds.Protocol do
               name: "@params",
               type: :string,
               direction: :input,
-              value: Parameter.prepared_params(params)
+              value: Parameter.prepared_params(params, registry)
             }
             | Parameter.prepare_params(params)
           ]
@@ -662,7 +666,7 @@ defmodule Tds.Protocol do
   defp send_param_query(
          %Query{handle: handle, statement: statement} = _,
          params,
-         s
+         %{registry: registry} = s
        ) do
     msg =
       case handle do
@@ -678,7 +682,7 @@ defmodule Tds.Protocol do
               name: "@params",
               type: :string,
               direction: :input,
-              value: Parameter.prepared_params(params)
+              value: Parameter.prepared_params(params, registry)
             }
             | Parameter.prepare_params(params)
           ]

@@ -107,7 +107,7 @@ defmodule Tds.Type.FloatTest do
       {type_code, meta, value} = Float.encode(nil, %{})
 
       assert type_code == 0x6D
-      assert IO.iodata_to_binary(meta) == <<0x08>>
+      assert IO.iodata_to_binary(meta) == <<0x6D, 0x08>>
       assert IO.iodata_to_binary(value) == <<0x00>>
     end
 
@@ -115,7 +115,7 @@ defmodule Tds.Type.FloatTest do
       {type_code, meta, value} = Float.encode(1.5, %{})
 
       assert type_code == 0x6D
-      assert IO.iodata_to_binary(meta) == <<0x08>>
+      assert IO.iodata_to_binary(meta) == <<0x6D, 0x08>>
 
       assert IO.iodata_to_binary(value) ==
                <<0x08, 1.5::little-float-64>>
@@ -125,7 +125,7 @@ defmodule Tds.Type.FloatTest do
       {type_code, meta, value} = Float.encode(0.0, %{})
 
       assert type_code == 0x6D
-      assert IO.iodata_to_binary(meta) == <<0x08>>
+      assert IO.iodata_to_binary(meta) == <<0x6D, 0x08>>
 
       assert IO.iodata_to_binary(value) ==
                <<0x08, 0.0::little-float-64>>
@@ -135,7 +135,7 @@ defmodule Tds.Type.FloatTest do
       {type_code, meta, value} = Float.encode(-3.14, %{})
 
       assert type_code == 0x6D
-      assert IO.iodata_to_binary(meta) == <<0x08>>
+      assert IO.iodata_to_binary(meta) == <<0x6D, 0x08>>
 
       assert IO.iodata_to_binary(value) ==
                <<0x08, -3.14::little-float-64>>
@@ -145,7 +145,7 @@ defmodule Tds.Type.FloatTest do
       {type_code, meta, value} = Float.encode(1.0e100, %{})
 
       assert type_code == 0x6D
-      assert IO.iodata_to_binary(meta) == <<0x08>>
+      assert IO.iodata_to_binary(meta) == <<0x6D, 0x08>>
 
       assert IO.iodata_to_binary(value) ==
                <<0x08, 1.0e100::little-float-64>>

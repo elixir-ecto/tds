@@ -67,12 +67,14 @@ defmodule Tds.Type.Integer do
 
   @impl true
   def encode(nil, _metadata) do
-    {tds_type(:intn), <<0x04>>, <<0x00>>}
+    type = tds_type(:intn)
+    {type, <<type, 0x04>>, <<0x00>>}
   end
 
   def encode(value, _metadata) when is_integer(value) do
+    type = tds_type(:intn)
     size = wire_size(value)
-    {tds_type(:intn), <<size>>, [<<size>>, encode_value(value, size)]}
+    {type, <<type, size>>, [<<size>>, encode_value(value, size)]}
   end
 
   # -- param_descriptor ----------------------------------------------

@@ -64,14 +64,16 @@ defmodule Tds.Type.Money do
 
   @impl true
   def encode(nil, _metadata) do
-    {tds_type(:moneyn), <<0x08>>, <<0x00>>}
+    type = tds_type(:moneyn)
+    {type, <<type, 0x08>>, <<0x00>>}
   end
 
   def encode(%Decimal{} = dec, _metadata) do
+    type = tds_type(:moneyn)
     units = decimal_to_units(dec)
     <<high::unsigned-32, low::unsigned-32>> = <<units::signed-64>>
 
-    {tds_type(:moneyn), <<0x08>>,
+    {type, <<type, 0x08>>,
      <<0x08, high::little-unsigned-32, low::little-unsigned-32>>}
   end
 

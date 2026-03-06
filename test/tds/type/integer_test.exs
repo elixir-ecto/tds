@@ -159,7 +159,7 @@ defmodule Tds.Type.IntegerTest do
       {type_code, meta, value} = Integer.encode(nil, %{})
 
       assert type_code == 0x26
-      assert IO.iodata_to_binary(meta) == <<0x04>>
+      assert IO.iodata_to_binary(meta) == <<0x26, 0x04>>
       assert IO.iodata_to_binary(value) == <<0x00>>
     end
 
@@ -167,7 +167,7 @@ defmodule Tds.Type.IntegerTest do
       {type_code, meta, value} = Integer.encode(42, %{})
 
       assert type_code == 0x26
-      assert IO.iodata_to_binary(meta) == <<0x04>>
+      assert IO.iodata_to_binary(meta) == <<0x26, 0x04>>
 
       assert IO.iodata_to_binary(value) ==
                <<0x04, 42, 0, 0, 0>>
@@ -177,7 +177,7 @@ defmodule Tds.Type.IntegerTest do
       {type_code, meta, value} = Integer.encode(0, %{})
 
       assert type_code == 0x26
-      assert IO.iodata_to_binary(meta) == <<0x04>>
+      assert IO.iodata_to_binary(meta) == <<0x26, 0x04>>
 
       assert IO.iodata_to_binary(value) ==
                <<0x04, 0, 0, 0, 0>>
@@ -187,7 +187,7 @@ defmodule Tds.Type.IntegerTest do
       {type_code, meta, value} = Integer.encode(-2, %{})
 
       assert type_code == 0x26
-      assert IO.iodata_to_binary(meta) == <<0x04>>
+      assert IO.iodata_to_binary(meta) == <<0x26, 0x04>>
 
       assert IO.iodata_to_binary(value) ==
                <<0x04, 0xFE, 0xFF, 0xFF, 0xFF>>
@@ -199,7 +199,7 @@ defmodule Tds.Type.IntegerTest do
       {type_code, meta, value} = Integer.encode(big, %{})
 
       assert type_code == 0x26
-      assert IO.iodata_to_binary(meta) == <<0x08>>
+      assert IO.iodata_to_binary(meta) == <<0x26, 0x08>>
 
       assert IO.iodata_to_binary(value) ==
                <<0x08, big::little-signed-64>>
@@ -211,7 +211,7 @@ defmodule Tds.Type.IntegerTest do
       {_type_code, meta, value} =
         Integer.encode(max_int32, %{})
 
-      assert IO.iodata_to_binary(meta) == <<0x04>>
+      assert IO.iodata_to_binary(meta) == <<0x26, 0x04>>
 
       assert IO.iodata_to_binary(value) ==
                <<0x04, max_int32::little-signed-32>>
@@ -223,7 +223,7 @@ defmodule Tds.Type.IntegerTest do
       {_type_code, meta, value} =
         Integer.encode(min_int32, %{})
 
-      assert IO.iodata_to_binary(meta) == <<0x04>>
+      assert IO.iodata_to_binary(meta) == <<0x26, 0x04>>
 
       assert IO.iodata_to_binary(value) ==
                <<0x04, min_int32::little-signed-32>>
@@ -234,7 +234,7 @@ defmodule Tds.Type.IntegerTest do
 
       {_type_code, meta, value} = Integer.encode(val, %{})
 
-      assert IO.iodata_to_binary(meta) == <<0x08>>
+      assert IO.iodata_to_binary(meta) == <<0x26, 0x08>>
 
       assert IO.iodata_to_binary(value) ==
                <<0x08, val::little-signed-64>>
@@ -245,7 +245,7 @@ defmodule Tds.Type.IntegerTest do
 
       {_type_code, meta, value} = Integer.encode(val, %{})
 
-      assert IO.iodata_to_binary(meta) == <<0x08>>
+      assert IO.iodata_to_binary(meta) == <<0x26, 0x08>>
 
       assert IO.iodata_to_binary(value) ==
                <<0x08, val::little-signed-64>>

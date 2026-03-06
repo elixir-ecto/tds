@@ -158,7 +158,7 @@ defmodule Tds.Type.BinaryTest do
 
       assert type_code == 0xA5
       meta = IO.iodata_to_binary(meta_bin)
-      assert meta == <<0xFF, 0xFF>>
+      assert meta == <<0xA5, 0xFF, 0xFF>>
 
       value = IO.iodata_to_binary(value_bin)
       assert value == <<0xFFFFFFFFFFFFFFFF::little-unsigned-64>>
@@ -170,7 +170,7 @@ defmodule Tds.Type.BinaryTest do
 
       assert type_code == 0xA5
       meta = IO.iodata_to_binary(meta_bin)
-      assert meta == <<5::little-unsigned-16>>
+      assert meta == <<0xA5, 5::little-unsigned-16>>
 
       value = IO.iodata_to_binary(value_bin)
       assert value == <<5::little-unsigned-16, 1, 2, 3, 4, 5>>
@@ -181,7 +181,7 @@ defmodule Tds.Type.BinaryTest do
 
       assert type_code == 0xA5
       meta = IO.iodata_to_binary(meta_bin)
-      assert meta == <<0xFF, 0xFF>>
+      assert meta == <<0xA5, 0xFF, 0xFF>>
 
       value = IO.iodata_to_binary(value_bin)
       assert value == <<0::unsigned-64, 0::unsigned-32>>
@@ -193,7 +193,7 @@ defmodule Tds.Type.BinaryTest do
 
       assert type_code == 0xA5
       meta = IO.iodata_to_binary(meta_bin)
-      assert meta == <<0xFF, 0xFF>>
+      assert meta == <<0xA5, 0xFF, 0xFF>>
 
       value = IO.iodata_to_binary(value_bin)
       <<total_size::little-unsigned-64, _rest::binary>> = value
@@ -209,7 +209,7 @@ defmodule Tds.Type.BinaryTest do
       {_type_code, meta_bin, _value_bin} = BinType.encode(data, %{})
 
       meta = IO.iodata_to_binary(meta_bin)
-      assert meta == <<8000::little-unsigned-16>>
+      assert meta == <<0xA5, 8000::little-unsigned-16>>
     end
 
     test "integer value is coerced to single byte" do
@@ -217,7 +217,7 @@ defmodule Tds.Type.BinaryTest do
 
       assert type_code == 0xA5
       meta = IO.iodata_to_binary(meta_bin)
-      assert meta == <<1::little-unsigned-16>>
+      assert meta == <<0xA5, 1::little-unsigned-16>>
 
       value = IO.iodata_to_binary(value_bin)
       assert value == <<1::little-unsigned-16, 42>>

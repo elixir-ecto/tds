@@ -99,7 +99,7 @@ defmodule Tds.Type.XmlTest do
 
       assert type_code == 0xE7
       meta = IO.iodata_to_binary(meta_bin)
-      assert meta == <<0xFF, 0xFF>> <> @null_collation
+      assert meta == <<0xE7, 0xFF, 0xFF>> <> @null_collation
 
       value = IO.iodata_to_binary(value_bin)
       assert value == <<0xFFFFFFFFFFFFFFFF::little-unsigned-64>>
@@ -115,7 +115,7 @@ defmodule Tds.Type.XmlTest do
       ucs2_size = byte_size(ucs2)
 
       meta = IO.iodata_to_binary(meta_bin)
-      assert meta == <<ucs2_size::little-unsigned-16>> <> @null_collation
+      assert meta == <<0xE7, ucs2_size::little-unsigned-16>> <> @null_collation
 
       value = IO.iodata_to_binary(value_bin)
       assert value == <<ucs2_size::little-unsigned-16>> <> ucs2
@@ -127,7 +127,7 @@ defmodule Tds.Type.XmlTest do
       assert type_code == 0xE7
 
       meta = IO.iodata_to_binary(meta_bin)
-      assert meta == <<0xFF, 0xFF>> <> @null_collation
+      assert meta == <<0xE7, 0xFF, 0xFF>> <> @null_collation
 
       value = IO.iodata_to_binary(value_bin)
       assert value == <<0::unsigned-64, 0::unsigned-32>>
@@ -142,7 +142,7 @@ defmodule Tds.Type.XmlTest do
       assert type_code == 0xE7
 
       meta = IO.iodata_to_binary(meta_bin)
-      assert meta == <<0xFF, 0xFF>> <> @null_collation
+      assert meta == <<0xE7, 0xFF, 0xFF>> <> @null_collation
 
       value = IO.iodata_to_binary(value_bin)
       ucs2 = UCS2.from_string(xml)

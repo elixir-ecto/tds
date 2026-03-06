@@ -145,34 +145,37 @@ defmodule Tds.Type.String do
 
   @impl true
   def encode(nil, _metadata) do
-    meta_bin = <<0xFF, 0xFF>> <> @null_collation
+    type = tds_type(:nvarchar)
+    meta_bin = <<type, 0xFF, 0xFF>> <> @null_collation
     value_bin = <<plp(:null)::little-unsigned-64>>
-    {tds_type(:nvarchar), meta_bin, value_bin}
+    {type, meta_bin, value_bin}
   end
 
   def encode(value, _metadata) when is_binary(value) do
+    type = tds_type(:nvarchar)
     ucs2 = UCS2.from_string(value)
     ucs2_size = byte_size(ucs2)
 
     cond do
       ucs2_size == 0 ->
-        meta_bin = <<0xFF, 0xFF>> <> @null_collation
+        meta_bin = <<type, 0xFF, 0xFF>> <> @null_collation
         value_bin = <<0::unsigned-64, 0::unsigned-32>>
-        {tds_type(:nvarchar), meta_bin, value_bin}
+        {type, meta_bin, value_bin}
 
       ucs2_size > 8000 ->
-        meta_bin = <<0xFF, 0xFF>> <> @null_collation
+        meta_bin = <<type, 0xFF, 0xFF>> <> @null_collation
         value_bin = encode_plp(ucs2)
-        {tds_type(:nvarchar), meta_bin, value_bin}
+        {type, meta_bin, value_bin}
 
       true ->
         meta_bin =
-          <<ucs2_size::little-unsigned-16>> <> @null_collation
+          <<type, ucs2_size::little-unsigned-16>> <>
+            @null_collation
 
         value_bin =
           <<ucs2_size::little-unsigned-16>> <> ucs2
 
-        {tds_type(:nvarchar), meta_bin, value_bin}
+        {type, meta_bin, value_bin}
     end
   end
 
