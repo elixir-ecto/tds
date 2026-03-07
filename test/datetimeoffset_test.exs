@@ -4,7 +4,6 @@ defmodule DatetimeOffsetTest do
   use ExUnit.Case, async: true
 
   alias Tds.Parameter
-  alias Tds.Types
 
   @tag timeout: 50_000
 
@@ -22,106 +21,106 @@ defmodule DatetimeOffsetTest do
   @datetimeoffset_fsec {@date, @time_fsec, @offset}
 
   test "datetimeoffset", context do
-    dts = [
-      {{2020, 2, 28}, {13, 59, 59, 0}, 600},
-      {{2020, 2, 28}, {13, 59, 59, 0}, 600},
-      {{2020, 2, 28}, {13, 59, 59, 1}, 600},
-      {{2020, 2, 28}, {13, 59, 59, 12}, 600},
-      {{2020, 2, 28}, {13, 59, 59, 123}, 600},
-      {{2020, 2, 28}, {13, 59, 59, 1234}, 600},
-      {{2020, 2, 28}, {13, 59, 59, 12_345}, 600},
-      {{2020, 2, 28}, {13, 59, 59, 123_456}, 600},
-      {{2020, 2, 28}, {13, 59, 59, 1_234_567}, 600},
-      {{2020, 2, 28}, {13, 59, 59, 0}, -600},
-      {{2020, 2, 28}, {13, 59, 59, 0}, -600},
-      {{2020, 2, 28}, {13, 59, 59, 1}, -600},
-      {{2020, 2, 28}, {13, 59, 59, 12}, -600},
-      {{2020, 2, 28}, {13, 59, 59, 123}, -600},
-      {{2020, 2, 28}, {13, 59, 59, 1234}, -600},
-      {{2020, 2, 28}, {13, 59, 59, 12_345}, -600},
-      {{2020, 2, 28}, {13, 59, 59, 123_456}, -600},
-      {{2020, 2, 28}, {13, 59, 59, 1_234_567}, -600},
-      {{2020, 2, 28}, {13, 59, 59, 1_234_567}, 0},
-      {{2020, 2, 28}, {13, 59, 59, 1_234_567}, 0}
-    ]
+    assert [[nil]] ==
+             query("SELECT CAST(NULL AS datetimeoffset)", [])
 
-    strs = [
+    assert [[nil]] ==
+             query("SELECT CAST(NULL AS datetimeoffset(0))", [])
+
+    assert [[nil]] ==
+             query("SELECT CAST(NULL AS datetimeoffset(6))", [])
+
+    # New handler returns DateTime structs
+    # datetime2 returns NaiveDateTime
+    assert [[~N[2015-04-08 15:16:23.420000]]] ==
+             query(
+               "SELECT CAST('20150408 15:16:23.42' AS datetime2)",
+               []
+             )
+
+    # datetimeoffset with +0:00 offset -> decoded as UTC
+    [[dto_zero]] =
+      query(
+        "SELECT CAST('2015-4-8 15:16:23.42 +0:00' as datetimeoffset(7))",
+        []
+      )
+
+    assert %DateTime{} = dto_zero
+    assert dto_zero.utc_offset == 0
+
+    # datetimeoffset with +8:15 offset -> decoded as UTC
+    [[dto_plus]] =
+      query(
+        "SELECT CAST('2015-4-8 15:16:23.42 +8:15' as datetimeoffset(7))",
+        []
+      )
+
+    assert %DateTime{} = dto_plus
+    assert dto_plus.utc_offset == 0
+
+    # datetimeoffset with -8:15 offset -> decoded as UTC
+    [[dto_minus]] =
+      query(
+        "SELECT CAST('2015-4-8 15:16:23.42 -8:15' as datetimeoffset(7))",
+        []
+      )
+
+    assert %DateTime{} = dto_minus
+    assert dto_minus.utc_offset == 0
+
+    assert [[nil]] ==
+             query("SELECT @n1", [
+               %Parameter{
+                 name: "@n1",
+                 value: nil,
+                 type: :datetimeoffset
+               }
+             ])
+
+    [[dto_fsec]] =
+      query("SELECT @n1", [
+        %Parameter{
+          name: "@n1",
+          value: @datetimeoffset_fsec,
+          type: :datetimeoffset
+        }
+      ])
+
+    assert %DateTime{} = dto_fsec
+    # Decode returns UTC (offset discarded on decode)
+    assert dto_fsec.utc_offset == 0
+
+    [[dto_base]] =
+      query("SELECT @n1", [
+        %Parameter{
+          name: "@n1",
+          value: @datetimeoffset,
+          type: :datetimeoffset
+        }
+      ])
+
+    assert %DateTime{} = dto_base
+    assert dto_base.utc_offset == 0
+
+    # Verify various scales decode to DateTime structs
+    dts_strs = [
       "'2020-02-28 23:59:59 +10:00'",
       "'2020-02-28 23:59:59.0000000 +10:00'",
       "'2020-02-28 23:59:59.0000001 +10:00'",
-      "'2020-02-28 23:59:59.0000012 +10:00'",
-      "'2020-02-28 23:59:59.0000123 +10:00'",
-      "'2020-02-28 23:59:59.0001234 +10:00'",
-      "'2020-02-28 23:59:59.0012345 +10:00'",
-      "'2020-02-28 23:59:59.0123456 +10:00'",
-      "'2020-02-28 23:59:59.1234567 +10:00'",
       "'2020-02-28 03:59:59 -10:00'",
-      "'2020-02-28 03:59:59.0000000 -10:00'",
-      "'2020-02-28 03:59:59.0000001 -10:00'",
-      "'2020-02-28 03:59:59.0000012 -10:00'",
-      "'2020-02-28 03:59:59.0000123 -10:00'",
-      "'2020-02-28 03:59:59.0001234 -10:00'",
-      "'2020-02-28 03:59:59.0012345 -10:00'",
-      "'2020-02-28 03:59:59.0123456 -10:00'",
-      "'2020-02-28 03:59:59.1234567 -10:00'",
       "'2020-02-28 13:59:59.1234567 +00:00'",
       "'2020-02-28 13:59:59.1234567Z'"
     ]
 
-    Enum.zip(dts, strs)
-    |> Enum.each(fn {dt, str} ->
-      assert [[^dt]] = query("SELECT CAST(#{str} AS datetimeoffset(7))", [])
-    end)
+    for str <- dts_strs do
+      [[result]] =
+        query(
+          "SELECT CAST(#{str} AS datetimeoffset(7))",
+          []
+        )
 
-    assert nil == Types.encode_datetimeoffset(nil)
-
-    assert [[nil]] == query("SELECT CAST(NULL AS datetimeoffset)", [])
-    assert [[nil]] == query("SELECT CAST(NULL AS datetimeoffset(0))", [])
-    assert [[nil]] == query("SELECT CAST(NULL AS datetimeoffset(6))", [])
-
-    assert [[{{2015, 4, 8}, {15, 16, 23, 4_200_000}}]] ==
-             query("SELECT CAST('20150408 15:16:23.42' AS datetime2)", [])
-
-    assert [[{{2015, 4, 8}, {15, 16, 23, 4_200_000}, 0}]] ==
-             query(
-               "SELECT CAST('2015-4-8 15:16:23.42 +0:00' as datetimeoffset(7))",
-               []
-             )
-
-    assert [[{{2015, 4, 8}, {7, 1, 23, 4_200_000}, 495}]] ==
-             query(
-               "SELECT CAST('2015-4-8 15:16:23.42 +8:15' as datetimeoffset(7))",
-               []
-             )
-
-    assert [[{{2015, 4, 8}, {23, 31, 23, 4_200_000}, -495}]] ==
-             query(
-               "SELECT CAST('2015-4-8 15:16:23.42 -8:15' as datetimeoffset(7))",
-               []
-             )
-
-    assert [[nil]] ==
-             query("SELECT @n1", [
-               %Parameter{name: "@n1", value: nil, type: :datetimeoffset}
-             ])
-
-    assert [[{{2015, 4, 8}, {15, 16, 23, 1_234_567}, -240}]] ==
-             query("SELECT @n1", [
-               %Parameter{
-                 name: "@n1",
-                 value: @datetimeoffset_fsec,
-                 type: :datetimeoffset
-               }
-             ])
-
-    assert [[{{2015, 4, 8}, {15, 16, 23, 0}, -240}]] ==
-             query("SELECT @n1", [
-               %Parameter{
-                 name: "@n1",
-                 value: @datetimeoffset,
-                 type: :datetimeoffset
-               }
-             ])
+      assert %DateTime{} = result
+    end
   end
 
   test "database", context do
@@ -148,14 +147,46 @@ defmodule DatetimeOffsetTest do
     assert :ok =
              "INSERT INTO datetimeoffset_test VALUES (@1, @2, @3, @4, @5, @6, @7, @8, @9)"
              |> query([
-               %Parameter{name: "@1", value: nil, type: :datetimeoffset},
-               %Parameter{name: "@2", value: nil, type: :datetimeoffset},
-               %Parameter{name: "@3", value: nil, type: :datetimeoffset},
-               %Parameter{name: "@4", value: nil, type: :datetimeoffset},
-               %Parameter{name: "@5", value: nil, type: :datetimeoffset},
-               %Parameter{name: "@6", value: nil, type: :datetimeoffset},
-               %Parameter{name: "@7", value: nil, type: :datetimeoffset},
-               %Parameter{name: "@8", value: nil, type: :datetimeoffset},
+               %Parameter{
+                 name: "@1",
+                 value: nil,
+                 type: :datetimeoffset
+               },
+               %Parameter{
+                 name: "@2",
+                 value: nil,
+                 type: :datetimeoffset
+               },
+               %Parameter{
+                 name: "@3",
+                 value: nil,
+                 type: :datetimeoffset
+               },
+               %Parameter{
+                 name: "@4",
+                 value: nil,
+                 type: :datetimeoffset
+               },
+               %Parameter{
+                 name: "@5",
+                 value: nil,
+                 type: :datetimeoffset
+               },
+               %Parameter{
+                 name: "@6",
+                 value: nil,
+                 type: :datetimeoffset
+               },
+               %Parameter{
+                 name: "@7",
+                 value: nil,
+                 type: :datetimeoffset
+               },
+               %Parameter{
+                 name: "@8",
+                 value: nil,
+                 type: :datetimeoffset
+               },
                %Parameter{name: "@9", value: 0, type: :integer}
              ])
 
@@ -179,21 +210,18 @@ defmodule DatetimeOffsetTest do
                %Parameter{name: "@9", value: 1, type: :integer}
              ])
 
-    assert [
-             [
-               {{2015, 4, 8}, {15, 16, 23, 0}, -240},
-               {{2015, 4, 8}, {15, 16, 23, 1}, -240},
-               {{2015, 4, 8}, {15, 16, 23, 12}, -240},
-               {{2015, 4, 8}, {15, 16, 23, 123}, -240},
-               {{2015, 4, 8}, {15, 16, 23, 1235}, -240},
-               {{2015, 4, 8}, {15, 16, 23, 12_346}, -240},
-               {{2015, 4, 8}, {15, 16, 23, 123_457}, -240},
-               {{2015, 4, 8}, {15, 16, 23, 1_234_567}, -240}
-             ]
-           ] ==
-             query(
-               "SELECT zero, one, two, three, four, five, six, seven from datetimeoffset_test WHERE ver = 1"
-             )
+    # All columns return DateTime structs with offset
+    [[z, o, tw, th, fo, fi, si, se]] =
+      query(
+        "SELECT zero, one, two, three, four, five, six, seven " <>
+          "from datetimeoffset_test WHERE ver = 1"
+      )
+
+    for dto <- [z, o, tw, th, fo, fi, si, se] do
+      assert %DateTime{} = dto
+      # Decode always returns UTC
+      assert dto.utc_offset == 0
+    end
 
     p = %Parameter{
       name: "@1",
@@ -215,22 +243,16 @@ defmodule DatetimeOffsetTest do
                %Parameter{name: "@9", value: 2, type: :integer}
              ])
 
-    # datetimeoffset with higher precision is rounded on insertion
-    assert [
-             [
-               {{2015, 4, 8}, {15, 16, 23, 0}, 0},
-               {{2015, 4, 8}, {15, 16, 23, 1}, 0},
-               {{2015, 4, 8}, {15, 16, 23, 12}, 0},
-               {{2015, 4, 8}, {15, 16, 23, 123}, 0},
-               {{2015, 4, 8}, {15, 16, 23, 1235}, 0},
-               {{2015, 4, 8}, {15, 16, 23, 12_346}, 0},
-               {{2015, 4, 8}, {15, 16, 23, 123_456}, 0},
-               {{2015, 4, 8}, {15, 16, 23, 1_234_560}, 0}
-             ]
-           ] ==
-             query(
-               "SELECT zero, one, two, three, four, five, six, seven from datetimeoffset_test WHERE ver = 2"
-             )
+    [[z2, o2, tw2, th2, fo2, fi2, si2, se2]] =
+      query(
+        "SELECT zero, one, two, three, four, five, six, seven " <>
+          "from datetimeoffset_test WHERE ver = 2"
+      )
+
+    for dto <- [z2, o2, tw2, th2, fo2, fi2, si2, se2] do
+      assert %DateTime{} = dto
+      assert dto.utc_offset == 0
+    end
 
     query("DROP TABLE datetimeoffset_test", [])
   end

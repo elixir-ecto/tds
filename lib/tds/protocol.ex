@@ -3,7 +3,9 @@ defmodule Tds.Protocol do
   Implements DBConnection behaviour for TDS protocol.
   """
   alias Tds.{Parameter, Query}
-  import Tds.{BinaryUtils, Messages, Utils}
+  alias Tds.Protocol.Packet
+  alias Tds.Type.Registry
+  import Tds.{Messages, Utils}
   require Logger
   use DBConnection
 
@@ -42,7 +44,8 @@ defmodule Tds.Protocol do
           result: nil | list(),
           query: nil | String.t(),
           transaction: transaction,
-          env: env
+          env: env,
+          registry: Registry.t()
         }
 
   defstruct sock: nil,
@@ -59,7 +62,8 @@ defmodule Tds.Protocol do
               savepoint: 0,
               collation: %Tds.Protocol.Collation{},
               packetsize: 4096
-            }
+            },
+            registry: nil
 
   @spec connect(opts :: Keyword.t()) :: {:ok, state :: t()} | {:error, Exception.t()}
   def connect(opts) do
@@ -71,7 +75,8 @@ defmodule Tds.Protocol do
       |> Keyword.put_new(:hostname, System.get_env("MSSQLHOST") || "localhost")
       |> Enum.reject(fn {_k, v} -> is_nil(v) end)
 
-    s = %__MODULE__{}
+    registry = Registry.new(opts[:extra_types] || [])
+    s = %__MODULE__{registry: registry}
 
     case opts[:instance] do
       nil ->
@@ -201,7 +206,7 @@ defmodule Tds.Protocol do
       :prepare_execute ->
         params =
           opts[:parameters]
-          |> Parameter.prepared_params()
+          |> Parameter.prepared_params(s.registry)
 
         send_prepare(statement, params, %{s | state: :prepare})
 
@@ -609,7 +614,7 @@ defmodule Tds.Protocol do
   defp send_param_query(
          %Query{handle: handle, statement: statement} = _,
          params,
-         %{transaction: :started} = s
+         %{transaction: :started, registry: registry} = s
        ) do
     msg =
       case handle do
@@ -625,7 +630,7 @@ defmodule Tds.Protocol do
               name: "@params",
               type: :string,
               direction: :input,
-              value: Parameter.prepared_params(params)
+              value: Parameter.prepared_params(params, registry)
             }
             | Parameter.prepare_params(params)
           ]
@@ -661,7 +666,7 @@ defmodule Tds.Protocol do
   defp send_param_query(
          %Query{handle: handle, statement: statement} = _,
          params,
-         s
+         %{registry: registry} = s
        ) do
     msg =
       case handle do
@@ -677,7 +682,7 @@ defmodule Tds.Protocol do
               name: "@params",
               type: :string,
               direction: :input,
-              value: Parameter.prepared_params(params)
+              value: Parameter.prepared_params(params, registry)
             }
             | Parameter.prepare_params(params)
           ]
@@ -818,14 +823,15 @@ defmodule Tds.Protocol do
       mod.send(sock, pak)
     end)
 
-    case msg_recv(s) do
-      {:disconnect, ex, s} ->
-        {:disconnect, ex, %{s | opts: clean_opts(opts)}}
+    case Packet.reassemble(s.sock) do
+      {:ok, _type, payload} ->
+        decode(payload, %{s | state: :login})
 
-      buffer ->
-        buffer
-        |> IO.iodata_to_binary()
-        |> decode(%{s | state: :login})
+      {:error, reason} ->
+        {:disconnect,
+         %Tds.Error{
+           message: "Login failed: #{inspect(reason)}"
+         }, %{s | opts: clean_opts(opts)}}
     end
   end
 
@@ -850,94 +856,14 @@ defmodule Tds.Protocol do
       end)
 
     with :ok <- send_result,
-         buffer when is_list(buffer) <- msg_recv(s) do
-      buffer
-      |> IO.iodata_to_binary()
-      |> decode(s)
-    end
-  end
-
-  defp msg_recv(%{sock: {mod, pid}} = s) do
-    case mod.recv(pid, 0) do
-      {:ok, pkg} ->
-        pkg
-        |> next_tds_pkg([])
-        |> msg_recv(s)
-
-      {:error, error} ->
+         {:ok, _type, payload} <- Packet.reassemble(s.sock) do
+      decode(payload, s)
+    else
+      {:error, reason} ->
         {:disconnect,
          %Tds.Error{
-           message: "Connection failed to receive packet due #{inspect(error)}"
+           message: "Failed to receive packet: #{inspect(reason)}"
          }, s}
-    end
-  catch
-    {:error, error} -> {:disconnect, error, s}
-  end
-
-  defp msg_recv({:done, buffer, _}, _s) do
-    Enum.reverse(buffer)
-  end
-
-  defp msg_recv({:more, buffer, more, last?}, %{sock: {mod, pid}} = s) do
-    take = if last?, do: more, else: 0
-
-    case mod.recv(pid, take) do
-      {:ok, pkg} ->
-        next_tds_pkg(pkg, buffer, more, last?)
-        |> msg_recv(s)
-
-      {:error, error} ->
-        throw({:error, error})
-    end
-  end
-
-  defp msg_recv({:more, buffer, unknown_pkg}, %{sock: {mod, pid}} = s) do
-    case mod.recv(pid, 0) do
-      {:ok, pkg} ->
-        unknown_pkg
-        |> Kernel.<>(pkg)
-        |> next_tds_pkg(buffer)
-        |> msg_recv(s)
-
-      {:error, error} ->
-        throw({:error, error})
-    end
-  end
-
-  defp next_tds_pkg(pkg, buffer) do
-    case pkg do
-      <<0x04, 0x01, size::int16(), _::int32(), chunk::binary>> ->
-        more = size - 8
-        next_tds_pkg(chunk, buffer, more, true)
-
-      <<0x04, 0x00, size::int16(), _::int32(), chunk::binary>> ->
-        more = size - 8
-        next_tds_pkg(chunk, buffer, more, false)
-
-      unknown_pkg ->
-        {:more, buffer, unknown_pkg}
-    end
-  end
-
-  defp next_tds_pkg(pkg, buffer, more, true) do
-    case pkg do
-      <<chunk::binary(more, 8), tail::binary>> ->
-        {:done, [chunk | buffer], tail}
-
-      <<chunk::binary>> ->
-        more = more - byte_size(chunk)
-        {:more, [chunk | buffer], more, true}
-    end
-  end
-
-  defp next_tds_pkg(pkg, buffer, more, false) do
-    case pkg do
-      <<chunk::binary(more, 8), tail::binary>> ->
-        next_tds_pkg(tail, [chunk | buffer])
-
-      <<chunk::binary>> ->
-        more = more - byte_size(chunk)
-        {:more, [chunk | buffer], more, false}
     end
   end
 

@@ -4,7 +4,6 @@ defmodule ElixirCalendarTest do
   use ExUnit.Case, async: true
 
   alias Tds.Parameter, as: P
-  alias Tds.Types
 
   setup do
     Calendar.put_time_zone_database(Tzdata.TimeZoneDatabase)
@@ -40,8 +39,6 @@ defmodule ElixirCalendarTest do
     ]
 
     Enum.each(times, fn t ->
-      {time, scale} = Types.encode_time(t)
-      assert t == Types.decode_time(scale, time)
       assert [[^t]] = query("SELECT @1", [%P{name: "@1", value: t}])
     end)
   end
@@ -64,11 +61,9 @@ defmodule ElixirCalendarTest do
     # AD dates are not supported yet since `:calendar.date_to_georgian_days` do not
     # support negative years
     date = ~D[0002-02-28]
-    assert date == Types.encode_date(date) |> Types.decode_date()
     assert [[date]] == query("select @1", [%P{name: "@1", value: date}])
 
     date = ~D[2020-02-28]
-    assert date == Types.encode_date(date) |> Types.decode_date()
     assert [[date]] == query("select @1", [%P{name: "@1", value: date}])
   end
 
@@ -97,9 +92,6 @@ defmodule ElixirCalendarTest do
     ]
 
     Enum.each(datetimes, fn {dt_in, dt_out} ->
-      token = Types.encode_datetime(dt_in)
-      assert dt_out == Types.decode_datetime(token)
-
       assert [[^dt_out]] =
                query("SELECT @1", [
                  %P{name: "@1", value: dt_in, type: :datetime}
@@ -137,8 +129,6 @@ defmodule ElixirCalendarTest do
     ]
 
     Enum.each(datetime2s, fn %{value: dt} = p ->
-      {token, scale} = Types.encode_datetime2(dt)
-      assert dt == Types.decode_datetime2(scale, token)
       assert [[^dt]] = query("SELECT @1", [p])
     end)
   end
@@ -182,9 +172,7 @@ defmodule ElixirCalendarTest do
       %P{name: "@1", value: ~U[2020-02-28 23:59:59.999999Z], type: type}
     ]
 
-    Enum.each(dts, fn %{value: %{microsecond: {_, s}} = dt} = p ->
-      token = Types.encode_datetimeoffset(dt, s)
-      assert dt == Types.decode_datetimeoffset(s, token)
+    Enum.each(dts, fn %{value: dt} = p ->
       assert [[^dt]] = query("SELECT @1 ", [p])
     end)
   end
@@ -233,10 +221,8 @@ defmodule ElixirCalendarTest do
       %P{name: "@1", value: tzb(~U[2020-02-28 13:59:59.999999Z]), type: type}
     ]
 
-    Enum.each(dts, fn %{value: %{microsecond: {_, s}} = dt} = p ->
-      token = Types.encode_datetimeoffset(dt, s)
+    Enum.each(dts, fn %{value: dt} = p ->
       {:ok, utc_dt} = DateTime.shift_zone(dt, "Etc/UTC")
-      assert utc_dt == Types.decode_datetimeoffset(s, token)
       assert [[^utc_dt]] = query("SELECT @1 ", [p])
     end)
   end

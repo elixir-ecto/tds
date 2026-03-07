@@ -3,11 +3,12 @@ defmodule Tds.Messages do
 
   import Record, only: [defrecord: 2]
   import Tds.Tokens, only: [decode_tokens: 1]
+  import Tds.Protocol.Constants
 
   alias Tds.Encoding.UCS2
   alias Tds.Parameter
-  alias Tds.Protocol.{Login7, Prelogin}
-  alias Tds.Types
+  alias Tds.Protocol.{Login7, Packet, Prelogin}
+  alias Tds.Type.Registry
 
   require Bitwise
   require Logger
@@ -47,21 +48,7 @@ defmodule Tds.Messages do
   # @tds_sp_prepexecrpc 14
   @tds_sp_unprepare 15
 
-  ## Packet Size
-  @tds_pack_data_size 4088
-  # @tds_pack_header_size 8
-  # @tds_pack_size @tds_pack_header_size + @tds_pack_data_size
-
-  ## Packet Types
-  # @tds_pack_sqlbatch    1
-  # @tds_pack_rpcRequest  3
-  @tds_pack_cancel 6
-  # @tds_pack_bulkloadbcp 7
-  # @tds_pack_transmgrreq 14
-  # @tds_pack_normal      15
-  # @tds_pack_login7      16
-  # @tds_pack_sspimessage 17
-  # @tds_pack_prelogin    18
+  # Packet sizes and types are sourced from Tds.Protocol.Constants via import.
 
   ## Parsers
   def parse(:prelogin, packet_data, s) do
@@ -254,7 +241,7 @@ defmodule Tds.Messages do
   end
 
   defp encode(msg_attn(), _s) do
-    encode_packets(@tds_pack_cancel, <<>>)
+    Packet.encode(packet_type(:attention), <<>>)
   end
 
   defp encode(msg_sql(query: q), %{trans: trans}) do
@@ -277,7 +264,7 @@ defmodule Tds.Messages do
     total_length = byte_size(headers) + 4
     all_headers = <<total_length::little-size(32)>> <> headers
     data = all_headers <> q_ucs
-    encode_packets(0x01, data)
+    Packet.encode(packet_type(:sql_batch), data)
   end
 
   defp encode(msg_rpc(proc: proc, params: params), %{trans: trans}) do
@@ -299,7 +286,7 @@ defmodule Tds.Messages do
 
     data = all_headers <> encode_rpc(proc, params)
     # layout Data
-    encode_packets(0x03, data)
+    Packet.encode(packet_type(:rpc), data)
   end
 
   defp encode(msg_transmgr(command: "TM_BEGIN_XACT", isolation_level: isolation_level), %{
@@ -356,7 +343,7 @@ defmodule Tds.Messages do
 
     data = all_headers <> <<request_type::little-size(2)-unit(8), request_payload::binary>>
 
-    encode_packets(0x0E, data)
+    Packet.encode(packet_type(:transaction_manager), data)
   end
 
   defp encode_rpc(:sp_executesql, params) do
@@ -412,38 +399,57 @@ defmodule Tds.Messages do
   defp encode_rpc_param(%Tds.Parameter{name: name} = param) do
     p_name = UCS2.from_string(name)
     p_flags = param |> Parameter.option_flags()
-    {type_code, type_data, type_attr} = Types.encode_data_type(param)
 
-    p_meta_data = <<byte_size(name)>> <> p_name <> p_flags <> type_data
+    {_type_code, meta_bin, value_bin} =
+      encode_via_handler(param)
 
-    p_meta_data <> Types.encode_data(type_code, param.value, type_attr)
+    IO.iodata_to_binary([
+      <<byte_size(name)>>,
+      p_name,
+      p_flags,
+      meta_bin,
+      value_bin
+    ])
   end
 
-  def encode_header(type, data, id, status) do
-    length = byte_size(data) + 8
-    # id::unsigned-size(8) below basicaly deals overflow e.g. rem(id, 255)
-    <<type, status, length::size(16), 0::size(16), id::unsigned-size(8), 0>>
+  @default_registry Registry.new()
+
+  defp encode_via_handler(%Tds.Parameter{
+         type: type,
+         value: value
+       })
+       when not is_nil(type) do
+    handler = resolve_handler(@default_registry, type)
+    meta = handler_metadata(handler, value, type)
+    handler.encode(value, meta)
   end
 
-  @spec encode_packets(integer, binary, non_neg_integer) :: [binary, ...]
-  def encode_packets(type, binary, id \\ 1)
+  defp encode_via_handler(%Tds.Parameter{value: value}) do
+    {:ok, handler, meta} =
+      Registry.infer(@default_registry, value)
 
-  def encode_packets(_type, <<>>, _) do
-    []
+    handler.encode(value, meta)
   end
 
-  def encode_packets(
-        type,
-        <<data::binary-size(@tds_pack_data_size)-unit(8), tail::binary>>,
-        id
-      ) do
-    status = if byte_size(tail) > 0, do: 0, else: 1
-    packet = [encode_header(type, data, id, status), data]
-    [packet | encode_packets(type, tail, id + 1)]
+  defp resolve_handler(registry, type) do
+    case Registry.handler_for_name(registry, type) do
+      {:ok, handler} ->
+        handler
+
+      :error ->
+        # Unknown types (e.g. {:array, :string}) default
+        # to string encoding, matching legacy behavior.
+        {:ok, handler} =
+          Registry.handler_for_name(registry, :string)
+
+        handler
+    end
   end
 
-  def encode_packets(type, data, id) do
-    header = encode_header(type, data, id, 1)
-    [header <> data]
+  defp handler_metadata(handler, value, type) do
+    case handler.infer(value) do
+      {:ok, meta} -> Map.put(meta, :type, type)
+      :skip -> %{type: type}
+    end
   end
 end

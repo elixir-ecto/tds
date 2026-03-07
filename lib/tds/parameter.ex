@@ -1,7 +1,7 @@
 defmodule Tds.Parameter do
   @moduledoc false
 
-  alias Tds.Types
+  alias Tds.Type.Registry
 
   @type t :: %__MODULE__{
           name: String.t() | nil,
@@ -33,20 +33,20 @@ defmodule Tds.Parameter do
     <<0::size(6), fDefaultValue::size(1), fByRefValue::size(1)>>
   end
 
-  def prepared_params(params) do
+  def prepared_params(params, registry \\ nil) do
+    reg = registry || default_registry()
+
     params
     |> List.wrap()
     |> name(0)
     |> Enum.map_join(", ", fn param ->
-      param
-      |> fix_data_type()
-      |> Types.encode_param_descriptor()
+      param_descriptor(param, reg)
     end)
   end
 
   @doc """
-  Prepares parameters by giving them names, define missing type, encoding value
-  if necessary.
+  Prepares parameters by giving them names, define missing type,
+  encoding value if necessary.
   """
   def prepare_params(params) do
     params
@@ -64,9 +64,14 @@ defmodule Tds.Parameter do
 
     param =
       case param do
-        %__MODULE__{name: nil} -> fix_data_type(%{param | name: "@#{name}"})
-        %__MODULE__{} -> fix_data_type(param)
-        raw_param -> fix_data_type(raw_param, name)
+        %__MODULE__{name: nil} ->
+          fix_data_type(%{param | name: "@#{name}"})
+
+        %__MODULE__{} ->
+          fix_data_type(param)
+
+        raw_param ->
+          fix_data_type(raw_param, name)
       end
 
     do_name(tail, name, [param | acc])
@@ -82,8 +87,6 @@ defmodule Tds.Parameter do
   end
 
   def fix_data_type(%__MODULE__{type: nil, value: nil} = param) do
-    # should fix Ecto has_one, on_change :nullify issue where type is not known when Ecto
-    # builds query/statement for on_change callback
     %{param | type: :binary}
   end
 
@@ -108,11 +111,6 @@ defmodule Tds.Parameter do
 
   def fix_data_type(%__MODULE__{value: value} = param)
       when is_integer(value) do
-    # if -2_147_483_648 >= value and value <= 2_147_483_647 do
-    #   %{param | type: :integer}
-    # else
-    #   %{param | type: :bigint}
-    # end
     %{param | type: :integer}
   end
 
@@ -145,14 +143,15 @@ defmodule Tds.Parameter do
     %{param | type: :datetime}
   end
 
-  def fix_data_type(%__MODULE__{value: %NaiveDateTime{microsecond: {_, s}}} = param) do
+  def fix_data_type(
+        %__MODULE__{value: %NaiveDateTime{microsecond: {_, s}}} =
+          param
+      ) do
     type = if s > 3, do: :datetime2, else: :datetime
     %{param | type: type}
   end
 
   def fix_data_type(%__MODULE__{value: {{_, _, _}, {_, _, _, fsec}}} = param) do
-    # todo: enable warning and introduce Tds.Types.DateTime2 and Tds.Types.DateTime
-    # Logger.warn(fn -> "Datetime as tuple is obsolete, please use NaiveDateTime." end)
     type = if rem(fsec, 1000) > 0, do: :datetime2, else: :datetime
     %{param | type: type}
   end
@@ -178,5 +177,55 @@ defmodule Tds.Parameter do
 
   def fix_data_type(raw_param, acc) do
     fix_data_type(%__MODULE__{name: "@#{acc}", value: raw_param})
+  end
+
+  @doc """
+  Generates a SQL parameter descriptor for a single parameter.
+
+  Returns a string like `"@name int"` or `"@name nvarchar(2000)"`.
+  """
+  def encode_param_descriptor(%__MODULE__{} = param) do
+    param_descriptor(param, default_registry())
+  end
+
+  defp param_descriptor(
+         %__MODULE__{name: name, type: type, value: value},
+         registry
+       )
+       when not is_nil(type) do
+    handler = resolve_handler(registry, type)
+    meta = infer_metadata(handler, value, type)
+    desc = handler.param_descriptor(value, meta)
+    "#{name} #{desc}"
+  end
+
+  defp param_descriptor(%__MODULE__{} = param, registry) do
+    param
+    |> fix_data_type()
+    |> param_descriptor(registry)
+  end
+
+  defp resolve_handler(registry, type) do
+    case Registry.handler_for_name(registry, type) do
+      {:ok, handler} ->
+        handler
+
+      :error ->
+        {:ok, handler} =
+          Registry.handler_for_name(registry, :string)
+
+        handler
+    end
+  end
+
+  defp infer_metadata(handler, value, type) do
+    case handler.infer(value) do
+      {:ok, meta} -> Map.put(meta, :type, type)
+      :skip -> %{type: type}
+    end
+  end
+
+  defp default_registry do
+    Registry.new()
   end
 end

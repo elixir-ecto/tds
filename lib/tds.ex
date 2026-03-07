@@ -16,7 +16,6 @@ defmodule Tds do
   Please consult with [configuration](readme.html#configuration) how to do this.
   """
   alias Tds.Query
-  alias Tds.Types.UUID
 
   @timeout 5000
   @execution_mode :prepare_execute
@@ -202,22 +201,28 @@ defmodule Tds do
     Application.fetch_env!(:tds, :json_library)
   end
 
+  @deprecated "Use Ecto.UUID instead"
   @doc """
   Generates a version 4 (random) UUID in the MS uniqueidentifier binary format.
   """
   @spec generate_uuid :: <<_::128>>
-  def generate_uuid, do: UUID.bingenerate()
+  # credo:disable-for-next-line Credo.Check.Refactor.Apply
+  def generate_uuid, do: apply(Tds.Types.UUID, :bingenerate, [])
 
+  @deprecated "Use Ecto.UUID instead"
   @doc """
   Decodes MS uniqueidentifier binary to its string representation.
   """
-  def decode_uuid(uuid), do: UUID.load(uuid)
+  # credo:disable-for-next-line Credo.Check.Refactor.Apply
+  def decode_uuid(uuid), do: apply(Tds.Types.UUID, :load, [uuid])
 
+  @deprecated "Use Ecto.UUID instead"
   @doc """
   Same as `decode_uuid/1` but raises `ArgumentError` if value is invalid.
   """
   def decode_uuid!(uuid) do
-    case UUID.load(uuid) do
+    # credo:disable-for-next-line Credo.Check.Refactor.Apply
+    case apply(Tds.Types.UUID, :load, [uuid]) do
       {:ok, value} ->
         value
 
@@ -226,15 +231,19 @@ defmodule Tds do
     end
   end
 
+  @deprecated "Use Ecto.UUID instead"
   @doc """
   Encodes UUID string into MS uniqueidentifier binary.
   """
   @spec encode_uuid(any) :: :error | {:ok, <<_::128>>}
-  def encode_uuid(value), do: UUID.dump(value)
+  # credo:disable-for-next-line Credo.Check.Refactor.Apply
+  def encode_uuid(value), do: apply(Tds.Types.UUID, :dump, [value])
 
+  @deprecated "Use Ecto.UUID instead"
   @doc """
   Same as `encode_uuid/1` but raises `ArgumentError` if value is invalid.
   """
   @spec encode_uuid!(any) :: <<_::128>>
-  def encode_uuid!(value), do: UUID.dump!(value)
+  # credo:disable-for-next-line Credo.Check.Refactor.Apply
+  def encode_uuid!(value), do: apply(Tds.Types.UUID, :dump!, [value])
 end

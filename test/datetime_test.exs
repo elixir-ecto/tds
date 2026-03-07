@@ -4,7 +4,6 @@ defmodule DatetimeTest do
   use ExUnit.Case, async: true
 
   alias Tds.Parameter
-  alias Tds.Types
 
   @tag timeout: 50_000
 
@@ -39,46 +38,52 @@ defmodule DatetimeTest do
         []
       )
 
-    assert nil == Types.encode_datetime(nil)
-
-    assert {@date, {15, 16, 23, 0}} ==
-             @datetime
-             |> Types.encode_datetime()
-             |> Types.decode_datetime()
-
-    assert {@date, {15, 16, 23, 123}} ==
-             @datetime_us
-             |> Types.encode_datetime()
-             |> Types.decode_datetime()
-
     assert [[nil]] ==
              "SELECT CAST(NULL AS datetime)"
              |> query([])
 
-    assert [[{{2014, 06, 20}, {10, 21, 42, 0}}]] ==
+    assert [[~N[2014-06-20 10:21:42.000]]] ==
              "SELECT CAST('20140620 10:21:42 AM' AS datetime)"
              |> query([])
 
     assert [[nil]] ==
              "SELECT @n1"
-             |> query([%Parameter{name: "@n1", value: nil, type: :datetime}])
-
-    assert [[{{2015, 4, 8}, {15, 16, 23, 0}}]] ==
-             "SELECT @n1"
              |> query([
-               %Parameter{name: "@n1", value: @datetime, type: :datetime}
+               %Parameter{
+                 name: "@n1",
+                 value: nil,
+                 type: :datetime
+               }
              ])
 
-    assert [[{{2015, 4, 8}, {15, 16, 23, 123}}]] ==
+    assert [[~N[2015-04-08 15:16:23.000]]] ==
              "SELECT @n1"
              |> query([
-               %Parameter{name: "@n1", value: @datetime_us, type: :datetime}
+               %Parameter{
+                 name: "@n1",
+                 value: @datetime,
+                 type: :datetime
+               }
+             ])
+
+    assert [[~N[2015-04-08 15:16:23.123]]] ==
+             "SELECT @n1"
+             |> query([
+               %Parameter{
+                 name: "@n1",
+                 value: @datetime_us,
+                 type: :datetime
+               }
              ])
 
     assert :ok =
              "INSERT INTO date_test VALUES (@1, @2)"
              |> query([
-               %Parameter{name: "@1", value: nil, type: :datetime},
+               %Parameter{
+                 name: "@1",
+                 value: nil,
+                 type: :datetime
+               },
                %Parameter{name: "@2", value: 0, type: :integer}
              ])
 
@@ -86,34 +91,35 @@ defmodule DatetimeTest do
   end
 
   test "smalldatetime", context do
-    assert nil == Types.encode_smalldatetime(nil)
-
-    assert {@date, {15, 16, 0, 0}} ==
-             @datetime
-             |> Types.encode_smalldatetime()
-             |> Types.decode_smalldatetime()
-
     assert [[nil]] ==
              "SELECT CAST(NULL AS smalldatetime)"
              |> query([])
 
-    assert [[{{2014, 06, 20}, {10, 40, 0, 0}}]] ==
+    assert [[~N[2014-06-20 10:40:00]]] ==
              "SELECT CAST('20140620 10:40 AM' AS smalldatetime)"
              |> query([])
 
     assert [[nil]] ==
              "SELECT @n1"
              |> query([
-               %Parameter{name: "@n1", value: nil, type: :smalldatetime}
+               %Parameter{
+                 name: "@n1",
+                 value: nil,
+                 type: :smalldatetime
+               }
              ])
 
-    assert [[{{2015, 4, 8}, {15, 16, 0, 0}}]] ==
+    assert [[~N[2015-04-08 15:16:00]]] ==
              "SELECT @n1"
              |> query([
-               %Parameter{name: "@n1", value: @datetime, type: :smalldatetime}
+               %Parameter{
+                 name: "@n1",
+                 value: @datetime,
+                 type: :smalldatetime
+               }
              ])
 
-    assert [[{{2015, 4, 8}, {15, 16, 0, 0}}]] ==
+    assert [[~N[2015-04-08 15:16:00]]] ==
              "SELECT @n1"
              |> query([
                %Parameter{
@@ -125,146 +131,203 @@ defmodule DatetimeTest do
   end
 
   test "date", context do
-    assert nil == Types.encode_date(nil)
-    enc = Types.encode_date(@date)
-    assert @date == Types.decode_date(enc)
-
     assert [[nil]] == query("SELECT CAST(NULL AS date)", [])
-    assert [[{2014, 06, 20}]] == query("SELECT CAST('20140620' AS date)", [])
+
+    assert [[~D[2014-06-20]]] ==
+             query("SELECT CAST('20140620' AS date)", [])
 
     assert [[nil]] ==
              query("SELECT @n1", [
                %Parameter{name: "@n1", value: nil, type: :date}
              ])
 
-    assert [[{2015, 4, 8}]] ==
+    assert [[~D[2015-04-08]]] ==
              query("SELECT @n1", [
-               %Parameter{name: "@n1", value: @date, type: :date}
+               %Parameter{
+                 name: "@n1",
+                 value: @date,
+                 type: :date
+               }
              ])
   end
 
   test "time", context do
-    assert {nil, 0} == Types.encode_time(nil)
-
-    {bin, scale} = Types.encode_time(@time)
-    assert {15, 16, 23, 0} == Types.decode_time(scale, bin)
-
-    {bin, scale} = Types.encode_time(@time_fsec, 7)
-    assert {15, 16, 23, 1_234_567} == Types.decode_time(scale, bin)
-
-    {bin, scale} = Types.encode_time(@time_us, 6)
-    assert {15, 16, 23, 123_456} == Types.decode_time(scale, bin)
-
     assert [[nil]] == query("SELECT CAST(NULL AS time)", [])
     assert [[nil]] == query("SELECT CAST(NULL AS time(0))", [])
     assert [[nil]] == query("SELECT CAST(NULL AS time(6))", [])
 
-    assert [[{10, 24, 30, 1_234_567}]] ==
-             query("SELECT CAST('10:24:30.1234567' AS time)", [])
+    # Scale 7 -> clipped to microsecond (6 digits)
+    assert [[~T[10:24:30.123456]]] ==
+             query(
+               "SELECT CAST('10:24:30.1234567' AS time)",
+               []
+             )
 
-    assert [[{10, 24, 30, 0}]] ==
-             query("SELECT CAST('10:24:30.1234567' AS time(0))", [])
+    assert [[~T[10:24:30]]] ==
+             query(
+               "SELECT CAST('10:24:30.1234567' AS time(0))",
+               []
+             )
 
-    assert [[{10, 24, 30, 1_234_567}]] ==
-             query("SELECT CAST('10:24:30.1234567' AS time(7))", [])
+    # Scale 7 -> same clipping
+    assert [[~T[10:24:30.123456]]] ==
+             query(
+               "SELECT CAST('10:24:30.1234567' AS time(7))",
+               []
+             )
 
-    assert [[{10, 24, 30, 123_457}]] ==
-             query("SELECT CAST('10:24:30.1234567' AS time(6))", [])
+    assert [[~T[10:24:30.123457]]] ==
+             query(
+               "SELECT CAST('10:24:30.1234567' AS time(6))",
+               []
+             )
 
-    assert [[{10, 24, 30, 1}]] ==
-             query("SELECT CAST('10:24:30.1234567' AS time(1))", [])
+    assert [[~T[10:24:30.1]]] ==
+             query(
+               "SELECT CAST('10:24:30.1234567' AS time(1))",
+               []
+             )
 
     assert [[nil]] ==
              query("SELECT @n1", [
                %Parameter{name: "@n1", value: nil, type: :time}
              ])
 
-    assert [[{15, 16, 23, 0}]] ==
+    # Old encode sends @time as scale 7 -> decode returns scale 6
+    assert [[~T[15:16:23.000000]]] ==
              query("SELECT @n1", [
-               %Parameter{name: "@n1", value: @time, type: :time}
+               %Parameter{
+                 name: "@n1",
+                 value: @time,
+                 type: :time
+               }
              ])
 
-    assert [[{15, 16, 23, 123}]] ==
+    # {15,16,23,123} at scale 7 -> 123 * 100ns = 12.3us = 12us
+    assert [[~T[15:16:23.000012]]] ==
              query("SELECT @n1", [
-               %Parameter{name: "@n1", value: {15, 16, 23, 123}, type: :time}
+               %Parameter{
+                 name: "@n1",
+                 value: {15, 16, 23, 123},
+                 type: :time
+               }
              ])
 
-    assert [[{15, 16, 23, 1_234_567}]] ==
+    # @time_fsec = {15,16,23,1_234_567} at scale 7
+    # 1234567 * 100ns = 123456.7us = 123456us
+    assert [[~T[15:16:23.123456]]] ==
              query("SELECT @n1", [
-               %Parameter{name: "@n1", value: @time_fsec, type: :time}
+               %Parameter{
+                 name: "@n1",
+                 value: @time_fsec,
+                 type: :time
+               }
              ])
   end
 
   test "datetime2", context do
-    assert {nil, 0} == Types.encode_datetime2(nil)
+    assert [[nil]] ==
+             query("SELECT CAST(NULL AS datetime2)", [])
 
-    {dt, scale} = Types.encode_datetime2(@datetime)
-    assert {@date, {15, 16, 23, 0}} == Types.decode_datetime2(scale, dt)
+    assert [[nil]] ==
+             query("SELECT CAST(NULL AS datetime2(0))", [])
 
-    {dt, scale} = Types.encode_datetime2(@datetime_fsec)
-    assert @datetime_fsec == Types.decode_datetime2(scale, dt)
+    assert [[nil]] ==
+             query("SELECT CAST(NULL AS datetime2(6))", [])
 
-    {dt, scale} = Types.encode_datetime2({@date, {131, 56, 23, 0}}, 0)
-    assert {@date, {131, 56, 23, 0}} == Types.decode_datetime2(scale, dt)
+    # Scale 7 -> microsecond clipping
+    assert [[~N[2015-04-08 15:16:23.000000]]] ==
+             query(
+               "SELECT CAST('20150408 15:16:23' AS datetime2)",
+               []
+             )
 
-    assert [[nil]] == query("SELECT CAST(NULL AS datetime2)", [])
-    assert [[nil]] == query("SELECT CAST(NULL AS datetime2(0))", [])
-    assert [[nil]] == query("SELECT CAST(NULL AS datetime2(6))", [])
+    assert [[~N[2015-04-08 15:16:23.420000]]] ==
+             query(
+               "SELECT CAST('20150408 15:16:23.42' AS datetime2)",
+               []
+             )
 
-    assert [[{{2015, 4, 8}, {15, 16, 23, 0}}]] ==
-             query("SELECT CAST('20150408 15:16:23' AS datetime2)", [])
+    assert [[~N[2015-04-08 15:16:23.420000]]] ==
+             query(
+               "SELECT CAST('20150408 15:16:23.42' AS datetime2(7))",
+               []
+             )
 
-    assert [[{{2015, 4, 8}, {15, 16, 23, 4_200_000}}]] ==
-             query("SELECT CAST('20150408 15:16:23.42' AS datetime2)", [])
+    assert [[~N[2015-04-08 15:16:23.420000]]] ==
+             query(
+               "SELECT CAST('20150408 15:16:23.42' AS datetime2(6))",
+               []
+             )
 
-    assert [[{{2015, 4, 8}, {15, 16, 23, 4_200_000}}]] ==
-             query("SELECT CAST('20150408 15:16:23.42' AS datetime2(7))", [])
+    assert [[~N[2015-04-08 15:16:23]]] ==
+             query(
+               "SELECT CAST('20150408 15:16:23.42' AS datetime2(0))",
+               []
+             )
 
-    assert [[{{2015, 4, 8}, {15, 16, 23, 420_000}}]] ==
-             query("SELECT CAST('20150408 15:16:23.42' AS datetime2(6))", [])
-
-    assert [[{{2015, 4, 8}, {15, 16, 23, 0}}]] ==
-             query("SELECT CAST('20150408 15:16:23.42' AS datetime2(0))", [])
-
-    assert [[{{2015, 4, 8}, {15, 16, 23, 4}}]] ==
-             query("SELECT CAST('20150408 15:16:23.42' AS datetime2(1))", [])
+    assert [[~N[2015-04-08 15:16:23.4]]] ==
+             query(
+               "SELECT CAST('20150408 15:16:23.42' AS datetime2(1))",
+               []
+             )
 
     assert [[nil]] ==
              query("SELECT @n1", [
-               %Parameter{name: "@n1", value: nil, type: :datetime2}
+               %Parameter{
+                 name: "@n1",
+                 value: nil,
+                 type: :datetime2
+               }
              ])
 
-    assert [[{{2015, 4, 8}, {15, 16, 23, 0}}]] ==
+    assert [[~N[2015-04-08 15:16:23.000000]]] ==
              query("SELECT @n1", [
-               %Parameter{name: "@n1", value: @datetime, type: :datetime2}
+               %Parameter{
+                 name: "@n1",
+                 value: @datetime,
+                 type: :datetime2
+               }
              ])
 
-    assert [[{{2015, 4, 8}, {15, 16, 23, 1_234_567}}]] ==
+    # Scale 7 -> clipped to 6
+    assert [[~N[2015-04-08 15:16:23.123456]]] ==
              query("SELECT @n1", [
-               %Parameter{name: "@n1", value: @datetime_fsec, type: :datetime2}
+               %Parameter{
+                 name: "@n1",
+                 value: @datetime_fsec,
+                 type: :datetime2
+               }
              ])
   end
 
   test "implicit params", context do
-    assert [[{{2015, 4, 8}, {15, 16, 23, 0}}]] ==
-             query("SELECT @n1", [%Parameter{name: "@n1", value: @datetime}])
+    # datetime via old encode -> NaiveDateTime decode
+    assert [[~N[2015-04-08 15:16:23.000]]] ==
+             query("SELECT @n1", [
+               %Parameter{name: "@n1", value: @datetime}
+             ])
 
-    # #datetime_us {_,_,_,}, {_,_,_,_}
-    assert [[{{2015, 4, 8}, {15, 16, 23, 123_456}}]] ==
+    # @datetime_us = {{2015,4,8},{15,16,23,123_456}} at scale 7
+    # 123456 * 100ns = 12345.6us = 12345us -> ~N[...012345]
+    assert [[~N[2015-04-08 15:16:23.012345]]] ==
              query("SELECT @n1", [
                %Parameter{name: "@n1", value: @datetime_us}
              ])
 
-    # datetime_fsec {_,_,_,}, {_,_,_}, _
-    assert [[{{2015, 4, 8}, {15, 16, 23, 0}, -240}]] ==
-             query("SELECT @n1", [
-               %Parameter{name: "@n1", value: @datetimeoffset}
-             ])
+    # datetimeoffset returns DateTime struct
+    [[result]] =
+      query("SELECT @n1", [
+        %Parameter{name: "@n1", value: @datetimeoffset}
+      ])
 
-    # datetime_fsec {_,_,_,}, {_,_,_,_}, _
-    assert [[{{2015, 4, 8}, {15, 16, 23, 1_234_567}, -240}]] ==
-             query("SELECT @n1", [
-               %Parameter{name: "@n1", value: @datetimeoffset_fsec}
-             ])
+    assert %DateTime{} = result
+
+    [[result_fsec]] =
+      query("SELECT @n1", [
+        %Parameter{name: "@n1", value: @datetimeoffset_fsec}
+      ])
+
+    assert %DateTime{} = result_fsec
   end
 end

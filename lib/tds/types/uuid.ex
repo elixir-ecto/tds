@@ -1,8 +1,13 @@
 defmodule Tds.Types.UUID do
   @moduledoc """
-  UUID data type
+  UUID data type.
+
+  Deprecated: Use `Ecto.UUID` instead. The `Tds.Type.UUID` handler now
+  performs MSSQL mixed-endian byte reordering at the wire level, so
+  `Ecto.UUID` works directly without this module.
   """
 
+  @deprecated "Use Ecto.UUID instead"
   @doc """
   Casts to UUID.
   """
@@ -19,10 +24,13 @@ defmodule Tds.Types.UUID do
     casted -> {:ok, casted}
   end
 
+  @deprecated "Use Ecto.UUID instead"
   def cast(<<bin::binary-size(16)>>), do: encode(bin)
 
+  @deprecated "Use Ecto.UUID instead"
   def cast(_), do: :error
 
+  @deprecated "Use Ecto.UUID instead"
   @doc """
   Same as `cast/1` but raises `Ecto.CastError` on invalid arguments.
   """
@@ -59,6 +67,7 @@ defmodule Tds.Types.UUID do
   defp c(?f), do: ?f
   defp c(_), do: throw(:error)
 
+  @deprecated "Use Ecto.UUID instead"
   @doc """
   Converts a string representing a UUID into a binary.
   """
@@ -79,8 +88,10 @@ defmodule Tds.Types.UUID do
     end
   end
 
+  @deprecated "Use Ecto.UUID instead"
   def dump(_), do: :error
 
+  @deprecated "Use Ecto.UUID instead"
   def dump!(value) do
     case dump(value) do
       {:ok, binary} -> binary
@@ -114,6 +125,7 @@ defmodule Tds.Types.UUID do
   defp d(?f), do: 15
   defp d(_), do: throw(:error)
 
+  @deprecated "Use Ecto.UUID instead"
   @doc """
   Converts a binary UUID into a string.
   """
@@ -127,8 +139,10 @@ defmodule Tds.Types.UUID do
             "Maybe you wanted to declare :uuid as your database field?"
   end
 
+  @deprecated "Use Ecto.UUID instead"
   def load(_), do: :error
 
+  @deprecated "Use Ecto.UUID instead"
   @doc """
   Generates a version 4 (random) UUID.
   """
@@ -137,6 +151,7 @@ defmodule Tds.Types.UUID do
     uuid
   end
 
+  @deprecated "Use Ecto.UUID instead"
   @doc """
   Generates a version 4 (random) UUID in the binary format.
   """
@@ -150,7 +165,7 @@ defmodule Tds.Types.UUID do
       e7::4, e8::4, e9::4, e10::4, e11::4, e12::4>>
   end
 
-  # Callback invoked by autogenerate fields.
+  @deprecated "Use Ecto.UUID instead"
   @doc false
   def autogenerate, do: generate()
 
