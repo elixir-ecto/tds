@@ -54,11 +54,21 @@ defmodule QueryTest do
       []
     )
 
-    [[
-      tiny, bit_val, small, int_val, sdt,
-      real_val, money_val, dt, float_val,
-      small_money, big_int
-    ]] = query("SELECT TOP(1) * FROM FixedLength", [])
+    [
+      [
+        tiny,
+        bit_val,
+        small,
+        int_val,
+        sdt,
+        real_val,
+        money_val,
+        dt,
+        float_val,
+        small_money,
+        big_int
+      ]
+    ] = query("SELECT TOP(1) * FROM FixedLength", [])
 
     assert tiny == 1
     assert bit_val == false

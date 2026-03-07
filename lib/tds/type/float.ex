@@ -31,9 +31,7 @@ defmodule Tds.Type.Float do
     {:ok, %{data_reader: {:fixed, 8}}, rest}
   end
 
-  def decode_metadata(
-        <<tds_type(:floatn), length::unsigned-8, rest::binary>>
-      ) do
+  def decode_metadata(<<tds_type(:floatn), length::unsigned-8, rest::binary>>) do
     {:ok, %{data_reader: :bytelen, length: length}, rest}
   end
 

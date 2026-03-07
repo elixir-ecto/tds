@@ -139,9 +139,7 @@ defmodule Tds.Parameter do
     %{param | type: :time}
   end
 
-  def fix_data_type(
-        %__MODULE__{value: {{_, _, _}, {_, _, _}}} = param
-      ) do
+  def fix_data_type(%__MODULE__{value: {{_, _, _}, {_, _, _}}} = param) do
     %{param | type: :datetime}
   end
 
@@ -153,9 +151,7 @@ defmodule Tds.Parameter do
     %{param | type: type}
   end
 
-  def fix_data_type(
-        %__MODULE__{value: {{_, _, _}, {_, _, _, fsec}}} = param
-      ) do
+  def fix_data_type(%__MODULE__{value: {{_, _, _}, {_, _, _, fsec}}} = param) do
     type = if rem(fsec, 1000) > 0, do: :datetime2, else: :datetime
     %{param | type: type}
   end
@@ -164,9 +160,7 @@ defmodule Tds.Parameter do
     %{param | type: :datetimeoffset}
   end
 
-  def fix_data_type(
-        %__MODULE__{value: {{_y, _m, _d}, _time, _offset}} = param
-      ) do
+  def fix_data_type(%__MODULE__{value: {{_y, _m, _d}, _time, _offset}} = param) do
     %{param | type: :datetimeoffset}
   end
 

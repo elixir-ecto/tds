@@ -537,6 +537,7 @@ defmodule Tds.Type.DateTimeTest do
 
     test "~N[2024-01-01 12:30:45] encodes correctly" do
       ndt = ~N[2024-01-01 12:30:45]
+
       {type_code, meta, value} =
         DTType.encode(ndt, %{type: :datetime2})
 
@@ -568,6 +569,7 @@ defmodule Tds.Type.DateTimeTest do
 
     test "UTC DateTime encodes correctly" do
       {:ok, dt} = DateTime.new(~D[2024-01-01], ~T[12:30:45], "Etc/UTC")
+
       {type_code, _meta, value} =
         DTType.encode(dt, %{type: :datetimeoffset})
 
@@ -688,6 +690,7 @@ defmodule Tds.Type.DateTimeTest do
 
     test "Time roundtrips" do
       original = ~T[14:30:00.123456]
+
       {_type, meta_bin, value_bin} =
         DTType.encode(original, %{type: :time})
 
@@ -710,6 +713,7 @@ defmodule Tds.Type.DateTimeTest do
 
     test "NaiveDateTime roundtrips at scale 0" do
       original = ~N[2024-01-15 08:45:30]
+
       {_type, meta_bin, value_bin} =
         DTType.encode(original, %{type: :datetime2})
 

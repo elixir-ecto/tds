@@ -21,9 +21,7 @@ defmodule Tds.Type.Boolean do
     {:ok, %{data_reader: {:fixed, 1}}, rest}
   end
 
-  def decode_metadata(
-        <<tds_type(:bitn), _length::unsigned-8, rest::binary>>
-      ) do
+  def decode_metadata(<<tds_type(:bitn), _length::unsigned-8, rest::binary>>) do
     {:ok, %{data_reader: :bytelen}, rest}
   end
 

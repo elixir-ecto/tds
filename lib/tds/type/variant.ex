@@ -28,10 +28,7 @@ defmodule Tds.Type.Variant do
   # -- decode_metadata ------------------------------------------------
 
   @impl true
-  def decode_metadata(
-        <<tds_type(:variant), length::little-signed-32,
-          rest::binary>>
-      ) do
+  def decode_metadata(<<tds_type(:variant), length::little-signed-32, rest::binary>>) do
     meta = %{
       data_reader: :variant,
       length: length

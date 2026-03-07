@@ -62,8 +62,7 @@ defmodule Tds.Type.Binary do
 
   # image (0x22): 4-byte length + numparts table names
   def decode_metadata(
-        <<tds_type(:image), length::little-unsigned-32,
-          numparts::signed-8, rest::binary>>
+        <<tds_type(:image), length::little-unsigned-32, numparts::signed-8, rest::binary>>
       ) do
     rest = skip_table_parts(numparts, rest)
 
@@ -156,9 +155,7 @@ defmodule Tds.Type.Binary do
   defp skip_table_parts(0, rest), do: rest
 
   defp skip_table_parts(n, rest) when n > 0 do
-    <<tsize::little-unsigned-16,
-      _table_name::binary-size(tsize)-unit(16),
-      next::binary>> = rest
+    <<tsize::little-unsigned-16, _table_name::binary-size(tsize)-unit(16), next::binary>> = rest
 
     skip_table_parts(n - 1, next)
   end

@@ -23,10 +23,10 @@ defmodule Tds.TypeIntegrationTest do
     col_name_ucs2 = :unicode.characters_to_binary(name, :utf8, {:utf16, :little})
     name_len = div(byte_size(col_name_ucs2), 2)
 
+    # column_count = 1
+    # usertype (4 bytes) + flags (2 bytes)
     colmetadata_body =
-      # column_count = 1
       <<0x01, 0x00>> <>
-        # usertype (4 bytes) + flags (2 bytes)
         <<0x00, 0x00, 0x00, 0x00, 0x00, 0x20>> <>
         type_meta_bin <>
         <<name_len::unsigned-8>> <>
@@ -37,8 +37,7 @@ defmodule Tds.TypeIntegrationTest do
 
     # DONE token (0xFD) + 12 bytes
     done_body =
-      <<0x10, 0x00, 0xC1, 0x00, 0x01, 0x00, 0x00, 0x00,
-        0x00, 0x00, 0x00, 0x00>>
+      <<0x10, 0x00, 0xC1, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00>>
 
     <<token(:colmetadata)>> <>
       colmetadata_body <>
@@ -160,7 +159,7 @@ defmodule Tds.TypeIntegrationTest do
       value =
         <<ucs2_len::little-unsigned-64>> <>
           <<ucs2_len::little-unsigned-32>> <>
-          ucs2<>
+          ucs2 <>
           <<0, 0, 0, 0>>
 
       stream = single_column_stream(type_meta, value)
@@ -215,15 +214,17 @@ defmodule Tds.TypeIntegrationTest do
       col1_name = :unicode.characters_to_binary("id", :utf8, {:utf16, :little})
       col2_name = :unicode.characters_to_binary("name", :utf8, {:utf16, :little})
 
+      # Column 1: int
+      # Column 2: nvarchar shortlen
       colmetadata_body =
         <<0x02, 0x00>> <>
-          # Column 1: int
           <<0x00, 0x00, 0x00, 0x00, 0x00, 0x20>> <>
           <<tds_type(:int)>> <>
-          <<div(byte_size(col1_name), 2)::unsigned-8>> <> col1_name <>
-          # Column 2: nvarchar shortlen
+          <<div(byte_size(col1_name), 2)::unsigned-8>> <>
+          col1_name <>
           <<0x00, 0x00, 0x00, 0x00, 0x00, 0x20>> <>
-          <<tds_type(:nvarchar), 0xC8, 0x00>> <> collation <>
+          <<tds_type(:nvarchar), 0xC8, 0x00>> <>
+          collation <>
           <<div(byte_size(col2_name), 2)::unsigned-8>> <> col2_name
 
       # Row values: int 7 + nvarchar "hi"
@@ -232,8 +233,7 @@ defmodule Tds.TypeIntegrationTest do
           <<ucs2_len::little-unsigned-16>> <> ucs2
 
       done_body =
-        <<0x10, 0x00, 0xC1, 0x00, 0x01, 0x00, 0x00, 0x00,
-          0x00, 0x00, 0x00, 0x00>>
+        <<0x10, 0x00, 0xC1, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00>>
 
       stream =
         <<token(:colmetadata)>> <>
@@ -275,9 +275,7 @@ defmodule Tds.TypeIntegrationTest do
       collation = <<0x09, 0x04, 0xD0, 0x00, 0x34>>
 
       {:ok, meta, <<>>} =
-        handler.decode_metadata(
-          <<tds_type(:nvarchar), 0xC8, 0x00>> <> collation
-        )
+        handler.decode_metadata(<<tds_type(:nvarchar), 0xC8, 0x00>> <> collation)
 
       ucs2 = :unicode.characters_to_binary("abc", :utf8, {:utf16, :little})
       ucs2_len = byte_size(ucs2)

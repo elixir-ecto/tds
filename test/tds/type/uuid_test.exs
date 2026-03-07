@@ -7,15 +7,13 @@ defmodule Tds.Type.UUIDTest do
   # stored and returned without reordering to preserve existing
   # roundtrip behavior with bingenerate/load/dump.
 
-  @test_binary <<1, 2, 3, 4, 5, 6, 7, 8,
-    9, 10, 11, 12, 13, 14, 15, 16>>
+  @test_binary <<1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16>>
 
   @uuid_string "01020304-0506-0708-090a-0b0c0d0e0f10"
 
   # parse_uuid_string produces hex bytes in order (no reorder)
-  @parsed_string_binary <<0x01, 0x02, 0x03, 0x04, 0x05, 0x06,
-    0x07, 0x08, 0x09, 0x0A, 0x0B, 0x0C, 0x0D, 0x0E, 0x0F,
-    0x10>>
+  @parsed_string_binary <<0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0A, 0x0B, 0x0C,
+                          0x0D, 0x0E, 0x0F, 0x10>>
 
   describe "type_codes/0" do
     test "returns uniqueidentifier code 0x24" do

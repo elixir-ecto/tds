@@ -28,10 +28,7 @@ defmodule Tds.Type.Udt do
   # -- decode_metadata ------------------------------------------------
 
   @impl true
-  def decode_metadata(
-        <<tds_type(:udt), length::little-unsigned-16,
-          rest::binary>>
-      ) do
+  def decode_metadata(<<tds_type(:udt), length::little-unsigned-16, rest::binary>>) do
     data_reader = if length == 0xFFFF, do: :plp, else: :shortlen
 
     meta = %{

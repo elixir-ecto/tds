@@ -22,10 +22,7 @@ defmodule Tds.Type.UUID do
   # -- decode_metadata -------------------------------------------------
 
   @impl true
-  def decode_metadata(
-        <<tds_type(:uniqueidentifier), _length::unsigned-8,
-          rest::binary>>
-      ) do
+  def decode_metadata(<<tds_type(:uniqueidentifier), _length::unsigned-8, rest::binary>>) do
     {:ok, %{data_reader: :bytelen}, rest}
   end
 
@@ -73,22 +70,42 @@ defmodule Tds.Type.UUID do
   # -- private helpers -------------------------------------------------
 
   defp parse_uuid_string(
-         <<a1, a2, a3, a4, a5, a6, a7, a8, ?-,
-           b1, b2, b3, b4, ?-,
-           c1, c2, c3, c4, ?-,
-           d1, d2, d3, d4, ?-,
-           e1, e2, e3, e4, e5, e6, e7, e8,
-           e9, e10, e11, e12>>
+         <<a1, a2, a3, a4, a5, a6, a7, a8, ?-, b1, b2, b3, b4, ?-, c1, c2, c3, c4, ?-, d1, d2, d3,
+           d4, ?-, e1, e2, e3, e4, e5, e6, e7, e8, e9, e10, e11, e12>>
        ) do
     <<
-      hex(a1)::4, hex(a2)::4, hex(a3)::4, hex(a4)::4,
-      hex(a5)::4, hex(a6)::4, hex(a7)::4, hex(a8)::4,
-      hex(b1)::4, hex(b2)::4, hex(b3)::4, hex(b4)::4,
-      hex(c1)::4, hex(c2)::4, hex(c3)::4, hex(c4)::4,
-      hex(d1)::4, hex(d2)::4, hex(d3)::4, hex(d4)::4,
-      hex(e1)::4, hex(e2)::4, hex(e3)::4, hex(e4)::4,
-      hex(e5)::4, hex(e6)::4, hex(e7)::4, hex(e8)::4,
-      hex(e9)::4, hex(e10)::4, hex(e11)::4, hex(e12)::4
+      hex(a1)::4,
+      hex(a2)::4,
+      hex(a3)::4,
+      hex(a4)::4,
+      hex(a5)::4,
+      hex(a6)::4,
+      hex(a7)::4,
+      hex(a8)::4,
+      hex(b1)::4,
+      hex(b2)::4,
+      hex(b3)::4,
+      hex(b4)::4,
+      hex(c1)::4,
+      hex(c2)::4,
+      hex(c3)::4,
+      hex(c4)::4,
+      hex(d1)::4,
+      hex(d2)::4,
+      hex(d3)::4,
+      hex(d4)::4,
+      hex(e1)::4,
+      hex(e2)::4,
+      hex(e3)::4,
+      hex(e4)::4,
+      hex(e5)::4,
+      hex(e6)::4,
+      hex(e7)::4,
+      hex(e8)::4,
+      hex(e9)::4,
+      hex(e10)::4,
+      hex(e11)::4,
+      hex(e12)::4
     >>
   end
 

@@ -49,9 +49,7 @@ defmodule Tds.Type.Integer do
     {:ok, %{data_reader: {:fixed, 8}}, rest}
   end
 
-  def decode_metadata(
-        <<tds_type(:intn), length::unsigned-8, rest::binary>>
-      ) do
+  def decode_metadata(<<tds_type(:intn), length::unsigned-8, rest::binary>>) do
     {:ok, %{data_reader: :bytelen, length: length}, rest}
   end
 

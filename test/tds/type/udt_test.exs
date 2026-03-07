@@ -195,10 +195,7 @@ defmodule Tds.Type.UdtTest do
   defp reassemble_plp(<<0::little-unsigned-32, _rest::binary>>),
     do: <<>>
 
-  defp reassemble_plp(
-         <<size::little-unsigned-32,
-           chunk::binary-size(size), rest::binary>>
-       ) do
+  defp reassemble_plp(<<size::little-unsigned-32, chunk::binary-size(size), rest::binary>>) do
     chunk <> reassemble_plp(rest)
   end
 end

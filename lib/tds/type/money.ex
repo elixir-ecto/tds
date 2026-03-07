@@ -39,9 +39,7 @@ defmodule Tds.Type.Money do
     {:ok, %{data_reader: {:fixed, 4}}, rest}
   end
 
-  def decode_metadata(
-        <<tds_type(:moneyn), length::unsigned-8, rest::binary>>
-      ) do
+  def decode_metadata(<<tds_type(:moneyn), length::unsigned-8, rest::binary>>) do
     {:ok, %{data_reader: :bytelen, length: length}, rest}
   end
 
@@ -73,8 +71,7 @@ defmodule Tds.Type.Money do
     units = decimal_to_units(dec)
     <<high::unsigned-32, low::unsigned-32>> = <<units::signed-64>>
 
-    {type, <<type, 0x08>>,
-     <<0x08, high::little-unsigned-32, low::little-unsigned-32>>}
+    {type, <<type, 0x08>>, <<0x08, high::little-unsigned-32, low::little-unsigned-32>>}
   end
 
   @impl true

@@ -46,8 +46,7 @@ defmodule Tds.Type.String do
   # nchar (0xEF) — 2-byte LE max_length + 5-byte collation
   @impl true
   def decode_metadata(
-        <<type_code, length::little-unsigned-16,
-          collation_bin::binary-5, rest::binary>>
+        <<type_code, length::little-unsigned-16, collation_bin::binary-5, rest::binary>>
       )
       when type_code in [
              tds_type(:bigvarchar),
@@ -71,10 +70,7 @@ defmodule Tds.Type.String do
 
   # Legacy short types: varchar (0x27), char (0x2F) — 1-byte length
   # + 5-byte collation
-  def decode_metadata(
-        <<type_code, length::unsigned-8,
-          collation_bin::binary-5, rest::binary>>
-      )
+  def decode_metadata(<<type_code, length::unsigned-8, collation_bin::binary-5, rest::binary>>)
       when type_code in [tds_type(:varchar), tds_type(:char)] do
     {:ok, collation} = Collation.decode(collation_bin)
 
@@ -90,9 +86,8 @@ defmodule Tds.Type.String do
 
   # text (0x23) — 4-byte length + collation + numparts table names
   def decode_metadata(
-        <<tds_type(:text), length::little-unsigned-32,
-          collation_bin::binary-5, numparts::signed-8,
-          rest::binary>>
+        <<tds_type(:text), length::little-unsigned-32, collation_bin::binary-5,
+          numparts::signed-8, rest::binary>>
       ) do
     {:ok, collation} = Collation.decode(collation_bin)
     rest = skip_table_parts(numparts, rest)
@@ -109,9 +104,8 @@ defmodule Tds.Type.String do
 
   # ntext (0x63) — 4-byte length + collation + numparts table names
   def decode_metadata(
-        <<tds_type(:ntext), length::little-unsigned-32,
-          collation_bin::binary-5, numparts::signed-8,
-          rest::binary>>
+        <<tds_type(:ntext), length::little-unsigned-32, collation_bin::binary-5,
+          numparts::signed-8, rest::binary>>
       ) do
     {:ok, collation} = Collation.decode(collation_bin)
     rest = skip_table_parts(numparts, rest)
@@ -210,9 +204,7 @@ defmodule Tds.Type.String do
   defp skip_table_parts(0, rest), do: rest
 
   defp skip_table_parts(n, rest) when n > 0 do
-    <<tsize::little-unsigned-16,
-      _table_name::binary-size(tsize)-unit(16),
-      next::binary>> = rest
+    <<tsize::little-unsigned-16, _table_name::binary-size(tsize)-unit(16), next::binary>> = rest
 
     skip_table_parts(n - 1, next)
   end

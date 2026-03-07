@@ -8,11 +8,16 @@ defmodule Tds.Type.BinaryTest do
     test "returns all 5 binary-related type codes" do
       codes = BinType.type_codes()
 
-      assert 0xAD in codes  # bigbinary
-      assert 0xA5 in codes  # bigvarbinary
-      assert 0x22 in codes  # image
-      assert 0x2D in codes  # legacy binary
-      assert 0x25 in codes  # legacy varbinary
+      # bigbinary
+      assert 0xAD in codes
+      # bigvarbinary
+      assert 0xA5 in codes
+      # image
+      assert 0x22 in codes
+      # legacy binary
+      assert 0x2D in codes
+      # legacy varbinary
+      assert 0x25 in codes
       assert length(codes) == 5
     end
   end
@@ -90,8 +95,7 @@ defmodule Tds.Type.BinaryTest do
       tail = <<0x44>>
 
       input =
-        <<0x22, 2_147_483_647::little-unsigned-32,
-          1::signed-8, table_size::little-unsigned-16>> <>
+        <<0x22, 2_147_483_647::little-unsigned-32, 1::signed-8, table_size::little-unsigned-16>> <>
           table_name <> tail
 
       assert {:ok, meta, ^tail} = BinType.decode_metadata(input)
@@ -107,8 +111,7 @@ defmodule Tds.Type.BinaryTest do
       tail = <<0x55>>
 
       input =
-        <<0x22, 100::little-unsigned-32, 2::signed-8,
-          t1_size::little-unsigned-16>> <>
+        <<0x22, 100::little-unsigned-32, 2::signed-8, t1_size::little-unsigned-16>> <>
           t1 <>
           <<t2_size::little-unsigned-16>> <>
           t2 <> tail
@@ -309,10 +312,7 @@ defmodule Tds.Type.BinaryTest do
   defp reassemble_plp(<<0::little-unsigned-32, _rest::binary>>),
     do: <<>>
 
-  defp reassemble_plp(
-         <<size::little-unsigned-32,
-           chunk::binary-size(size), rest::binary>>
-       ) do
+  defp reassemble_plp(<<size::little-unsigned-32, chunk::binary-size(size), rest::binary>>) do
     chunk <> reassemble_plp(rest)
   end
 end

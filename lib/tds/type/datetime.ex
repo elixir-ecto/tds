@@ -62,9 +62,7 @@ defmodule Tds.Type.DateTime do
     {:ok, %{data_reader: :bytelen, type_code: @daten_code}, rest}
   end
 
-  def decode_metadata(
-        <<@timen_code, scale::unsigned-8, rest::binary>>
-      ) do
+  def decode_metadata(<<@timen_code, scale::unsigned-8, rest::binary>>) do
     meta = %{
       data_reader: :bytelen,
       scale: scale,
@@ -74,9 +72,7 @@ defmodule Tds.Type.DateTime do
     {:ok, meta, rest}
   end
 
-  def decode_metadata(
-        <<@datetime2n_code, scale::unsigned-8, rest::binary>>
-      ) do
+  def decode_metadata(<<@datetime2n_code, scale::unsigned-8, rest::binary>>) do
     meta = %{
       data_reader: :bytelen,
       scale: scale,
@@ -86,10 +82,7 @@ defmodule Tds.Type.DateTime do
     {:ok, meta, rest}
   end
 
-  def decode_metadata(
-        <<@datetimeoffsetn_code, scale::unsigned-8,
-          rest::binary>>
-      ) do
+  def decode_metadata(<<@datetimeoffsetn_code, scale::unsigned-8, rest::binary>>) do
     meta = %{
       data_reader: :bytelen,
       scale: scale,
@@ -117,9 +110,7 @@ defmodule Tds.Type.DateTime do
     {:ok, meta, rest}
   end
 
-  def decode_metadata(
-        <<@datetimen_code, length::unsigned-8, rest::binary>>
-      ) do
+  def decode_metadata(<<@datetimen_code, length::unsigned-8, rest::binary>>) do
     meta = %{
       data_reader: :bytelen,
       length: length,
@@ -376,9 +367,7 @@ defmodule Tds.Type.DateTime do
 
   # -- private: smalldatetime ------------------------------------------
 
-  defp decode_smalldatetime(
-         <<days::little-unsigned-16, mins::little-unsigned-16>>
-       ) do
+  defp decode_smalldatetime(<<days::little-unsigned-16, mins::little-unsigned-16>>) do
     date = :calendar.gregorian_days_to_date(@year_1900_days + days)
     hour = div(mins, 60)
     min = mins - hour * 60
@@ -394,9 +383,7 @@ defmodule Tds.Type.DateTime do
 
   # -- private: datetime -----------------------------------------------
 
-  defp decode_datetime(
-         <<days::little-signed-32, secs300::little-unsigned-32>>
-       ) do
+  defp decode_datetime(<<days::little-signed-32, secs300::little-unsigned-32>>) do
     date = :calendar.gregorian_days_to_date(@year_1900_days + days)
     milliseconds = round(secs300 * 10 / 3)
     usec = rem(milliseconds, 1_000)
@@ -523,8 +510,7 @@ defmodule Tds.Type.DateTime do
     tlen = time_byte_length(scale)
     dt2_len = tlen + 3
 
-    <<dt2_bin::binary-size(dt2_len),
-      _offset_min::little-signed-16>> = data
+    <<dt2_bin::binary-size(dt2_len), _offset_min::little-signed-16>> = data
 
     # Wire stores UTC time + offset. Return UTC DateTime
     # (same as old Tds.Types behavior) so roundtrip is stable.

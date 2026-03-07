@@ -55,8 +55,14 @@ defmodule Tds.Type.DataReader do
   def read(
         :plp,
         <<
-          0xFF, 0xFF, 0xFF, 0xFF,
-          0xFF, 0xFF, 0xFF, 0xFF,
+          0xFF,
+          0xFF,
+          0xFF,
+          0xFF,
+          0xFF,
+          0xFF,
+          0xFF,
+          0xFF,
           rest::binary
         >>
       ),

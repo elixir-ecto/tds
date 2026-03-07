@@ -61,8 +61,7 @@ defmodule Tds.Type.XmlTest do
       tail = <<0xDD>>
 
       input =
-        <<0xF1, 0x01, 0::unsigned-8, 0::unsigned-8,
-          0::little-unsigned-16>> <> tail
+        <<0xF1, 0x01, 0::unsigned-8, 0::unsigned-8, 0::little-unsigned-16>> <> tail
 
       assert {:ok, meta, ^tail} = Xml.decode_metadata(input)
       assert meta.data_reader == :plp

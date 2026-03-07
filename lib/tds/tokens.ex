@@ -150,8 +150,7 @@ defmodule Tds.Tokens do
 
   # ERROR
   defp decode_error(
-         <<l::little-size(16), data::binary-size(l),
-           tail::binary>>,
+         <<l::little-size(16), data::binary-size(l), tail::binary>>,
          collmetadata
        ) do
     <<
@@ -181,8 +180,7 @@ defmodule Tds.Tokens do
   end
 
   defp decode_info(
-         <<l::little-size(16), data::binary-size(l),
-           tail::binary>>,
+         <<l::little-size(16), data::binary-size(l), tail::binary>>,
          collmetadata
        ) do
     <<
@@ -503,8 +501,7 @@ defmodule Tds.Tokens do
       t_sql_only: interface == 1,
       tds_version: tds_version,
       program: UCS2.to_string(prog_name),
-      version:
-        "#{major_ver}.#{minor_ver}.#{build_hi}.#{build_low}"
+      version: "#{major_ver}.#{minor_ver}.#{build_hi}.#{build_low}"
     }
 
     {{:loginack, token}, tail, collmetadata}
@@ -531,8 +528,7 @@ defmodule Tds.Tokens do
   end
 
   defp bitmap_list(
-         <<b8::1, b7::1, b6::1, b5::1, b4::1, b3::1, b2::1,
-           b1::1, tail::binary>>,
+         <<b8::1, b7::1, b6::1, b5::1, b4::1, b3::1, b2::1, b1::1, tail::binary>>,
          n
        ) do
     {bits, tail} = bitmap_list(tail, n - 1)
@@ -550,9 +546,7 @@ defmodule Tds.Tokens do
     decode_columns(tail, n - 1, [column | acc])
   end
 
-  defp decode_column(
-         <<_usertype::int32(), _flags::int16(), tail::binary>>
-       ) do
+  defp decode_column(<<_usertype::int32(), _flags::int16(), tail::binary>>) do
     {info, tail} = decode_type_metadata(tail)
     {name, tail} = decode_column_name(tail)
 
@@ -560,10 +554,7 @@ defmodule Tds.Tokens do
     {info, tail}
   end
 
-  defp decode_column_name(
-         <<length::int8(), name::binary-size(length)-unit(16),
-           tail::binary>>
-       ) do
+  defp decode_column_name(<<length::int8(), name::binary-size(length)-unit(16), tail::binary>>) do
     name = UCS2.to_string(name)
     {name, tail}
   end
@@ -620,9 +611,7 @@ defmodule Tds.Tokens do
   # -- New type system pipeline ----------------------------------------
 
   # Decodes type metadata from binary using Registry + handler.
-  defp decode_type_metadata(
-         <<type_code::unsigned-8, _::binary>> = bin
-       ) do
+  defp decode_type_metadata(<<type_code::unsigned-8, _::binary>> = bin) do
     {:ok, handler} =
       Registry.handler_for_code(@registry, type_code)
 

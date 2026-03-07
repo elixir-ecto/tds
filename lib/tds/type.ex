@@ -33,8 +33,7 @@ defmodule Tds.Type do
   Returns `{type_code, colmetadata_binary, value_binary}`.
   """
   @callback encode(term(), metadata()) ::
-              {type_code :: byte(), meta_bin :: iodata(),
-               value_bin :: iodata()}
+              {type_code :: byte(), meta_bin :: iodata(), value_bin :: iodata()}
 
   @doc "Generate sp_executesql parameter descriptor string."
   @callback param_descriptor(term(), metadata()) :: String.t()

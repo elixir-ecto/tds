@@ -100,11 +100,9 @@ defmodule Tds.Type.Xml do
   # -- private helpers -------------------------------------------------
 
   defp skip_schema_info(binary) do
-    <<dblen::unsigned-8, _db::binary-size(dblen)-unit(16),
-      ownerlen::unsigned-8, _owner::binary-size(ownerlen)-unit(16),
-      schemalen::little-unsigned-16,
-      _schema::binary-size(schemalen)-unit(16),
-      rest::binary>> = binary
+    <<dblen::unsigned-8, _db::binary-size(dblen)-unit(16), ownerlen::unsigned-8,
+      _owner::binary-size(ownerlen)-unit(16), schemalen::little-unsigned-16,
+      _schema::binary-size(schemalen)-unit(16), rest::binary>> = binary
 
     rest
   end

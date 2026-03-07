@@ -15,14 +15,22 @@ defmodule Tds.Type.StringTest do
     test "returns all 8 string-related type codes" do
       codes = StrType.type_codes()
 
-      assert 0xAF in codes  # bigchar
-      assert 0xA7 in codes  # bigvarchar
-      assert 0xE7 in codes  # nvarchar
-      assert 0xEF in codes  # nchar
-      assert 0x23 in codes  # text
-      assert 0x27 in codes  # varchar (legacy short)
-      assert 0x2F in codes  # char (legacy short)
-      assert 0x63 in codes  # ntext
+      # bigchar
+      assert 0xAF in codes
+      # bigvarchar
+      assert 0xA7 in codes
+      # nvarchar
+      assert 0xE7 in codes
+      # nchar
+      assert 0xEF in codes
+      # text
+      assert 0x23 in codes
+      # varchar (legacy short)
+      assert 0x27 in codes
+      # char (legacy short)
+      assert 0x2F in codes
+      # ntext
+      assert 0x63 in codes
       assert length(codes) == 8
     end
   end
