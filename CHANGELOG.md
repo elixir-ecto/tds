@@ -5,6 +5,78 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## v3.0.0 (2026-03-05)
+
+### Breaking Changes
+
+* **Money columns return `%Decimal{}`** instead of `float`. Use `Decimal`
+  arithmetic for money values. Previously `SELECT CAST(10.50 AS money)`
+  returned `10.5` (float); now returns `Decimal.new("10.5000")`.
+
+* **Date/time columns always return Elixir calendar structs.** No more tuple
+  format. `smalldatetime`, `datetime`, `datetime2` return `%NaiveDateTime{}`;
+  `datetimeoffset` returns `%DateTime{}`; `date` returns `%Date{}`;
+  `time` returns `%Time{}`. The `use_elixir_calendar_types` config option
+  is ignored — struct output is always on.
+
+* **`Tds.Types.UUID` deprecated.** Use `Ecto.UUID` instead. The new
+  `Tds.Type.UUID` wire handler performs MSSQL mixed-endian byte reordering
+  at the protocol level, so `Ecto.UUID` works directly.
+
+* **`Tds.Types` module removed.** The 1815-line monolithic type module has been
+  replaced by 12 focused handler modules under `Tds.Type.*`.
+
+### New Features
+
+* **`Tds.Type` behaviour** — Pluggable type system with 7 callbacks:
+  `type_codes/0`, `type_names/0`, `decode_metadata/1`, `decode/2`,
+  `encode/2`, `param_descriptor/2`, `infer/1`.
+
+* **12 handler modules** — `Tds.Type.{Boolean, Integer, Float, Decimal, Money,
+  String, Binary, DateTime, UUID, Xml, Variant, Udt}`.
+
+* **`Tds.Type.DataReader`** — Shared framing reader with 6 strategies
+  (`:fixed`, `:bytelen`, `:shortlen`, `:longlen`, `:plp`, `:variant`).
+  PLP uses iolist accumulation (8x faster than binary concat).
+  All strategies sever sub-binary references via `:binary.copy/1` to
+  prevent memory leaks.
+
+* **`Tds.Type.Registry`** — Per-connection type registry mapping TDS type
+  codes and atom names to handlers. Supports user-provided `extra_types`
+  that override built-in handlers.
+
+* **`extra_types` connection option** — Register custom type handlers at
+  connect time: `Tds.start_link(extra_types: [MyApp.GeographyType])`.
+
+### Performance
+
+Benchmarked on Apple M4 Pro, 48 GB, Elixir 1.18.1, Erlang/OTP 27.2:
+
+* Integer decode: **54% faster** (7.12M → 10.96M ips)
+* Decimal encode (1000 params): **8.5x faster** (0.63K → 5.39K ips)
+* Decimal encode memory: **8.8x less** (1.99 MB → 226 KB per 1000 params)
+* PLP reassembly: **8x faster** at 1 MB, **7x faster** at 10 MB
+* PLP memory: **~2x less** (iolist vs binary concat)
+
+### Improvements
+
+* Decimal encoding no longer mutates `Decimal.Context` in the process
+  dictionary. Precision and scale are passed via metadata.
+* All decoded values sever sub-binary references to the TCP packet buffer,
+  preventing memory retention when values are stored in ETS or GenServer state.
+
+### Migration Guide
+
+1. **Money values**: Replace float arithmetic with `Decimal` operations.
+   `Decimal.to_float/1` is available if float is needed temporarily.
+2. **Date/time tuples**: Replace `{{y,m,d},{h,min,s}}` with
+   `~N[2013-10-12 00:37:14]` or `NaiveDateTime.new!/3`. For encoding,
+   convert tuples to calendar structs before passing as parameters.
+3. **Remove `use_elixir_calendar_types`**: Delete from your config —
+   calendar structs are now the only output format.
+4. **`Tds.Types.UUID`**: Replace with `Ecto.UUID`. If you called
+   `Tds.generate_uuid/0`, use `Ecto.UUID.bingenerate/0` instead.
+
 ## v2.3.5 (2024-01-23)
 ### Improvements
 * Removed unnecessary append of possibly large binaries for floats
@@ -324,11 +396,7 @@ could not determine if binary is of uuid type, it interpreted such values as raw
 ### Enhancements
   * Added API for ATTN call
 
-<<<<<<< HEAD
-## v0.1.5
-=======
 ## v0.1.5 - 2015-02-19
->>>>>>> 1007dc1 (Misc doc changes)
 ### Bug Fixes
   * Fixed issue where driver would not call Connection.next when setting the state to :ready
   * Fixed UCS2 Encoding

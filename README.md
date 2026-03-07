@@ -8,8 +8,6 @@ MSSQL / TDS Database driver for Elixir.
 ### NOTE:
 Since TDS version 2.0, `tds_ecto` package is deprecated, this version supports `ecto_sql` since version 3.3.4.
 
-Please check out the issues for a more complete overview. This branch should not be considered stable or ready for production yet.
-
 For stable versions always use [hex.pm](https://hex.pm/packages/tds) as source for your mix.exs.
 
 ## Usage
@@ -19,7 +17,7 @@ Add `:tds` as a dependency in your `mix.exs` file.
 ```elixir
 def deps do
   [
-    {:tds, "~> 2.3"}
+    {:tds, "~> 3.0"}
   ]
 end
 ```
@@ -151,52 +149,77 @@ This functionality requires specific environment to be developed.
 
 ## Data representation
 
-| TDS               | Elixir                                                                                     |
-| ----------------- | ------------------------------------------------------------------------------------------ |
-| NULL              | nil                                                                                        |
-| bool              | true / false                                                                               |
-| char              | "é"                                                                                        |
-| int               | 42                                                                                         |
-| float             | 42.0                                                                                       |
-| text              | "text"                                                                                     |
-| binary            | <<42>>                                                                                     |
-| numeric           | #Decimal<42.0>                                                                             |
-| date              | {2013, 10, 12} or %Date{}                                                                  |
-| time              | {0, 37, 14} or {0, 37, 14, 123456} or %Time{}                                              |
-| smalldatetime     | {{2013, 10, 12}, {0, 37, 14}} or {{2013, 10, 12}, {0, 37, 14, 123456}}                     |
-| datetime          | {{2013, 10, 12}, {0, 37, 14}} or {{2013, 10, 12}, {0, 37, 14, 123456}} or %NaiveDateTime{} |
-| datetime2         | {{2013, 10, 12}, {0, 37, 14}} or {{2013, 10, 12}, {0, 37, 14, 123456}} or %NaiveDateTime{} |
-| datetimeoffset(n) | {{2013, 10, 12}, {0, 37, 14}} or {{2013, 10, 12}, {0, 37, 14, 123456}} or %DateTime{}      |
-| uuid              | <<160,238,188,153,156,11,78,248,187,109,107,185,189,56,10,17>>                             |
+| TDS               | Elixir                 |
+| ----------------- | ---------------------- |
+| NULL              | `nil`                  |
+| bool              | `true` / `false`       |
+| char / varchar    | `"text"`               |
+| nchar / nvarchar  | `"text"`               |
+| int / bigint      | `42`                   |
+| float / real      | `42.0`                 |
+| text / ntext      | `"text"`               |
+| binary / varbinary | `<<42>>`              |
+| numeric / decimal | `#Decimal<42.0>`       |
+| money / smallmoney | `#Decimal<10.5000>`   |
+| date              | `%Date{}`              |
+| time              | `%Time{}`              |
+| smalldatetime     | `%NaiveDateTime{}`     |
+| datetime          | `%NaiveDateTime{}`     |
+| datetime2         | `%NaiveDateTime{}`     |
+| datetimeoffset(n) | `%DateTime{}`          |
+| uniqueidentifier  | `<<_::128>>`           |
+| xml               | `"<xml>...</xml>"`     |
+| sql_variant       | varies by inner type   |
 
-Currently unsupported: [User-Defined Types](https://docs.microsoft.com/en-us/sql/relational-databases/clr-integration-database-objects-user-defined-types/working-with-user-defined-types-in-sql-server), XML
+User-Defined Types (UDT) are returned as raw binary by default. Register custom
+handlers via `extra_types` to decode specific UDTs (see below).
 
 ### Dates and Times
 
-Tds can work with dates and times in either a tuple format or as Elixir calendar types. Calendar types can be enabled in the config with `config :tds, opts: [use_elixir_calendar_types: true]`.
+As of v3.0, all date/time columns are decoded as Elixir calendar structs:
 
-**Tuple forms:**
+| SQL Type            | Elixir Type          |
+| ------------------- | -------------------- |
+| `date`              | `%Date{}`            |
+| `time(n)`           | `%Time{}`            |
+| `smalldatetime`     | `%NaiveDateTime{}`   |
+| `datetime`          | `%NaiveDateTime{}`   |
+| `datetime2(n)`      | `%NaiveDateTime{}`   |
+| `datetimeoffset(n)` | `%DateTime{}`        |
 
-- Date: `{yr, mth, day}`
-- Time: `{hr, min, sec}` or `{hr, min, sec, fractional_seconds}`
-- DateTime: `{date, time}`
-- DateTimeOffset: `{utc_date, utc_time, offset_mins}`
+SQL Server `time`, `datetime2`, and `datetimeoffset` support precision 0-7.
+Elixir's `microsecond` field supports precision 0-6, so fractional seconds
+are truncated to microsecond precision when the SQL scale exceeds 6.
 
-In SQL Server, the `fractional_seconds` of a `time`, `datetime2` or `datetimeoffset(n)` column can have a precision of 0-7, where the `microsecond` field of a `%Time{}` or `%DateTime{}` struct can have a precision of 0-6.
-
-Note that the DateTimeOffset tuple expects the date and time in UTC and the offset in minutes. For example, `{{2020, 4, 5}, {5, 30, 59}, 600}` is equal to `'2020-04-05 15:30:59+10:00'`.
+The `use_elixir_calendar_types` config option from v2.x is no longer needed
+and is ignored in v3.0.
 
 ### UUIDs
 
 [MSSQL stores UUIDs in mixed-endian
-format](https://dba.stackexchange.com/a/121878), and these mixed-endian UUIDs
-are returned in [Tds.Result](https://hexdocs.pm/tds/Tds.Result.html).
+format](https://dba.stackexchange.com/a/121878) where the first three groups
+are byte-reversed (little-endian) and the last two are big-endian.
 
-To convert a mixed-endian UUID binary to a big-endian string, use
-[Tds.Types.UUID.load/1](https://hexdocs.pm/tds/Tds.Types.UUID.html#load/1)
+As of v3.0, the `Tds.Type.UUID` wire handler performs this byte reordering
+automatically at the protocol level, so `Ecto.UUID` works directly without
+any wrapper module.
 
-To convert a big-endian UUID string to a mixed-endian binary, use
-[Tds.Types.UUID.dump/1](https://hexdocs.pm/tds/Tds.Types.UUID.html#dump/1)
+`Tds.Types.UUID` is deprecated. Use `Ecto.UUID` for all UUID operations.
+
+### Custom Type Handlers
+
+Register custom type handlers via the `extra_types` connection option:
+
+```elixir
+Tds.start_link(
+  hostname: "localhost",
+  extra_types: [MyApp.GeographyType]
+)
+```
+
+Custom handlers implement the `Tds.Type` behaviour and can override built-in
+handlers for the same type codes or names. See `Tds.Type` docs for the
+callback specification.
 
 ## Contributing
 
