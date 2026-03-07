@@ -34,6 +34,7 @@ defmodule TypeBench.Fixtures do
     meta = %{
       data_reader: :shortlen,
       collation: %Tds.Protocol.Collation{codepage: :RAW},
+      encoding: :ucs2,
       length: size,
       handler: handler
     }
