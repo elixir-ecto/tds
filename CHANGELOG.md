@@ -5,6 +5,10 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## Unreleased
+### Improvements
+* Surface the last MSSQL error token alongside connection-close errors. When the server sends an error token immediately before closing the connection (login failure, fatal severity, kill-by-DBA), the token detail is preserved on the protocol state and combined with the transport-level reason in the resulting `Tds.Error`, so callers no longer see only "Connection closed." / "tcp closed".
+
 ## v2.3.8 (2026-05-18)
 ### Improvements
 * Relax decimal dependency
