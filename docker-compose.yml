@@ -9,17 +9,7 @@ services:
       MSSQL_SA_PASSWORD: "some!Password"
       MSSQL_PID: "Developer"
     healthcheck:
-      test:
-        [
-          "CMD",
-          "/opt/mssql-tools/bin/sqlcmd",
-          "-U",
-          "sa",
-          "-P",
-          "Password!",
-          "-Q",
-          "select 1",
-        ]
+      test: ["CMD-SHELL", "timeout 1 bash -c '</dev/tcp/localhost/1433'"]
       interval: 10s
       timeout: 5s
       retries: 10
@@ -32,17 +22,7 @@ services:
     platform: "linux/arm64"
     container_name: tds-mssql-arm64
     healthcheck:
-      test:
-        [
-          "CMD",
-          "/opt/mssql-tools/bin/sqlcmd",
-          "-U",
-          "sa",
-          "-P",
-          "Password!",
-          "-Q",
-          "select 1",
-        ]
+      test: ["CMD-SHELL", "timeout 1 bash -c '</dev/tcp/localhost/1433'"]
       interval: 10s
       timeout: 5s
       retries: 10
