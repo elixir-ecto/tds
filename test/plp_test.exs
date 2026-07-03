@@ -1,6 +1,5 @@
 defmodule PLPTest do
   import Tds.TestHelper
-  require Logger
   use ExUnit.Case, async: true
 
   @tag timeout: 50_000

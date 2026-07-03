@@ -1,6 +1,5 @@
 defmodule BinaryTest do
   import Tds.TestHelper
-  require Logger
   use ExUnit.Case, async: false
   alias Tds.Parameter
 

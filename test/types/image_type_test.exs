@@ -1,6 +1,5 @@
 defmodule Types.ImageTypeTest do
   import Tds.TestHelper
-  require Logger
   use ExUnit.Case, async: false
   alias Tds.Parameter
 

@@ -1,6 +1,5 @@
 defmodule TdsProtocolTest do
   import Tds.TestHelper
-  require Logger
   use ExUnit.Case, async: true
 
   @moduletag :capture_log

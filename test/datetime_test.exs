@@ -1,6 +1,5 @@
 defmodule DatetimeTest do
   import Tds.TestHelper
-  require Logger
   use ExUnit.Case, async: true
 
   alias Tds.Parameter

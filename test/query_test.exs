@@ -3,8 +3,6 @@ defmodule QueryTest do
 
   import Tds.TestHelper
 
-  require Logger
-
   @tag timeout: 50_000
 
   setup do
