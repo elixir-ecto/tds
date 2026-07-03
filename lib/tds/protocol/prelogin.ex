@@ -5,8 +5,6 @@ defmodule Tds.Protocol.Prelogin do
   See: https://docs.microsoft.com/en-us/openspecs/windows_protocols/ms-tds/60f56408-0188-4cd5-8b90-25c6f2423868
   """
   import Tds.Protocol.Grammar
-  require Logger
-
   @type state :: Tds.Protocol.t()
   @type packet_data :: iodata()
 
@@ -275,7 +273,7 @@ defmodule Tds.Protocol.Prelogin do
   defp decode_data([], _, result), do: result
 
   defp decode_data([{key, _, length} | tokens], bin, m) do
-    <<data::binary-size(length), tail::binary>> = bin
+    <<data::binary-size(^length), tail::binary>> = bin
 
     case key do
       :version ->

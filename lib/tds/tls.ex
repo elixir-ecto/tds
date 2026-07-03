@@ -2,10 +2,7 @@ defmodule Tds.Tls do
   @moduledoc false
   use GenServer
 
-  require Logger
-
   import Kernel, except: [send: 2]
-  import Tds.BinaryUtils
 
   @default_ssl_opts [active: false, cb_info: {Tds.Tls, :tcp, :tcp_closed, :tcp_error}]
 
@@ -155,7 +152,7 @@ defmodule Tds.Tls do
     expecting = size - 8
 
     case tail do
-      <<ssl_payload::binary(expecting), next_packet::binary>> ->
+      <<ssl_payload::binary-size(^expecting), next_packet::binary>> ->
         Kernel.send(pid, {:tcp, socket, ssl_payload})
         handle_info({:tcp, port, next_packet}, %{s | buffer: nil})
 
@@ -172,7 +169,7 @@ defmodule Tds.Tls do
     expecting = size - 8
 
     case tail do
-      <<ssl_payload::binary(expecting), next_packet::binary>> ->
+      <<ssl_payload::binary-size(^expecting), next_packet::binary>> ->
         Kernel.send(pid, {:tcp, socket, ssl_payload})
         handle_info({:tcp, port, next_packet}, %{s | buffer: nil})
 
@@ -187,7 +184,7 @@ defmodule Tds.Tls do
         %{socket: socket, owner_pid: pid, buffer: {slice, expecting}, handshake?: true} = s
       ) do
     case IO.iodata_to_binary([slice, bin]) do
-      <<ssl_payload::binary(expecting), next_packet::binary>> ->
+      <<ssl_payload::binary-size(^expecting), next_packet::binary>> ->
         Kernel.send(pid, {:tcp, socket, ssl_payload})
         handle_info({:tcp, port, next_packet}, %{s | buffer: nil})
 

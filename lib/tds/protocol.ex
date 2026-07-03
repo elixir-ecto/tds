@@ -921,7 +921,7 @@ defmodule Tds.Protocol do
 
   defp next_tds_pkg(pkg, buffer, more, true) do
     case pkg do
-      <<chunk::binary(more, 8), tail::binary>> ->
+      <<chunk::binary-size(^more)-unit(8), tail::binary>> ->
         {:done, [chunk | buffer], tail}
 
       <<chunk::binary>> ->
@@ -932,7 +932,7 @@ defmodule Tds.Protocol do
 
   defp next_tds_pkg(pkg, buffer, more, false) do
     case pkg do
-      <<chunk::binary(more, 8), tail::binary>> ->
+      <<chunk::binary-size(^more)-unit(8), tail::binary>> ->
         next_tds_pkg(tail, [chunk | buffer])
 
       <<chunk::binary>> ->
@@ -1015,9 +1015,6 @@ defmodule Tds.Protocol do
 
       val when val in [:low, :high, :normal] ->
         conn ++ ["SET DEADLOCK_PRIORITY #{val}; "]
-
-      nil ->
-        conn
 
       val when val in -10..10 ->
         conn ++ ["SET DEADLOCK_PRIORITY #{val}; "]

@@ -9,7 +9,6 @@ defmodule Tds.Messages do
   alias Tds.Protocol.{Login7, Prelogin}
   alias Tds.Types
 
-  require Bitwise
   require Logger
 
   # requests

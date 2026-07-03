@@ -407,7 +407,7 @@ defmodule Tds.Types do
         %{data_type: :fixed, data_type_code: data_type_code, length: length},
         <<tail::binary>>
       ) do
-    <<value_binary::binary-size(length)-unit(8), tail::binary>> = tail
+    <<value_binary::binary-size(^length)-unit(8), tail::binary>> = tail
 
     value =
       case data_type_code do
@@ -438,7 +438,7 @@ defmodule Tds.Types do
           decode_money(value_binary)
 
         _ ->
-          <<val::little-signed-size(length)-unit(8)>> = value_binary
+          <<val::little-signed-size(^length)-unit(8)>> = value_binary
           val
       end
 
@@ -506,7 +506,7 @@ defmodule Tds.Types do
 
         data_type_code == @tds_data_type_floatn ->
           len = length * 8
-          <<val::little-float-size(len), _::binary>> = data
+          <<val::little-float-size(^len), _::binary>> = data
           val
 
         data_type_code == @tds_data_type_moneyn ->
@@ -690,7 +690,7 @@ defmodule Tds.Types do
     set_decimal_precision(precision)
 
     size = byte_size(value)
-    <<value::little-size(size)-unit(8)>> = value
+    <<value::little-size(^size)-unit(8)>> = value
 
     case sign do
       0 -> Decimal.new(-1, value, -scale)
@@ -1115,7 +1115,7 @@ defmodule Tds.Types do
 
   def encode_decimal_descriptor(%Parameter{value: value} = param)
       when is_binary(value) or is_integer(value) do
-    encode_decimal_descriptor(%{param | value: Decimal.new(value)})
+    encode_decimal_descriptor(%{param | value: Decimal.new(value, max_digits: 38)})
   end
 
   def encode_decimal_descriptor(%Parameter{value: %Decimal{} = dec}) do
@@ -1137,11 +1137,6 @@ defmodule Tds.Types do
       end
 
     "decimal(#{precision}, #{scale})"
-  end
-
-  # Decimal.new/0 is undefined -- modifying params to hopefully fix
-  def encode_decimal_descriptor(%Parameter{type: :decimal, value: value} = param) do
-    encode_decimal_descriptor(%{param | value: Decimal.new(value)})
   end
 
   @doc """
@@ -1280,13 +1275,8 @@ defmodule Tds.Types do
     set_decimal_precision(38)
     precision = attr[:precision]
 
-    d =
-      value
-      |> Decimal.to_string()
-      |> Decimal.new()
-
     sign =
-      case d.sign do
+      case value.sign do
         1 -> 1
         -1 -> 0
       end
@@ -1320,7 +1310,7 @@ defmodule Tds.Types do
     do: <<0x00::little-unsigned-32>>
 
   def encode_data(@tds_data_type_decimaln = data_type, value, attr) do
-    encode_data(data_type, Decimal.new(value), attr)
+    encode_data(data_type, Decimal.new(value, max_digits: 38), attr)
   end
 
   # uuid
@@ -1429,7 +1419,7 @@ defmodule Tds.Types do
 
   def encode_plp_chunk(size, data, buf) do
     <<_t::unsigned-32, chunk_size::unsigned-32>> = <<size::unsigned-64>>
-    <<chunk::binary-size(chunk_size), data::binary>> = data
+    <<chunk::binary-size(^chunk_size), data::binary>> = data
     plp = <<chunk_size::little-unsigned-32>> <> chunk
     encode_plp_chunk(size - chunk_size, data, buf <> plp)
   end
@@ -1765,13 +1755,15 @@ defmodule Tds.Types do
   end
 
   def encode_datetimeoffset(
-        %DateTime{utc_offset: offset} = dt,
+        %DateTime{utc_offset: utc_offset, std_offset: std_offset} = dt,
         scale
       ) do
+    offset = utc_offset + std_offset
+
     {datetime, _} =
       dt
-      |> DateTime.add(-offset)
       |> DateTime.to_naive()
+      |> NaiveDateTime.add(-offset)
       |> encode_datetime2(scale)
 
     offset_min = trunc(offset / 60)
