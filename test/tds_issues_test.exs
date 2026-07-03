@@ -1,6 +1,5 @@
 defmodule TdsIssuesTest do
   import Tds.TestHelper
-  require Logger
   use ExUnit.Case, async: true
   import ExUnit.CaptureLog
 
@@ -159,6 +158,7 @@ defmodule TdsIssuesTest do
     )
   end
 
+  @tag capture_log: true
   test "should return first error from token stream then auto log the rest of errors", context do
     query("DROP TABLE test_collation1", [])
 
@@ -201,9 +201,11 @@ defmodule TdsIssuesTest do
     end
 
     # this should be error returned to as result of query execution
-    assert not (capture_log(fun) =~ "Invalid column name 'b'")
+    log = capture_log(fun)
+
+    assert not (log =~ "Invalid column name 'b'")
     # this should be logged in console
-    assert capture_log(fun) =~ "Statement(s) could not be prepared"
+    assert log =~ "Statement(s) could not be prepared"
   end
 
   test "should interprete correctly colmetadata type_info for text columns", context do

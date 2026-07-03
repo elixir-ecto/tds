@@ -5,8 +5,6 @@ defmodule Tds.TypesTest do
 
   import Tds.TestHelper
 
-  require Logger
-
   @tds_data_type_decimaln 0x6A
 
   setup do
@@ -186,7 +184,7 @@ defmodule Tds.TypesTest do
 
     @tag precision: 38, scale: 0
     test "decodes to exact value with 0 scale", context do
-      value = Decimal.new("99999999999999999999999999999999999999")
+      value = Decimal.new("99999999999999999999999999999999999999", max_digits: 38)
       assert insert_decimal(value, context) == value
     end
 
@@ -217,14 +215,14 @@ defmodule Tds.TypesTest do
     @tag precision: 38, scale: 18
     test "inserts very large decimal", context do
       # 38 digits
-      value = Decimal.new("99999999999999999999.999999999999999999")
+      value = Decimal.new("99999999999999999999.999999999999999999", max_digits: 38)
       assert insert_decimal(value, context) == value
     end
 
     @tag precision: 38, scale: 18, capture_log: true
     test "raises an error with value larger than SQL Server maximum", context do
       # 39 digits
-      value = Decimal.new("999999999999999999999.9999999999999999999")
+      value = Decimal.new("999999999999999999999.999999999999999999", max_digits: 39)
       message = ~r/size \(39\) given to the type 'decimal' exceeds the maximum allowed \(38\)/
       assert_raise(MatchError, message, fn -> insert_decimal(value, context) end)
     end

@@ -1,7 +1,6 @@
 defmodule RPCTest do
   @moduledoc false
   import Tds.TestHelper
-  require Logger
   use ExUnit.Case, async: false
   alias Tds.Parameter
 
@@ -89,9 +88,11 @@ defmodule RPCTest do
       ]
 
       Enum.each(nums, fn num ->
-        assert [[Decimal.new("#{num}")]] ==
+        value = Decimal.new("#{num}", max_digits: 38)
+
+        assert [[value]] ==
                  query("SELECT @n1", [
-                   %Parameter{name: "@n1", value: Decimal.new("#{num}")}
+                   %Parameter{name: "@n1", value: value}
                  ])
       end)
 

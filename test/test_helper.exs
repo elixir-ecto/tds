@@ -1,9 +1,8 @@
+Application.put_env(:tzdata, :autoupdate, :disabled)
 Application.ensure_all_started(:tzdata)
 
 defmodule Tds.TestHelper do
   alias Tds.Connection
-
-  require Logger
 
   def opts do
     [
