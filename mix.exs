@@ -8,12 +8,12 @@ defmodule Tds.Mixfile do
     [
       app: :tds,
       version: @version,
-      elixir: "~> 1.11",
+      elixir: "~> 1.12",
       name: "Tds",
       deps: deps(),
       docs: docs(),
       package: package(),
-      xref: [exclude: [:ssl]],
+      elixirc_options: [no_warn_undefined: [:ssl]],
       rustler_crates: [
         tds_encoding: [
           mode: if(Mix.env() == :prod, do: :release, else: :debug)
@@ -33,12 +33,16 @@ defmodule Tds.Mixfile do
 
   defp deps do
     [
-      {:decimal, "~> 1.9 or ~> 2.0 or ~> 3.0"},
+      {:decimal, "~> 3.1"},
       {:jason, "~> 1.0", optional: true},
       {:db_connection, "~> 2.1"},
       {:ex_doc, "~> 0.40.1", only: :dev, runtime: false, warn_if_outdated: true},
       {:excoding, "~> 0.1", optional: true, only: :test},
-      {:tzdata, "~> 1.0", optional: true, only: :test},
+      {:tzdata,
+       git: "https://github.com/yaglo/tzdata.git",
+       branch: "update-hackney-4-elixir-1-20",
+       only: :test,
+       runtime: false},
       {:table, "~> 0.1.0", optional: true},
       {:credo, "~> 1.7", only: [:dev, :test], runtime: false}
     ]
