@@ -2,7 +2,7 @@ defmodule Tds.Protocol do
   @moduledoc """
   Implements DBConnection behaviour for TDS protocol.
   """
-  alias Tds.{Parameter, Query}
+  alias Tds.{Instance, Parameter, Query}
   import Tds.{BinaryUtils, Messages, Utils}
   require Logger
   use DBConnection
@@ -78,9 +78,20 @@ defmodule Tds.Protocol do
         connect(opts, s)
 
       _instance ->
-        case instance(opts, s) do
-          {:ok, s} -> connect(opts, s)
-          err -> {:error, err}
+        case Instance.resolve_port(opts) do
+          {:ok, port} ->
+            connect(opts, %{s | itcp: port})
+
+          {:fallback, port, instance_error} ->
+            Logger.warning(
+              "SQL Server Browser instance lookup failed; falling back to TCP port #{port}: " <>
+                Exception.message(instance_error)
+            )
+
+            connect(opts, %{s | itcp: port})
+
+          {:error, error} ->
+            {:error, error}
         end
     end
   end
@@ -335,21 +346,6 @@ defmodule Tds.Protocol do
 
   # CONNECTION
 
-  defp instance(opts, s) do
-    host = Keyword.fetch!(opts, :hostname)
-    host = if is_binary(host), do: String.to_charlist(host), else: host
-
-    case :gen_udp.open(0, [:binary, {:active, false}, {:reuseaddr, true}]) do
-      {:ok, sock} ->
-        :gen_udp.send(sock, host, 1434, <<3>>)
-        {:ok, msg} = :gen_udp.recv(sock, 0)
-        parse_udp(msg, %{s | opts: opts, usock: sock})
-
-      {:error, error} ->
-        {:error, %Tds.Error{message: "udp connect: #{error}"}}
-    end
-  end
-
   defp connect(opts, s) do
     host = Keyword.fetch!(opts, :hostname)
     host = if is_binary(host), do: String.to_charlist(host), else: host
@@ -382,46 +378,6 @@ defmodule Tds.Protocol do
 
       {:error, error} ->
         {:error, %Tds.Error{message: "tcp connect: #{error}"}}
-    end
-  end
-
-  defp parse_udp(
-         {_, 1434, <<_head::binary-3, data::binary>>},
-         %{opts: opts, usock: sock} = s
-       ) do
-    :gen_udp.close(sock)
-
-    server =
-      data
-      |> String.split(";;")
-      |> Enum.drop(-1)
-      |> Enum.reduce([], fn str, acc ->
-        server =
-          str
-          |> String.split(";")
-          |> Enum.chunk_every(2)
-          |> Enum.reduce([], fn [k, v], acc ->
-            k =
-              k
-              |> String.downcase()
-              |> String.to_atom()
-
-            Keyword.put_new(acc, k, v)
-          end)
-
-        [server | acc]
-      end)
-      |> Enum.find(fn s ->
-        String.downcase(s[:instancename]) == String.downcase(opts[:instance])
-      end)
-
-    case server do
-      nil ->
-        {:error, %Tds.Error{message: "Instance #{opts[:instance]} not found"}}
-
-      serv ->
-        {port, _} = Integer.parse(serv[:tcp])
-        {:ok, %{s | opts: opts, itcp: port, usock: nil}}
     end
   end
 
