@@ -18,6 +18,7 @@ defmodule Tds.Instance do
       {:error, %Tds.Error{} = instance_error} ->
         case fallback_port(opts) do
           {:ok, port} -> {:fallback, port, instance_error}
+          :none -> {:error, instance_error}
           {:error, %Tds.Error{} = fallback_error} -> {:error, fallback_error}
         end
     end
@@ -214,9 +215,16 @@ defmodule Tds.Instance do
   end
 
   defp fallback_port(opts) do
-    opts
-    |> Keyword.get(:port, System.get_env("MSSQLPORT") || 1433)
-    |> normalize_port("SQL Server fallback port")
+    case Keyword.fetch(opts, :port) do
+      {:ok, port} ->
+        normalize_port(port, "SQL Server fallback port")
+
+      :error ->
+        case System.get_env("MSSQLPORT") do
+          nil -> :none
+          port -> normalize_port(port, "SQL Server fallback port")
+        end
+    end
   end
 
   defp normalize_port(port, _label) when is_integer(port) and port in 1..65_535 do

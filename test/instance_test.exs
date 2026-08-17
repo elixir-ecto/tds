@@ -81,6 +81,21 @@ defmodule Tds.InstanceTest do
     assert_receive {:udp_close, :test_socket}
   end
 
+  test "returns the discovery error when no fixed fallback port is configured" do
+    Tds.TestUdp.configure(recv: {:error, :timeout})
+
+    assert {:error, %Tds.Error{message: message}} =
+             Instance.resolve_port(
+               hostname: "db.internal",
+               instance: "SQLUTF",
+               instance_timeout: 10,
+               instance_udp_module: Tds.TestUdp
+             )
+
+    assert message =~ "timed out after 10ms"
+    assert_receive {:udp_close, :test_socket}
+  end
+
   test "handles an udp open error without attempting send or close" do
     Tds.TestUdp.configure(open: {:error, :eacces})
 
