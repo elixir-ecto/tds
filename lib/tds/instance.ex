@@ -106,10 +106,11 @@ defmodule Tds.Instance do
   end
 
   defp parse_response(
-         {_address, source_port, <<5, _length::little-16, data::binary>>},
+         {_address, source_port, <<5, declared_length::little-16, data::binary>>},
          source_port,
          instance
-       ) do
+       )
+       when declared_length == byte_size(data) do
     parse_instances(data, instance)
   end
 
