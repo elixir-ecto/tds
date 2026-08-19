@@ -142,6 +142,105 @@ defmodule QueryTest do
     assert [[1]] = query("SELECT 1", [])
   end
 
+  test "query returns Tds.Error with MSSQL error metadata on unique violation", context do
+    query("DROP TABLE UniqueBangTable", [])
+
+    assert :ok =
+             query(
+               "CREATE TABLE UniqueBangTable (id INT, email NVARCHAR(100), " <>
+                 "CONSTRAINT UQ_UniqueBangTable_email UNIQUE (email))",
+               []
+             )
+
+    assert :ok = query("INSERT INTO UniqueBangTable (id, email) VALUES (1, 'foo@bar.com')", [])
+
+    err = query("INSERT INTO UniqueBangTable (id, email) VALUES (2, 'foo@bar.com')", [])
+    assert %{number: 2627, msg_text: msg} = err.mssql
+    assert msg =~ "UQ_UniqueBangTable_email"
+
+    query("DROP TABLE dbo.UniqueBangTable", [])
+  end
+
+  test "query! re-raises Tds.Error preserving MSSQL error metadata", context do
+    pid = context[:pid]
+
+    query("DROP TABLE UniqueBangTable2", [])
+
+    assert :ok =
+             query(
+               "CREATE TABLE UniqueBangTable2 (id INT, email NVARCHAR(100), " <>
+                 "CONSTRAINT UQ_UniqueBangTable2_email UNIQUE (email))",
+               []
+             )
+
+    assert :ok = query("INSERT INTO UniqueBangTable2 (id, email) VALUES (1, 'foo@bar.com')", [])
+
+    err =
+      try do
+        Tds.query!(pid, "INSERT INTO UniqueBangTable2 (id, email) VALUES (2, 'foo@bar.com')", [])
+        flunk("expected Tds.Error to be raised")
+      rescue
+        e in Tds.Error -> e
+      end
+
+    assert %{number: 2627, msg_text: msg} = err.mssql
+    assert msg =~ "UQ_UniqueBangTable2_email"
+
+    query("DROP TABLE dbo.UniqueBangTable2", [])
+  end
+
+  test "prepare! re-raises Tds.Error preserving MSSQL error metadata", context do
+    pid = context[:pid]
+
+    err =
+      try do
+        Tds.prepare!(pid, "SELECT * FROM UniqueBangPrepareMissingTable", [])
+        flunk("expected Tds.Error to be raised")
+      rescue
+        e in Tds.Error -> e
+      end
+
+    assert %{number: 208, msg_text: msg} = err.mssql
+    assert msg =~ "UniqueBangPrepareMissingTable"
+  end
+
+  test "execute! re-raises Tds.Error preserving MSSQL error metadata on unique violation",
+       context do
+    pid = context[:pid]
+
+    query("DROP TABLE UniqueBangExecuteTable", [])
+
+    assert :ok =
+             query(
+               "CREATE TABLE UniqueBangExecuteTable (id INT, email NVARCHAR(100), " <>
+                 "CONSTRAINT UQ_UniqueBangExecuteTable_email UNIQUE (email))",
+               []
+             )
+
+    assert :ok =
+             query("INSERT INTO UniqueBangExecuteTable (id, email) VALUES (1, 'foo@bar.com')", [])
+
+    {:ok, q} =
+      Tds.prepare(
+        pid,
+        "INSERT INTO UniqueBangExecuteTable (id, email) VALUES (2, 'foo@bar.com')",
+        []
+      )
+
+    err =
+      try do
+        Tds.execute!(pid, q, [], [])
+        flunk("expected Tds.Error to be raised")
+      rescue
+        e in Tds.Error -> e
+      end
+
+    assert %{number: 2627, msg_text: msg} = err.mssql
+    assert msg =~ "UQ_UniqueBangExecuteTable_email"
+
+    query("DROP TABLE dbo.UniqueBangExecuteTable", [])
+  end
+
   test "char nulls", context do
     assert [[nil]] = query("SELECT CAST(NULL as nvarchar(255))", [])
   end
