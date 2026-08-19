@@ -241,6 +241,24 @@ defmodule QueryTest do
     query("DROP TABLE dbo.UniqueBangExecuteTable", [])
   end
 
+  test "close! re-raises Tds.Error preserving MSSQL error metadata", context do
+    pid = context[:pid]
+
+    {:ok, q} = Tds.prepare(pid, "SELECT 1", [])
+    assert %Tds.Result{} = Tds.close!(pid, q, [])
+
+    err =
+      try do
+        Tds.close!(pid, q, [])
+        flunk("expected Tds.Error to be raised")
+      rescue
+        e in Tds.Error -> e
+      end
+
+    assert %{number: 8179, msg_text: msg} = err.mssql
+    assert msg =~ "Could not find prepared statement"
+  end
+
   test "char nulls", context do
     assert [[nil]] = query("SELECT CAST(NULL as nvarchar(255))", [])
   end
