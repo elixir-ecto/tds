@@ -25,7 +25,7 @@ jobs:
         mssql:
           - version: "mssql/server:2017-latest"
           - version:  "mssql/server:2022-latest"
-          - version: "mssql/server:2024-latest"
+          - version: "mssql/server:2025-latest"
           - version: "azure-sql-edge:latest"
         pair:
           - otp: 24.3
