@@ -24,7 +24,6 @@ jobs:
       matrix:
         mssql:
           - version: "mssql/server:2017-latest"
-          - version:  "mssql/server:2022-latest"
           - version: "mssql/server:2025-latest"
           - version: "azure-sql-edge:latest"
         pair:
@@ -32,17 +31,11 @@ jobs:
             elixir: 1.14.3
         include:
           - mssql:
-              version: "mssql/server:2022-latest"
+              version: "mssql/server:2025-latest"
             pair:
               otp: 25.3
               elixir: 1.18.4
             lint: lint
-          - mssql:
-              version: "mssql/server:2022-latest"
-            pair:
-              otp: 24.3
-              elixir: 1.14.3
-            lint: skip_lint
 
     env:
       ACCEPT_EULA: Y
