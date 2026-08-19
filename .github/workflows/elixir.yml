@@ -43,37 +43,6 @@ jobs:
       GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
     steps:
-      - name: Install MSSql Client Tools
-        timeout-minutes: 10
-        run: |
-          curl --max-time 60 -sSL https://packages.microsoft.com/keys/microsoft.asc \
-            | sudo gpg --dearmor --yes -o /usr/share/keyrings/microsoft-prod.gpg
-          echo "deb [arch=amd64,arm64,armhf signed-by=/usr/share/keyrings/microsoft-prod.gpg] https://packages.microsoft.com/ubuntu/22.04/prod jammy main" \
-            | sudo tee /etc/apt/sources.list.d/mssql-release.list
-          # Refresh only the Microsoft repo: a full `apt-get update` also downloads the
-          # large Ubuntu archive indexes, which stall mid-transfer on runner network
-          # flakes. pkill first clears any apt-get orphaned by a watchdog kill, since
-          # it keeps holding the lists lock and would fail every retry. Ubuntu-side
-          # dependencies (unixodbc, libkrb5, openssl) ship with the runner image.
-          apt_ok=0
-          for i in 1 2 3; do
-            sudo pkill -9 apt-get 2>/dev/null || true
-            if timeout --kill-after=10 90 sudo apt-get update \
-              -o Dir::Etc::sourcelist=sources.list.d/mssql-release.list \
-              -o Dir::Etc::sourceparts=/dev/null \
-              -o APT::Get::List-Cleanup=0; then
-              apt_ok=1
-              break
-            fi
-            echo "apt-get update attempt $i/3 failed; retrying in 5s"
-            sleep 5
-          done
-          if [ "$apt_ok" -ne 1 ]; then
-            echo "::error::apt-get update failed after 3 attempts"
-            exit 1
-          fi
-          timeout --kill-after=10 120 sudo apt-get install mssql-tools18
-
       - uses: actions/checkout@eef61447b9ff4aafe5dcd4e0bbf5d482be7e7871  # v4.2.1
 
       - name: Setup elixir
@@ -106,6 +75,4 @@ jobs:
         if: ${{ matrix.lint == 'lint' }}
 
       - name: Run Tests
-        run: |
-          export PATH=/opt/mssql-tools18/bin:$PATH
-          mix test
+        run: mix test
