@@ -225,7 +225,7 @@ defmodule Tds.Protocol do
           | {:error | :disconnect, Exception.t(), new_state :: t()}
   def handle_close(query, opts, s) do
     params = opts[:parameters]
-    send_close(query, params, s)
+    send_close(query, params, %{s | state: :executing})
   end
 
   @spec handle_begin(Keyword.t(), t) ::

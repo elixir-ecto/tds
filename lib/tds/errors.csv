@@ -1,4 +1,4 @@
-unique,2627,Violation of UNIQUE KEY constraint '%.*ls'\..*
+unique,2627,Violation of UNIQUE KEY constraint '(\S+?)'\..*
 unique,2627,Verletzung der UNIQUE KEY-Einschränkung "(\S+?)"\..*
 unique,2627,Violation de la contrainte UNIQUE KEY « (\S+?) »\..*
 unique,2627,制約 '(\S+?)' の UNIQUE KEY 違反.*

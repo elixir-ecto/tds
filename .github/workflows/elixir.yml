@@ -24,24 +24,18 @@ jobs:
       matrix:
         mssql:
           - version: "mssql/server:2017-latest"
-          - version:  "mssql/server:2022-latest"
+          - version: "mssql/server:2025-latest"
           - version: "azure-sql-edge:latest"
         pair:
           - otp: 24.3
             elixir: 1.14.3
         include:
           - mssql:
-              version: "mssql/server:2022-latest"
+              version: "mssql/server:2025-latest"
             pair:
               otp: 25.3
               elixir: 1.18.4
             lint: lint
-          - mssql:
-              version: "mssql/server:2022-latest"
-            pair:
-              otp: 24.3
-              elixir: 1.14.3
-            lint: skip_lint
 
     env:
       ACCEPT_EULA: Y
@@ -49,15 +43,7 @@ jobs:
       GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
     steps:
-      - name: Install MSSql Client Tools
-        run: |
-          sudo rm -f /etc/apt/sources.list.d/microsoft-prod.list
-          curl https://packages.microsoft.com/keys/microsoft.asc | sudo gpg --batch --yes --dearmor -o /usr/share/keyrings/microsoft-prod.gpg
-          echo "deb [signed-by=/usr/share/keyrings/microsoft-prod.gpg arch=amd64,arm64,armhf] https://packages.microsoft.com/ubuntu/22.04/prod jammy main" | sudo tee /etc/apt/sources.list.d/mssql-release.list
-          sudo apt-get update
-          sudo ACCEPT_EULA=Y apt-get install -y mssql-tools18 unixodbc-dev
-
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@eef61447b9ff4aafe5dcd4e0bbf5d482be7e7871  # v4.2.1
 
       - name: Setup elixir
         uses: erlef/setup-beam@v1
@@ -89,6 +75,4 @@ jobs:
         if: ${{ matrix.lint == 'lint' }}
 
       - name: Run Tests
-        run: |
-          export PATH=/opt/mssql-tools18/bin:$PATH
-          mix test
+        run: mix test
