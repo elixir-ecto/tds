@@ -13,6 +13,16 @@ defmodule ErrorTest do
     end
   end
 
+  test "combines :message and :mssql when both are populated" do
+    error = %Tds.Error{
+      message: "Connection closed.",
+      mssql: %{line_number: 1, number: 18_456, msg_text: "Login failed for user 'sa'"}
+    }
+
+    assert Tds.Error.message(error) ==
+             "Connection closed. Line 1 (Error 18456): Login failed for user 'sa'"
+  end
+
   test "raises a Tds.Error with a default message as a fallback" do
     # no arguments
     assert_raise Tds.Error, "An error occured.", fn ->

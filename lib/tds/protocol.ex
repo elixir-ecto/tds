@@ -42,7 +42,8 @@ defmodule Tds.Protocol do
           result: nil | list(),
           query: nil | String.t(),
           transaction: transaction,
-          env: env
+          env: env,
+          last_mssql_error: nil | Tds.Error.error_details()
         }
 
   defstruct sock: nil,
@@ -59,7 +60,8 @@ defmodule Tds.Protocol do
               savepoint: 0,
               collation: %Tds.Protocol.Collation{},
               packetsize: 4096
-            }
+            },
+            last_mssql_error: nil
 
   @spec connect(opts :: Keyword.t()) :: {:ok, state :: t()} | {:error, Exception.t()}
   def connect(opts) do
@@ -100,7 +102,7 @@ defmodule Tds.Protocol do
         {:ok, s}
 
       {:disconnect, :closed, s} ->
-        {:disconnect, %Tds.Error{message: "Connection closed."}, s}
+        {:disconnect, disconnect_error("Connection closed.", s), s}
 
       {:error, err, s} ->
         err =
@@ -126,6 +128,7 @@ defmodule Tds.Protocol do
 
   def checkout(%{sock: {mod, _sock}} = s) do
     sock_mod = inspect(mod)
+    s = %{s | last_mssql_error: nil}
 
     case setopts(s.sock, active: false) do
       :ok ->
@@ -460,11 +463,11 @@ defmodule Tds.Protocol do
   end
 
   def handle_info({tag, _}, s) when tag in [:tcp_closed, :ssl_closed] do
-    {:stop, Tds.Error.exception("tcp closed"), s}
+    {:stop, disconnect_error("tcp closed", s), s}
   end
 
   def handle_info({tag, _, reason}, s) when tag in [:tcp_error, :ssl_error] do
-    {:stop, Tds.Error.exception("tcp error: #{reason}"), s}
+    {:stop, disconnect_error("tcp error: #{reason}", s), s}
   end
 
   def handle_info(msg, s) do
@@ -505,10 +508,10 @@ defmodule Tds.Protocol do
         {:ok, s}
 
       {:tcp_closed, ^sock} ->
-        {:disconnect, %Tds.Error{message: "tcp closed"}, s}
+        {:disconnect, disconnect_error("tcp closed", s), s}
 
       {:tcp_error, ^sock, reason} ->
-        {:disconnect, %Tds.Error{message: "tcp error: #{reason}"}, s}
+        {:disconnect, disconnect_error("tcp error: #{reason}", s), s}
     after
       0 ->
         # There might not be any socket messages.
@@ -796,7 +799,7 @@ defmodule Tds.Protocol do
   ## Error
   def message(_, msg_error(error: e), %{} = s) do
     error = %Tds.Error{mssql: e}
-    {:error, error, mark_ready(s)}
+    {:error, error, mark_ready(%{s | last_mssql_error: e})}
   end
 
   ## ATTN Ack
@@ -808,6 +811,15 @@ defmodule Tds.Protocol do
 
   defp mark_ready(%{state: _} = s) do
     %{s | state: :ready}
+  end
+
+  @spec disconnect_error(String.t(), t()) :: Tds.Error.t()
+  defp disconnect_error(message, %__MODULE__{last_mssql_error: nil}) do
+    %Tds.Error{message: message}
+  end
+
+  defp disconnect_error(message, %__MODULE__{last_mssql_error: %{} = mssql}) do
+    %Tds.Error{message: message, mssql: mssql}
   end
 
   # Send Command To Sql Server
@@ -866,9 +878,7 @@ defmodule Tds.Protocol do
 
       {:error, error} ->
         {:disconnect,
-         %Tds.Error{
-           message: "Connection failed to receive packet due #{inspect(error)}"
-         }, s}
+         disconnect_error("Connection failed to receive packet due #{inspect(error)}", s), s}
     end
   catch
     {:error, error} -> {:disconnect, error, s}

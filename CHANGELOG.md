@@ -5,6 +5,11 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+
+## Unreleased
+### Improvements
+* Surface the last MSSQL error token alongside connection-close errors. When the server sends an error token immediately before closing the connection (login failure, fatal severity, kill-by-DBA), the token detail is preserved on the protocol state and combined with the transport-level reason in the resulting `Tds.Error`, so callers no longer see only "Connection closed." / "tcp closed".
+
 ## v2.4.0 (2026-08-19)
 ### Fixes
 * Fix `unique_constraint` support in Ecto for en-US error messages: MSSQL error metadata is now preserved when re-raising from `query!/4`, `prepare!/3`, `execute!/4` and `close!/2` (#173)
@@ -334,11 +339,7 @@ could not determine if binary is of uuid type, it interpreted such values as raw
 ### Enhancements
   * Added API for ATTN call
 
-<<<<<<< HEAD
-## v0.1.5
-=======
 ## v0.1.5 - 2015-02-19
->>>>>>> 1007dc1 (Misc doc changes)
 ### Bug Fixes
   * Fixed issue where driver would not call Connection.next when setting the state to :ready
   * Fixed UCS2 Encoding

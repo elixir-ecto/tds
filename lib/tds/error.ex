@@ -5,8 +5,13 @@ defmodule Tds.Error do
   The struct has two fields:
 
   * `:message`: expected to be a string
-  * `:mssql`: expected to be a keyword list with the fields `line_number`,
-              `number` and `msg_text`
+  * `:mssql`: expected to be a map carrying the fields decoded from a
+              SQL Server error token: `number`, `state`, `class`, `msg_text`,
+              `server_name`, `proc_name`, and `line_number`
+
+  When both fields are populated — for example, when a connection-close is
+  preceded by a server-side error token — `message/1` combines them so the
+  underlying server error is surfaced alongside the transport-level reason.
 
   ## Usage
 
@@ -21,8 +26,16 @@ defmodule Tds.Error do
 
   """
 
-  @type error_details :: %{line_number: integer(), number: integer(), msg_text: String.t()}
-  @type t :: %__MODULE__{message: String.t(), mssql: error_details}
+  @type error_details :: %{
+          optional(:state) => integer(),
+          optional(:class) => integer(),
+          optional(:server_name) => String.t(),
+          optional(:proc_name) => String.t(),
+          required(:line_number) => integer(),
+          required(:number) => integer(),
+          required(:msg_text) => String.t()
+        }
+  @type t :: %__MODULE__{message: String.t() | nil, mssql: error_details | nil}
 
   defexception [:message, :mssql]
 
@@ -45,8 +58,13 @@ defmodule Tds.Error do
   end
 
   @spec message(%__MODULE__{}) :: String.t()
+  def message(%__MODULE__{mssql: mssql, message: message})
+      when is_map(mssql) and is_binary(message) do
+    "#{message} Line #{mssql.line_number} (Error #{mssql.number}): #{mssql.msg_text}"
+  end
+
   def message(%__MODULE__{mssql: mssql}) when is_map(mssql) do
-    "Line #{mssql[:line_number]} (Error #{mssql[:number]}): #{mssql[:msg_text]}"
+    "Line #{mssql.line_number} (Error #{mssql.number}): #{mssql.msg_text}"
   end
 
   def message(%__MODULE__{message: message}) when is_binary(message) do
