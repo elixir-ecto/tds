@@ -47,7 +47,8 @@ defmodule Tds.Tokens do
     {token_data, tail, collmetadata} =
       case token do
         0x81 -> decode_colmetadata(tail, collmetadata)
-        # 0xA5 -> decode_colinfo(tail, collmetadata)
+        0xA4 -> decode_tabname(tail, collmetadata)
+        0xA5 -> decode_colinfo(tail, collmetadata)
         0xFD -> decode_done(tail, collmetadata)
         0xFE -> decode_doneproc(tail, collmetadata)
         0xFF -> decode_doneinproc(tail, collmetadata)
@@ -494,6 +495,20 @@ defmodule Tds.Tokens do
 
   defp decode_column_order(<<col_id::little-unsigned-16, tail::binary>>, n, acc) do
     decode_column_order(tail, n - 1, [col_id | acc])
+  end
+
+  defp decode_tabname(
+         <<length::little-unsigned-16, _data::binary-size(length), tail::binary>>,
+         collmetadata
+       ) do
+    {{:tabname, :ok}, tail, collmetadata}
+  end
+
+  defp decode_colinfo(
+         <<length::little-unsigned-16, _data::binary-size(length), tail::binary>>,
+         collmetadata
+       ) do
+    {{:colinfo, :ok}, tail, collmetadata}
   end
 
   ## Row and Column Decoders

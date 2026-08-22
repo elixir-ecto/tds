@@ -170,6 +170,12 @@ defmodule Tds do
     DBConnection.transaction(conn, fun, opts)
   end
 
+  @spec stream(conn, iodata, list, [execute_option]) :: DBConnection.Stream.t()
+  def stream(conn, statement, params \\ [], opts \\ []) do
+    query = %Query{statement: statement}
+    DBConnection.stream(conn, query, params, opts)
+  end
+
   @spec rollback(DBConnection.t(), reason :: any) :: no_return
   defdelegate rollback(conn, any), to: DBConnection
 

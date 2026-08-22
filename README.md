@@ -54,6 +54,100 @@ iex> Tds.query!(pid, "INSERT INTO MyTable (MyColumn) VALUES (@my_value)",
 
 * Automatic decoding and encoding of Elixir values to and from MSSQL's binary format
 * Support of TDS Versions 7.3, 7.4
+* Streaming/cursor support via `Tds.stream/4` and `DBConnection.stream/4`
+
+## Streaming
+
+Tds supports streaming large result sets using SQL Server server-side cursors. This allows you to process rows in batches without loading the entire result set into memory. Streaming requires an active transaction since SQL Server cursors must operate within a transaction context.
+
+### Basic Usage
+
+```elixir
+Tds.transaction(pid, fn conn ->
+  stream = Tds.stream(conn, "SELECT id, name FROM users ORDER BY id", [])
+  results = Enum.to_list(stream)
+
+  # Process each batch
+  for %Tds.Result{rows: rows} <- results do
+    for row <- rows do
+      IO.inspect(row)
+    end
+  end
+end)
+```
+
+### Chunked Streaming with `max_rows`
+
+Control the number of rows fetched per batch with the `:max_rows` option (defaults to 500):
+
+```elixir
+Tds.transaction(pid, fn conn ->
+  stream = Tds.stream(conn, "SELECT id, name FROM users ORDER BY id", [], max_rows: 100)
+  results = Enum.to_list(stream)
+end)
+```
+
+### Parameterized Queries
+
+Streaming works with parameterized queries. When parameters are provided, Tds automatically uses `PARAMETERIZED_STMT` mode for the cursor:
+
+```elixir
+Tds.transaction(pid, fn conn ->
+  stream = Tds.stream(
+    conn,
+    "SELECT id, name FROM users WHERE id > @1 ORDER BY id",
+    [%Tds.Parameter{name: "@1", type: :integer, value: 100}]
+  )
+  results = Enum.to_list(stream)
+end)
+```
+
+### Using `DBConnection.stream/4` Directly
+
+You can also use the `DBConnection.stream/4` function with a prepared query:
+
+```elixir
+Tds.transaction(pid, fn conn ->
+  {:ok, query} = Tds.prepare(conn, "SELECT id FROM users ORDER BY id")
+  stream = DBConnection.stream(conn, query, [], max_rows: 100)
+  results = Enum.to_list(stream)
+  # ...
+end)
+```
+
+### Lazy Enumeration with `Stream.map`
+
+Use `Stream.map` to process rows lazily without loading all batches:
+
+```elixir
+Tds.transaction(pid, fn conn ->
+  stream = Tds.stream(conn, "SELECT id FROM users ORDER BY id", [], max_rows: 50)
+  stream
+  |> Stream.map(fn %Tds.Result{rows: rows} -> rows end)
+  |> Enum.take(3)  # Only processes the first 3 batches
+end)
+```
+
+### Ecto Integration
+
+When using `Ecto.Adapters.Tds` (from `ecto_sql`), `Repo.stream/2` works out of the box since it delegates to `DBConnection.stream/4`:
+
+```elixir
+Repo.transaction(fn ->
+  Repo.stream(User, max_rows: 500)
+  |> Enum.to_list()
+end)
+```
+
+### Technical Details
+
+Streaming is implemented via the TDS cursor stored procedures:
+
+- `sp_cursoropen` (ProcID 2) — Opens a FORWARD_ONLY, READ_ONLY cursor
+- `sp_cursorfetch` (ProcID 7) — Fetches the next batch of rows (NEXT fetch type)
+- `sp_cursorclose` (ProcID 9) — Closes and deallocates the cursor
+
+For parameterized queries, the cursor uses `PARAMETERIZED_STMT` mode (scrollopt flag `0x1004`) which allows passing query parameters via `@params` (similar to `sp_executesql`).
 
 ## Configuration
 

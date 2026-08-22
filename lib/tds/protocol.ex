@@ -310,8 +310,41 @@ defmodule Tds.Protocol do
         ) ::
           {:cont | :halt, Tds.Result.t(), new_state :: t()}
           | {:error | :disconnect, Exception.t(), new_state :: t()}
-  def handle_fetch(_query, _cursor, _opts, state) do
-    {:error, Tds.Error.exception("Cursor is not supported by TDS"), state}
+  def handle_fetch(_query, cursor, opts, %{sock: _sock} = s) do
+    fetch_type = Keyword.get(opts, :fetch_type, 2)
+    max_rows = Keyword.get(opts, :max_rows, 500)
+
+    params = [
+      %Tds.Parameter{name: "@cursor", type: :integer, direction: :input, value: cursor},
+      %Tds.Parameter{name: "@fetchtype", type: :integer, direction: :input, value: fetch_type},
+      %Tds.Parameter{name: "@rownum", type: :integer, direction: :input, value: 0},
+      %Tds.Parameter{name: "@nrows", type: :integer, direction: :input, value: max_rows}
+    ]
+
+    msg = msg_rpc(proc: :sp_cursorfetch, params: params)
+
+    Process.put(:resultset, false)
+
+    s = %{s | state: :executing}
+
+    case msg_send(msg, s) do
+      {:ok, %{result: %Tds.Result{num_rows: 0}} = s} ->
+        {:halt, %Tds.Result{columns: [], rows: [], num_rows: 0}, s}
+
+      {:ok, %{result: %Tds.Result{} = result} = s} ->
+        {:cont, result, s}
+
+      {:error, err, %{transaction: :started} = s} ->
+        {:error, err, %{s | transaction: :failed}}
+
+      {:error, err, s} ->
+        {:error, err, s}
+    end
+  rescue
+    exception ->
+      {:error, exception, s}
+  after
+    Process.delete(:resultset)
   end
 
   @spec handle_deallocate(
@@ -322,16 +355,122 @@ defmodule Tds.Protocol do
         ) ::
           {:ok, Tds.Result.t(), new_state :: t()}
           | {:error | :disconnect, Exception.t(), new_state :: t()}
-  def handle_deallocate(_query, _cursor, _opts, state) do
-    {:error, Tds.Error.exception("Cursor operations are not supported in TDS"), state}
+  def handle_deallocate(_query, cursor, _opts, %{sock: _sock} = s) do
+    params = [
+      %Tds.Parameter{name: "@cursor", type: :integer, direction: :input, value: cursor}
+    ]
+
+    msg = msg_rpc(proc: :sp_cursorclose, params: params)
+
+    s = %{s | state: :executing}
+
+    case msg_send(msg, s) do
+      {:ok, %{result: result} = s} ->
+        {:ok, result, %{s | state: :ready}}
+
+      {:error, err, %{transaction: :started} = s} ->
+        {:error, err, %{s | transaction: :failed}}
+
+      {:error, err, s} ->
+        {:error, err, s}
+    end
   end
 
   @spec handle_declare(Query.t(), params :: any, opts :: Keyword.t(), state :: t) ::
           {:ok, Query.t(), cursor :: any, new_state :: t}
           | {:error | :disconnect, Exception.t(), new_state :: t}
-  def handle_declare(_query, _params, _opts, state) do
-    {:error, Tds.Error.exception("Cursor operations are not supported in TDS"), state}
+  def handle_declare(%Query{statement: statement} = query, params, opts, %{sock: _sock} = s) do
+    resultset? = Keyword.get(opts, :resultset, false)
+
+    prepared_params = Tds.Parameter.prepared_params(params)
+
+    cursor_param = %Tds.Parameter{
+      name: "@cursor",
+      type: :integer,
+      direction: :output,
+      value: nil
+    }
+
+    scrollopt =
+      if prepared_params != "" do
+        0x1004
+      else
+        0x0004
+      end
+
+    rpc_params =
+      [
+        cursor_param,
+        %Tds.Parameter{
+          name: "@stmt",
+          type: :string,
+          direction: :input,
+          value: statement
+        },
+        %Tds.Parameter{
+          name: "@scrollopt",
+          type: :integer,
+          direction: :input,
+          value: scrollopt
+        },
+        %Tds.Parameter{
+          name: "@ccopt",
+          type: :integer,
+          direction: :input,
+          value: 0x2001
+        },
+        %Tds.Parameter{
+          name: "@rowcount",
+          type: :integer,
+          direction: :output,
+          value: nil
+        }
+      ] ++
+        if prepared_params != "" do
+          [
+            %Tds.Parameter{
+              name: "@params",
+              type: :string,
+              direction: :input,
+              value: prepared_params
+            }
+          ] ++ Tds.Parameter.prepare_params(params)
+        else
+          []
+        end
+
+    msg = msg_rpc(proc: :sp_cursoropen, params: rpc_params)
+
+    Process.put(:resultset, resultset?)
+
+    case msg_send(msg, %{s | state: :executing}) do
+      {:ok, %{result: %Tds.Result{} = result} = s} ->
+        Process.delete(:resultset)
+        cursor_handle = extract_cursor_handle(result)
+        {:ok, query, cursor_handle, %{s | state: :ready}}
+
+      {:error, err, %{transaction: :started} = s} ->
+        Process.delete(:resultset)
+        {:error, err, %{s | transaction: :failed}}
+
+      {:error, err, s} ->
+        Process.delete(:resultset)
+        {:error, err, s}
+    end
+  rescue
+    exception ->
+      Process.delete(:resultset)
+      {:error, exception, s}
   end
+
+  defp extract_cursor_handle(%Tds.Result{params: params}) do
+    case Enum.find(params, &(&1.name == "@cursor" and &1.direction == :output)) do
+      %Tds.Parameter{value: cursor_id} when is_integer(cursor_id) -> cursor_id
+      _ -> nil
+    end
+  end
+
+  defp extract_cursor_handle(_), do: nil
 
   # CONNECTION
 
@@ -762,7 +901,7 @@ defmodule Tds.Protocol do
     |> send_query(state)
   end
 
-  def message(:executing, msg_result(set: set), s) do
+  def message(:executing, msg_result(set: set, params: params), s) do
     resultset? = Process.get(:resultset, false)
 
     result =
@@ -770,6 +909,13 @@ defmodule Tds.Protocol do
         {r, true} -> r
         {r, false} -> List.first(r) || %Tds.Result{rows: nil}
         {[h | _t], _false} -> h
+      end
+
+    result =
+      if result != nil and params != [] do
+        %{result | params: params}
+      else
+        result
       end
 
     {:ok, mark_ready(%{s | result: result})}

@@ -8,16 +8,18 @@ defmodule Tds.Result do
   * `rows`: The result set as a list of tuples. Each tuple corresponds to a
     row, while each element in the tuple corresponds to a column.
   * `num_rows`: The number of fetched or affected rows.
+  * `params`: Output parameters returned from stored procedures or cursors.
   """
 
   @typedoc "The result of a database query."
   @type t :: %__MODULE__{
           columns: nil | [String.t()],
           rows: nil | [[any()]],
-          num_rows: integer
+          num_rows: integer,
+          params: [Tds.Parameter.t()]
         }
 
-  defstruct columns: nil, rows: nil, num_rows: 0
+  defstruct columns: nil, rows: nil, num_rows: 0, params: []
 
   if Code.ensure_loaded?(Table.Reader) do
     defimpl Table.Reader, for: Tds.Result do

@@ -32,14 +32,14 @@ defmodule Tds.Messages do
 
   ## Microsoft Stored Procedures
   # @tds_sp_cursor 1
-  # @tds_sp_cursoropen 2
+  @tds_sp_cursoropen 2
   # @tds_sp_cursorprepare 3
   # @tds_sp_cursorexecute 4
   # @tds_sp_cursorprepexec 5
   # @tds_sp_cursorunprepare 6
-  # @tds_sp_cursorfetch 7
+  @tds_sp_cursorfetch 7
   # @tds_sp_cursoroption 8
-  # @tds_sp_cursorclose 9
+  @tds_sp_cursorclose 9
   @tds_sp_executesql 10
   @tds_sp_prepare 11
   @tds_sp_execute 12
@@ -183,6 +183,10 @@ defmodule Tds.Messages do
         end
 
       {:parameters, param}, {msg_result(params: params) = m, c, s} ->
+        m = msg_result(m, params: [param | params])
+        {m, c, s}
+
+      {:returnvalue, param}, {msg_result(params: params) = m, c, s} ->
         m = msg_result(m, params: [param | params])
         {m, c, s}
 
@@ -398,6 +402,21 @@ defmodule Tds.Messages do
 
   defp encode_rpc(:sp_unprepare, params) do
     <<0xFF, 0xFF, @tds_sp_unprepare::little-size(2)-unit(8), 0x00, 0x00>> <>
+      encode_rpc_params(params, "")
+  end
+
+  defp encode_rpc(:sp_cursoropen, params) do
+    <<0xFF, 0xFF, @tds_sp_cursoropen::little-size(2)-unit(8), 0x00, 0x00>> <>
+      encode_rpc_params(params, "")
+  end
+
+  defp encode_rpc(:sp_cursorfetch, params) do
+    <<0xFF, 0xFF, @tds_sp_cursorfetch::little-size(2)-unit(8), 0x00, 0x00>> <>
+      encode_rpc_params(params, "")
+  end
+
+  defp encode_rpc(:sp_cursorclose, params) do
+    <<0xFF, 0xFF, @tds_sp_cursorclose::little-size(2)-unit(8), 0x00, 0x00>> <>
       encode_rpc_params(params, "")
   end
 
