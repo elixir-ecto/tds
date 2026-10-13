@@ -146,8 +146,61 @@ More info [here](https://docs.microsoft.com/en-us/dotnet/framework/data/adonet/s
 
 ## Federation Authentication
 
-This Authentication mechanism is not supported.
-This functionality requires specific environment to be developed.
+Tds supports federated authentication (Azure Active Directory / Microsoft
+Entra ID) using the TDS Security Token library: the access token is sent
+inside the `FEDAUTH` feature extension of the `LOGIN7` message (MS-TDS
+section 2.2.6.5), and `username`/`password` are ignored.
+
+To connect with an access token use the `:access_token` option, either as
+a binary token:
+
+```elixir
+Tds.start_link(
+  hostname: "myserver.database.windows.net",
+  database: "my_db",
+  access_token: token,
+  ssl: :required,
+  ssl_opts: [verify: :verify_peer, cacerts: :public_key.cacerts_get()]
+)
+```
+
+or as a zero arity function that obtains it:
+
+```elixir
+Tds.start_link(
+  hostname: "myserver.database.windows.net",
+  database: "my_db",
+  access_token: &MyTokenProvider.get_token/0,
+  ssl: :required,
+  ssl_opts: [verify: :verify_peer, cacerts: :public_key.cacerts_get()]
+)
+```
+
+The function must return `{:ok, token}` or `{:error, reason}`. It is
+invoked every time a new connection is established, including pool
+connection recycling: implement caching inside the function if the token
+endpoint should not be reached that often. Exceptions raised inside the
+function are wrapped into a connection error.
+
+The access token can be obtained, for example, with an OAuth2 client
+credentials flow against
+`https://login.microsoftonline.com/{tenant}/oauth2/v2.0/token` using the
+scope `https://database.windows.net/.default`, or with an Azure SDK
+credentials provider. Tokens are short lived: refresh them before they
+expire and reconnect when the server rejects an expired token.
+
+Federated authentication requires an encrypted connection, `ssl` is forced
+to `:required` when `:access_token` is set. The token is redacted from the
+connection options after the login handshake completes.
+
+An opt-in integration test against an Azure SQL server is available in
+`test/fed_auth_test.exs` (tagged `:manual`, excluded by default).
+
+Currently not supported:
+
+- ADAL/MASL workflows (username & password, integrated or interactive
+  login): the driver does not fetch tokens by itself.
+- Live ID Compact Token signatures.
 
 ## Data representation
 

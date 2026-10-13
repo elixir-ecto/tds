@@ -27,7 +27,9 @@ defmodule Tds.Protocol.Prelogin do
           version: tuple(),
           encryption: <<_::8>>,
           instance: boolean(),
-          mars: boolean()
+          mars: boolean(),
+          fed_auth_required: boolean(),
+          nonce_opt: nil | binary()
         }
 
   @packet_header 0x12
@@ -166,10 +168,23 @@ defmodule Tds.Protocol.Prelogin do
           | {:login, state()}
           | {:disconnect, Tds.Error.t(), state()}
   def decode(packet_data, %{opts: opts} = s) do
-    {:ok, %{encryption: encryption, instance: instance}} =
+    {:ok,
+     %{
+       encryption: encryption,
+       instance: instance,
+       fed_auth_required: fed_auth_required,
+       nonce_opt: nonce
+     }} =
       packet_data
       |> IO.iodata_to_binary()
       |> decode_tokens([], s)
+
+    opts =
+      opts
+      |> Keyword.put(:fed_auth_required, fed_auth_required)
+      |> Keyword.put(:nonce, nonce)
+
+    s = %{s | opts: opts}
 
     case {ssl?(opts), encryption, instance} do
       {_, _, false} ->
@@ -301,10 +316,22 @@ defmodule Tds.Protocol.Prelogin do
           %{m | instance: data == <<0x00>>}
         )
 
+      :fed_auth_required ->
+        decode_data(
+          tokens,
+          tail,
+          %{m | fed_auth_required: data == <<0x01>>}
+        )
+
+      :nonce_opt ->
+        decode_data(
+          tokens,
+          tail,
+          %{m | nonce_opt: data}
+        )
+
       # :thread_id ->
       # :mars ->
-      # :fed_auth_required ->
-      # :nonce_opt ->
       _ ->
         decode_data(tokens, tail, m)
     end

@@ -6,6 +6,7 @@ defmodule Tds.Protocol.Login7 do
   """
   alias Tds.Encoding.UCS2
   import Tds.BinaryUtils
+  require Bitwise
 
   @packet_header 0x10
   ## Packet Size
@@ -22,6 +23,15 @@ defmodule Tds.Protocol.Login7 do
   @default_app_name "Elixir TDS"
   # EN-US
   @language_code_id <<0x09, 0x04, 0x00, 0x00>>
+  # OptionFlags3 fExtension bit, set when the message contains an
+  # extension block (MS-TDS 2.2.6.5)
+  @f_extension 0x10
+  # FeatureExt FEDAUTH, Security Token library (MS-TDS 2.2.6.5)
+  # The Options byte is bFedAuthLibrary (bits 1-3) << 1 | fFedAuthEcho (bit 0)
+  @fed_auth_feature_id 0x02
+  @fed_auth_security_token_library 0x01
+  @fed_auth_echo 0x01
+  @feature_ext_terminator 0xFF
 
   defstruct [
     # Highest TDS version used by the client
@@ -58,12 +68,22 @@ defmodule Tds.Protocol.Login7 do
     # Hostname of the SQL server
     :hostname,
     # Database to use (defaults to user database)
-    :database
+    :database,
+    # Federated authentication (Security Token library), access token
+    # sent inside the FEDAUTH FeatureExt block
+    :fed_auth_token,
+    # Must mirror the FEDAUTHREQUIRED option from the server PRELOGIN response
+    :fed_auth_echo,
+    # Nonce echoed back when fed_auth_echo is set
+    :nonce
   ]
 
   def new(opts) do
     # gethostname/0 always succeeds
     {:ok, hostname} = :inet.gethostname()
+
+    token = opts[:access_token]
+    fed_auth = is_binary(token) and token != ""
 
     %__MODULE__{
       tds_version: @max_supported_tds_version,
@@ -76,13 +96,16 @@ defmodule Tds.Protocol.Login7 do
       option_flags_1: @options,
       option_flags_2: @options,
       type_flags: @sql_type,
-      option_flags_3: @options,
+      option_flags_3: if(fed_auth, do: <<@f_extension>>, else: @options),
       client_time_zone: <<0x0, 0x0, 0x0, 0x0>>,
       client_language_code_id: @language_code_id,
-      username: opts[:username],
-      password: opts[:password],
+      username: if(fed_auth, do: "", else: opts[:username]),
+      password: if(fed_auth, do: "", else: opts[:password]),
       servername: opts[:hostname],
-      database: Keyword.get(opts, :database, "")
+      database: Keyword.get(opts, :database, ""),
+      fed_auth_token: if(fed_auth, do: token, else: nil),
+      fed_auth_echo: fed_auth and opts[:fed_auth_required] == true,
+      nonce: opts[:nonce]
     }
   end
 
@@ -91,7 +114,15 @@ defmodule Tds.Protocol.Login7 do
     fixed_login = fixed_login(login)
     {variable_login, offsets} = encode_variable_login(login, byte_size(fixed_login) + 62)
 
-    login7 = fixed_login <> offsets <> variable_login
+    tail =
+      if fed_auth?(login) do
+        base_size = byte_size(fixed_login) + byte_size(offsets) + byte_size(variable_login)
+        variable_login <> encode_fed_auth_extension(login, base_size)
+      else
+        variable_login
+      end
+
+    login7 = fixed_login <> offsets <> tail
     login7_len = byte_size(login7) + 4
     data = <<login7_len::little-size(32)>> <> login7
 
@@ -145,8 +176,16 @@ defmodule Tds.Protocol.Login7 do
     variable_login = variable_login <> servername
     current_offset = current_offset + byte_size(servername)
 
-    # Unused
-    offsets = offsets <> <<0::ushort(), 0::ushort()>>
+    # Unused / ibExtension + cbExtension
+    offsets =
+      if fed_auth?(login) do
+        database_data = UCS2.from_string(login.database)
+        # The extension block follows the rest of the variable data
+        ib_extension = current_offset + 8 + byte_size(database_data)
+        offsets <> <<ib_extension::ushort(), 4::ushort()>>
+      else
+        offsets <> <<0::ushort(), 0::ushort()>>
+      end
 
     # Client Int Name
     variable_login = variable_login <> UCS2.from_string(@clt_int_name)
@@ -192,6 +231,53 @@ defmodule Tds.Protocol.Login7 do
       Bitwise.bxor(c, 0xA5)
     end
     |> Enum.map_join(&<<&1>>)
+  end
+
+  defp fed_auth?(%__MODULE__{fed_auth_token: token})
+       when is_binary(token) and token != "",
+       do: true
+
+  defp fed_auth?(_login), do: false
+
+  # LOGIN7 extension block (MS-TDS 2.2.6.5): a DWORD ibFeatureExtLong that
+  # points to the FeatureExt block which follows it.
+  # base_size is relative to the end of the LOGIN7 Length field: add 4 bytes
+  # for the Length field itself and 4 for the ibFeatureExtLong DWORD to get
+  # the absolute message offset of the FeatureExt block.
+  defp encode_fed_auth_extension(login, base_size) do
+    feature_data = encode_fed_auth_feature_data(login)
+    ib_feature_ext = base_size + 8
+
+    <<ib_feature_ext::little-size(32)>> <>
+      <<@fed_auth_feature_id, byte_size(feature_data)::little-size(32), feature_data::binary,
+        @feature_ext_terminator>>
+  end
+
+  # FEDAUTH FeatureExt data for the Security Token library (MS-TDS 2.2.6.5)
+  # options + FedAuthToken + [Nonce]
+  #
+  # Options byte layout: bFedAuthLibrary occupies bits 1-3 (Security Token
+  # library = 0x01, shifted left by 1) and fFedAuthEcho is bit 0.
+  # FedAuthToken is encodeed as UTF-16EL (UCS-2), matching the Unicode String
+  # encoding used elsewhere in LOGIN7, with TokenLength set to its UTF-16LE
+  # by length
+  defp encode_fed_auth_feature_data(%__MODULE__{
+         fed_auth_token: token,
+         fed_auth_echo: echo,
+         nonce: nonce
+       }) do
+    library_bits = Bitwise.bsl(@fed_auth_security_token_library, 1)
+
+    options =
+      if echo,
+        do: Bitwise.bor(library_bits, @fed_auth_echo),
+        else: library_bits
+
+    nonce = if echo and is_binary(nonce), do: nonce, else: <<>>
+
+    token_bin = UCS2.from_string(token)
+
+    <<options>> <> <<byte_size(token_bin)::little-size(32)>> <> token_bin <> nonce
   end
 
   # Return the current pid

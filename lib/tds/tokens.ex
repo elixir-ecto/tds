@@ -9,6 +9,12 @@ defmodule Tds.Tokens do
   alias Tds.Encoding.UCS2
   alias Tds.Types
 
+  # Feature extension (MS-TDS 2.2.7.4 / 2.2.7.12)
+  @feature_ext_terminator 0xFF
+  @fed_auth_feature_id 0x02
+  @fed_auth_info_id_stsurl 0x01
+  @fed_auth_info_id_spn 0x02
+
   def retval_typ_size(38) do
     # 0x26 - SYBINTN - 1
     8
@@ -27,6 +33,8 @@ defmodule Tds.Tokens do
           | :doneproc
           | :envchange
           | :error
+          | :feature_ext_ack
+          | :fed_auth_info
           | :info
           | :loginack
           | :order
@@ -53,8 +61,8 @@ defmodule Tds.Tokens do
         0xFF -> decode_doneinproc(tail, collmetadata)
         0xE3 -> decode_envchange(tail, collmetadata)
         0xAA -> decode_error(tail, collmetadata)
-        # 0xAE -> decode_featureextack(tail, collmetadata)
-        # 0xEE -> decode_fedauthinfo(tail, collmetadata)
+        0xAE -> decode_featureextack(tail, collmetadata)
+        0xEE -> decode_fedauthinfo(tail, collmetadata)
         0xAB -> decode_info(tail, collmetadata)
         0xAD -> decode_loginack(tail, collmetadata)
         0xD2 -> decode_nbcrow(tail, collmetadata)
@@ -485,6 +493,66 @@ defmodule Tds.Tokens do
 
     {{:loginack, token}, tail, collmetadata}
   end
+
+  ## FEATUREEXTACK (MS-TDS 2.2.7.4)
+  defp decode_featureextack(bin, collmetadata) do
+    {features, tail} = decode_feature_ext_ack_opts(bin, [])
+    {{:feature_ext_ack, features}, tail, collmetadata}
+  end
+
+  defp decode_feature_ext_ack_opts(<<@feature_ext_terminator, tail::binary>>, acc),
+    do: {Enum.reverse(acc), tail}
+
+  defp decode_feature_ext_ack_opts(
+         <<feature_id::uchar(), data_len::dword(), data::binary-size(data_len), tail::binary>>,
+         acc
+       ) do
+    decode_feature_ext_ack_opts(tail, [decode_feature_ext(feature_id, data) | acc])
+  end
+
+  defp decode_feature_ext(@fed_auth_feature_id, <<nonce::binary-size(32), signature::binary>>) do
+    # Security Token library ack data: [Nonce], optionally followed by an
+    # HMAC-SHA256 signature (Live ID Compact Token)
+    {:fed_auth, %{nonce: nonce, signature: signature}}
+  end
+
+  defp decode_feature_ext(feature_id, data), do: {feature_id, data}
+
+  ## FEDAUTHINFO (MS-TDS 2.2.7.12)
+  defp decode_fedauthinfo(
+         <<_token_length::dword(), count_of_info_ids::dword(), tail::binary>>,
+         collmetadata
+       ) do
+    opts_size = 9 * count_of_info_ids
+    <<opts::binary-size(opts_size), data::binary>> = tail
+
+    # FedAuthInfoDataOffset is measured from the start of CountOfInfoIDs
+    base = 4 + opts_size
+
+    {info, data_end} =
+      for <<info_id::uchar(), data_len::dword(), data_offset::dword() <- opts>>,
+        reduce: {[], base} do
+        {acc, data_end} ->
+          start = data_offset - base
+
+          <<_::binary-size(start), value::binary-size(data_len), _::binary>> = data
+
+          value = decode_fed_auth_info_value(info_id, value)
+          {[value | acc], max(data_end, data_offset + data_len)}
+      end
+
+    tail = binary_part(data, data_end - base, byte_size(data) - (data_end - base))
+
+    {{:fed_auth_info, Enum.reverse(info)}, tail, collmetadata}
+  end
+
+  defp decode_fed_auth_info_value(@fed_auth_info_id_stsurl, value),
+    do: {:stsurl, UCS2.to_string(value)}
+
+  defp decode_fed_auth_info_value(@fed_auth_info_id_spn, value),
+    do: {:spn, UCS2.to_string(value)}
+
+  defp decode_fed_auth_info_value(info_id, value), do: {info_id, value}
 
   defp decode_column_order(tail, n, acc \\ [])
 

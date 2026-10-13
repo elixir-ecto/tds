@@ -111,38 +111,42 @@ end
 opts = Tds.TestHelper.opts()
 database = opts[:database]
 
-case Tds.TestHelper.sqlcmd(opts, """
-     IF EXISTS(SELECT * FROM sys.databases where name = '#{database}')
-     BEGIN
-       DROP DATABASE [#{database}];
-     END;
-     CREATE DATABASE [#{database}];
-     """) do
-  {"", 0} ->
-    :ok
+# Skip the local database fixtures when running the opt-in federated
+# authentication test against an Azure SQL server (SQL_ACCESS_TOKEN is set)
+if System.get_env("SQL_ACCESS_TOKEN") in [nil, ""] do
+  case Tds.TestHelper.sqlcmd(opts, """
+       IF EXISTS(SELECT * FROM sys.databases where name = '#{database}')
+       BEGIN
+         DROP DATABASE [#{database}];
+       END;
+       CREATE DATABASE [#{database}];
+       """) do
+    {"", 0} ->
+      :ok
 
-  {err, _} ->
-    raise RuntimeError, "Failed to create database '#{database}' due #{err}"
+    {err, _} ->
+      raise RuntimeError, "Failed to create database '#{database}' due #{err}"
+  end
+
+  {"Changed database context to 'test'." <> _, 0} =
+    Tds.TestHelper.sqlcmd(opts, """
+    USE [test];
+
+    CREATE TABLE altering ([a] int)
+
+    CREATE TABLE [composite1] ([a] int, [b] text);
+    CREATE TABLE [composite2] ([a] int, [b] int, [c] int);
+    CREATE TABLE [uniques] ([id] int NOT NULL, CONSTRAINT UIX_uniques_id UNIQUE([id]))
+    """)
+
+  {"", 0} =
+    Tds.TestHelper.sqlcmd(opts, """
+    IF NOT EXISTS (SELECT * FROM sys.schemas WHERE name = 'test')
+    EXEC('CREATE SCHEMA [test]')
+    """)
+
+  {"Changed database context to 'test'." <> _, 0} = Tds.TestHelper.sqlcmd(opts, "USE test;")
 end
-
-{"Changed database context to 'test'." <> _, 0} =
-  Tds.TestHelper.sqlcmd(opts, """
-  USE [test];
-
-  CREATE TABLE altering ([a] int)
-
-  CREATE TABLE [composite1] ([a] int, [b] text);
-  CREATE TABLE [composite2] ([a] int, [b] int, [c] int);
-  CREATE TABLE [uniques] ([id] int NOT NULL, CONSTRAINT UIX_uniques_id UNIQUE([id]))
-  """)
-
-{"", 0} =
-  Tds.TestHelper.sqlcmd(opts, """
-  IF NOT EXISTS (SELECT * FROM sys.schemas WHERE name = 'test')
-  EXEC('CREATE SCHEMA [test]')
-  """)
-
-{"Changed database context to 'test'." <> _, 0} = Tds.TestHelper.sqlcmd(opts, "USE test;")
 
 # :dbg.start()
 # :dbg.tracer()

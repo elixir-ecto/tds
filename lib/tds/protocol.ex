@@ -71,18 +71,108 @@ defmodule Tds.Protocol do
       |> Keyword.put_new(:hostname, System.get_env("MSSQLHOST") || "localhost")
       |> Enum.reject(fn {_k, v} -> is_nil(v) end)
 
-    s = %__MODULE__{}
-
-    case opts[:instance] do
-      nil ->
-        connect(opts, s)
-
-      _instance ->
-        case instance(opts, s) do
-          {:ok, s} -> connect(opts, s)
-          err -> {:error, err}
+    with {:ok, opts} <- put_access_token(opts) do
+      # Federated authentication sends the access token inside the LOGIN7
+      # message, an encrypted connection is required in that case
+      opts =
+        if not is_nil(opts[:access_token]) and opts[:ssl] not in [:on, :required, true] do
+          Keyword.put(opts, :ssl, :required)
+        else
+          opts
         end
+
+      s = %__MODULE__{}
+
+      case opts[:instance] do
+        nil ->
+          connect(opts, s)
+
+        _instance ->
+          case instance(opts, s) do
+            {:ok, s} -> connect(opts, s)
+            err -> {:error, err}
+          end
+      end
     end
+  end
+
+  # Resolves the :access_token option before connecting: a binary is used
+  # as is, a zero arity function is invoked to obtain the token
+  defp put_access_token(opts) do
+    case Keyword.get(opts, :access_token) do
+      nil ->
+        {:ok, opts}
+
+      token when is_binary(token) ->
+        {:ok, opts}
+
+      get_token when is_function(get_token, 0) ->
+        resolve_access_token(get_token, opts)
+
+      other ->
+        {:error, invalid_access_token_error(other)}
+    end
+  end
+
+  defp resolve_access_token(get_token, opts) do
+    case safe_get_token(get_token) do
+      {:ok, token} when is_binary(token) and token != "" ->
+        {:ok, Keyword.put(opts, :access_token, token)}
+
+      {:ok, other} ->
+        {:error, invalid_token_error(other)}
+
+      {:error, reason} ->
+        {:error, token_provider_failed_error(reason)}
+
+      {:raise, exception} ->
+        {:error, token_provider_raised_error(exception)}
+
+      other ->
+        {:error, invalid_token_return_error(other)}
+    end
+  end
+
+  defp safe_get_token(get_token) do
+    get_token.()
+  rescue
+    exception -> {:raise, exception}
+  end
+
+  defp invalid_token_error(token) do
+    %Tds.Error{message: "access token must be a non empty binary, got: #{inspect(token)}"}
+  end
+
+  defp token_provider_failed_error(reason) do
+    %Tds.Error{
+      message:
+        "failed to get access token, the :access_token function returned an error: " <>
+          inspect(reason)
+    }
+  end
+
+  defp token_provider_raised_error(exception) do
+    %Tds.Error{
+      message:
+        "failed to get access token, the :access_token function raised: " <>
+          Exception.message(exception)
+    }
+  end
+
+  defp invalid_token_return_error(other) do
+    %Tds.Error{
+      message:
+        "the :access_token function must return {:ok, token} | {:error, reason}, " <>
+          "got: #{inspect(other)}"
+    }
+  end
+
+  defp invalid_access_token_error(other) do
+    %Tds.Error{
+      message:
+        "invalid :access_token #{inspect(other)}, expected a binary or a " <>
+          "zero arity function returning {:ok, token} | {:error, reason}"
+    }
   end
 
   @spec disconnect(err :: Exception.t() | String.t(), state :: t()) :: :ok
@@ -495,6 +585,11 @@ defmodule Tds.Protocol do
 
       {:error, _, _} = err ->
         err
+
+      {:error, reason} ->
+        # e.g a ROUTING redirect (message/3 :login clause) that failed to
+        # reconnect: connect/1 returns {:error, exception}, a 2-tuple
+        {:error, reason, s}
     end
   end
 
@@ -942,7 +1037,9 @@ defmodule Tds.Protocol do
   end
 
   defp clean_opts(opts) do
-    Keyword.put(opts, :password, :REDACTED)
+    opts
+    |> Keyword.put(:password, :REDACTED)
+    |> Keyword.put(:access_token, :REDACTED)
   end
 
   @spec conn_opts(Keyword.t()) :: list() | no_return

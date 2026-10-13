@@ -93,8 +93,16 @@ defmodule Tds.Messages do
       {:error, error}, _ ->
         {msg_error(error: error), s}
 
+      {:feature_ext_ack, features}, {msg, s} ->
+        verify_fed_auth_ack(features, s)
+        {msg, s}
+
+      {:fed_auth_info, info}, {msg, s} ->
+        Logger.debug(fn -> "Tds.FedAuthInfo: #{inspect(info)}" end)
+
+        {msg, s}
+
       _, msg ->
-        # FeatureExtAck should be processed here in future
         msg
     end)
   end
@@ -203,6 +211,20 @@ defmodule Tds.Messages do
 
       {msg_error() = msg, _, s} ->
         {msg, s}
+    end
+  end
+
+  defp verify_fed_auth_ack(features, %{opts: opts}) do
+    case {List.keyfind(features, :fed_auth, 0), Keyword.get(opts, :nonce)} do
+      {{:fed_auth, %{nonce: nonce}}, expected}
+      when is_binary(nonce) and is_binary(expected) and nonce != expected ->
+        Logger.warning(
+          "Federated authentication nonce mismatch: the FEATUREEXTACK nonce does not " <>
+            "match the nonce received in the PRELOGIN response."
+        )
+
+      _ ->
+        :ok
     end
   end
 

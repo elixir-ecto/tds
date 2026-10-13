@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+### Features
+* Add federated authentication (Azure AD / Microsoft Entra ID) using the Security Token library: pass an access token via the `:access_token` connection option; the token is sent in the FEDAUTH FeatureExt block of LOGIN7 and `username`/`password` are ignored. `ssl` is forced to `:required` and the token is redacted from connection options after login
+* The `:access_token` option also accepts a zero arity function returning `{:ok, token} | {:error, reason}`; it is invoked every time a new connection is established and exceptions raised inside it are wrapped into a connection error
+* Decode the `FEDAUTHREQUIRED` and `NONCEOPT` PRELOGIN options sent by the server
+* Parse `FEATUREEXTACK` (0xAE) and `FEDAUTHINFO` (0xEE) tokens in login responses
+
 ## v2.4.0 (2026-08-19)
 ### Fixes
 * Fix `unique_constraint` support in Ecto for en-US error messages: MSSQL error metadata is now preserved when re-raising from `query!/4`, `prepare!/3`, `execute!/4` and `close!/2` (#173)

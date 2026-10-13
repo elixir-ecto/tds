@@ -1,6 +1,8 @@
 defmodule Packet.TokenStreamTest do
   use ExUnit.Case, async: true
 
+  alias Tds.Encoding.UCS2
+
   @package_data <<
     # HEADER
     0x04,
@@ -602,5 +604,38 @@ defmodule Packet.TokenStreamTest do
   test "should decode RPC Server Response" do
     <<_::binary-8, package_data::binary>> = @package_data
     assert @token_stream == Tds.Tokens.decode_tokens(package_data, nil)
+  end
+
+  test "should decode FEATUREEXTACK token" do
+    nonce = :binary.copy(<<0xAB>>, 32)
+    package_data = <<0xAE, 0x02, 32::little-32>> <> nonce <> <<0xFF>>
+
+    assert Tds.Tokens.decode_tokens(package_data, nil) ==
+             [feature_ext_ack: [fed_auth: %{nonce: nonce, signature: <<>>}]]
+  end
+
+  test "should decode FEATUREEXTACK token with signature" do
+    nonce = :binary.copy(<<0xAB>>, 32)
+    signature = :binary.copy(<<0xCD>>, 32)
+
+    package_data =
+      <<0xAE, 0x02, 64::little-32>> <> nonce <> signature <> <<0xFF>>
+
+    assert Tds.Tokens.decode_tokens(package_data, nil) ==
+             [feature_ext_ack: [fed_auth: %{nonce: nonce, signature: signature}]]
+  end
+
+  test "should decode FEDAUTHINFO token" do
+    stsurl = UCS2.from_string("sts.example.com")
+    spn = UCS2.from_string("spn")
+
+    package_data =
+      <<0xEE, 58::little-32, 2::little-32>> <>
+        <<0x01, 30::little-32, 22::little-32>> <>
+        <<0x02, 6::little-32, 52::little-32>> <>
+        stsurl <> spn
+
+    assert Tds.Tokens.decode_tokens(package_data, nil) ==
+             [fed_auth_info: [stsurl: "sts.example.com", spn: "spn"]]
   end
 end
