@@ -745,8 +745,14 @@ defmodule Tds.Protocol do
   def message(
         :login,
         msg_loginack(redirect: %{hostname: host, port: port}),
-        %{opts: opts}
+        %{opts: opts, sock: {mod, sock}}
       ) do
+    # The login continues on a new connection to the redirect target, so the
+    # gateway connection is done with. Left open, it is eventually closed by
+    # the gateway, and the Tds.Tls process owning it stops with :tcp_closed,
+    # taking down the linked connection process that is using the new socket.
+    mod.close(sock)
+
     opts
     |> Keyword.put(:hostname, host)
     |> Keyword.put(:port, port)
