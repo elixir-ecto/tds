@@ -745,12 +745,18 @@ defmodule Tds.Protocol do
   def message(
         :login,
         msg_loginack(redirect: %{hostname: host, port: port}),
-        %{opts: opts}
+        %{opts: opts} = s
       ) do
     opts
     |> Keyword.put(:hostname, host)
     |> Keyword.put(:port, port)
     |> connect()
+    |> case do
+      {:ok, _} = ok -> ok
+      # connect/1 returns a 2-tuple on failure, every other message/3 clause
+      # (and decode/2) uses {:error, error, state}
+      {:error, error} -> {:error, error, s}
+    end
   end
 
   def message(:login, msg_loginack(), %{opts: opts} = s) do
