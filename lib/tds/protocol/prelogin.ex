@@ -288,6 +288,17 @@ defmodule Tds.Protocol.Prelogin do
     {:ok, decode_data(Enum.reverse(tokens), tail, %__MODULE__{})}
   end
 
+  # Any other option, such as TRACEID echoed back by Azure SQL, is kept only so
+  # decode_data/3 skips its bytes. Clients must ignore options they don't know.
+  defp decode_tokens(
+         <<token, offset::ushort(), length::ushort(), tail::binary>>,
+         tokens,
+         s
+       ) do
+    tokens = [{{:unknown, token}, offset, length} | tokens]
+    decode_tokens(tail, tokens, s)
+  end
+
   defp decode_data([], _, result), do: result
 
   defp decode_data([{key, _, length} | tokens], bin, m) do

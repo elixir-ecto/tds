@@ -17,9 +17,9 @@ defmodule FedAuthTest do
 
   # PRELOGIN response: VERSION, ENCRYPTION (ENCRYPT_ON) and optionally
   # FEDAUTHREQUIRED, followed by the terminator and the option data
-  defp prelogin_response(fed_auth_required) do
+  defp prelogin_response(fed_auth_required, extra_options \\ []) do
     fed_auth = if fed_auth_required, do: [{0x06, <<fed_auth_required>>}], else: []
-    options = [{0x00, <<15, 0, 0x07, 0xD0, 0, 0>>}, {0x01, <<0x01>>} | fed_auth]
+    options = [{0x00, <<15, 0, 0x07, 0xD0, 0, 0>>}, {0x01, <<0x01>>} | fed_auth] ++ extra_options
     offset = 5 * length(options) + 1
 
     {headers, data, _} =
@@ -63,6 +63,15 @@ defmodule FedAuthTest do
       assert {:encrypt, %{fed_auth_echo: true}} = Prelogin.decode(prelogin_response(1), s)
       assert {:encrypt, %{fed_auth_echo: false}} = Prelogin.decode(prelogin_response(0), s)
       assert {:encrypt, %{fed_auth_echo: false}} = Prelogin.decode(prelogin_response(nil), s)
+    end
+
+    test "skips a TRACEID the server echoes back and options it doesn't know" do
+      s = %Tds.Protocol{opts: [ssl: true]}
+      trace_id = {0x05, :binary.copy(<<0xAB>>, 36)}
+      unknown = {0x42, <<1, 2, 3>>}
+
+      assert {:encrypt, %{fed_auth_echo: true}} =
+               Prelogin.decode(prelogin_response(1, [trace_id, unknown]), s)
     end
   end
 
