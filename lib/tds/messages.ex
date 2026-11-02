@@ -23,7 +23,8 @@ defmodule Tds.Messages do
 
   # responses
   defrecord :msg_preloginack, [:response]
-  defrecord :msg_loginack, [:redirect]
+  # features: FeatureIds the server acknowledged in FEATUREEXTACK
+  defrecord :msg_loginack, [:redirect, features: []]
   defrecord :msg_prepared, [:params]
   defrecord :msg_sql_result, [:columns, :rows, :row_count]
   defrecord :msg_result, [:set, :params, :status]
@@ -79,6 +80,9 @@ defmodule Tds.Messages do
       {:envchange, other}, {msg, s} ->
         {msg, on_envchange(other, s)}
 
+      {:featureextack, features}, {msg_loginack() = msg, s} ->
+        {msg_loginack(msg, features: Enum.map(features, &elem(&1, 0))), s}
+
       {:loginack, %{tds_version: version}}, {msg, s} ->
         Process.put(:tds_version, version)
         {msg, s}
@@ -93,8 +97,21 @@ defmodule Tds.Messages do
       {:error, error}, _ ->
         {msg_error(error: error), s}
 
+      {:fedauthinfo, _}, {msg_error(), _s} = msg_s ->
+        msg_s
+
+      {:fedauthinfo, _}, {_, s} ->
+        error = %{
+          line_number: 0,
+          number: 0,
+          msg_text:
+            "Server requested FEDAUTHINFO, which is not supported. " <>
+              "Pass a pre-acquired :access_token instead"
+        }
+
+        {msg_error(error: error), s}
+
       _, msg ->
-        # FeatureExtAck should be processed here in future
         msg
     end)
   end

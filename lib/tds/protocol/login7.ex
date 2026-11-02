@@ -22,6 +22,13 @@ defmodule Tds.Protocol.Login7 do
   @default_app_name "Elixir TDS"
   # EN-US
   @language_code_id <<0x09, 0x04, 0x00, 0x00>>
+  # OptionFlags3 fExtension: ibExtension points to a FeatureExt block
+  @option_flag_3_extension <<0x10>>
+  # FeatureExt ids
+  @feature_fed_auth 0x02
+  @feature_terminator 0xFF
+  # bFedAuthLibrary: Security Token (the client already holds an access token)
+  @fed_auth_library_security_token 0x01
 
   defstruct [
     # Highest TDS version used by the client
@@ -58,7 +65,11 @@ defmodule Tds.Protocol.Login7 do
     # Hostname of the SQL server
     :hostname,
     # Database to use (defaults to user database)
-    :database
+    :database,
+    # Federated authentication (nil for SQL Server authentication). When set,
+    # a map with the access `:token` and the `:echo` flag, which mirrors the
+    # FEDAUTHREQUIRED option the server sent back in its PRELOGIN response.
+    :fed_auth
   ]
 
   def new(opts) do
@@ -81,8 +92,23 @@ defmodule Tds.Protocol.Login7 do
       client_language_code_id: @language_code_id,
       username: opts[:username],
       password: opts[:password],
-      servername: opts[:hostname],
+      servername: opts[:routed_server_name] || opts[:hostname],
       database: Keyword.get(opts, :database, "")
+    }
+    |> put_fed_auth(opts[:access_token], opts)
+  end
+
+  defp put_fed_auth(login, nil, _opts), do: login
+
+  # Federated authentication with a Microsoft Entra ID access token.
+  # Username and password MUST be empty and fExtension MUST be set.
+  defp put_fed_auth(login, token, opts) when is_binary(token) do
+    %{
+      login
+      | username: "",
+        password: "",
+        option_flags_3: @option_flag_3_extension,
+        fed_auth: %{token: token, echo: Keyword.get(opts, :fed_auth_echo, false)}
     }
   end
 
@@ -145,8 +171,10 @@ defmodule Tds.Protocol.Login7 do
     variable_login = variable_login <> servername
     current_offset = current_offset + byte_size(servername)
 
-    # Unused
-    offsets = offsets <> <<0::ushort(), 0::ushort()>>
+    # ibExtension/cbExtension is filled in below, once the length of the
+    # variable data is known
+    offsets_before_extension = offsets
+    offsets = <<>>
 
     # Client Int Name
     variable_login = variable_login <> UCS2.from_string(@clt_int_name)
@@ -157,13 +185,14 @@ defmodule Tds.Protocol.Login7 do
     offsets = offsets <> <<0::ushort(), 0::ushort()>>
 
     # Database
-    variable_login = variable_login <> UCS2.from_string(login.database)
+    database_data = UCS2.from_string(login.database)
+    variable_login = variable_login <> database_data
 
     database =
-      if login.database == "" do
-        0xAC
-      else
-        String.length(login.database)
+      cond do
+        login.database != "" -> String.length(login.database)
+        is_nil(login.fed_auth) -> 0xAC
+        true -> 0
       end
 
     offsets = offsets <> <<current_offset::ushort(), database::ushort()>>
@@ -183,7 +212,28 @@ defmodule Tds.Protocol.Login7 do
     # SSPI Long
     offsets = offsets <> <<0::dword()>>
 
-    {variable_login, offsets}
+    current_offset = current_offset + byte_size(database_data)
+    {extension, extension_data} = encode_extension(login.fed_auth, current_offset)
+
+    {variable_login <> extension_data, offsets_before_extension <> extension <> offsets}
+  end
+
+  defp encode_extension(nil, _offset), do: {<<0::ushort(), 0::ushort()>>, <<>>}
+
+  # ibExtension points to a DWORD holding the offset of the FeatureExt block,
+  # which follows it directly.
+  defp encode_extension(fed_auth, offset) do
+    feature_ext = encode_feature_ext_fed_auth(fed_auth) <> <<@feature_terminator>>
+
+    {<<offset::ushort(), 4::ushort()>>, <<offset + 4::ulong()>> <> feature_ext}
+  end
+
+  defp encode_feature_ext_fed_auth(%{token: token, echo: echo}) do
+    options = Bitwise.bsl(@fed_auth_library_security_token, 1) + if(echo, do: 1, else: 0)
+    token = UCS2.from_string(token)
+    data = <<options, byte_size(token)::ulong()>> <> token
+
+    <<@feature_fed_auth, byte_size(data)::ulong()>> <> data
   end
 
   defp encode_tds_password(list) do

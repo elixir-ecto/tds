@@ -95,6 +95,8 @@ defmodule Tds.Tls do
 
   # SERVER
   def init({socket, ssl_opts}) do
+    # Stop with the socket, whoever closes it
+    _ = Port.monitor(socket)
     {:ok, %__MODULE__{socket: socket, ssl_opts: ssl_opts, handshake?: true}}
   end
 
@@ -210,14 +212,18 @@ defmodule Tds.Tls do
     {:noreply, s}
   end
 
+  # The transport is linked to the connection process, so it stops :normal:
+  # a closed socket reaches the owner as a message, never as an exit signal
   def handle_info({tag, _} = msg, %{owner_pid: pid} = s) when tag in [:tcp_closed, :ssl_closed] do
     Kernel.send(pid, msg)
-    {:stop, tag, s}
+    {:stop, :normal, s}
   end
 
   def handle_info({tag, _, _} = msg, %{owner_pid: pid} = s)
       when tag in [:tcp_error, :ssl_error] do
     Kernel.send(pid, msg)
-    {:stop, tag, s}
+    {:stop, :normal, s}
   end
+
+  def handle_info({:DOWN, _ref, :port, _socket, _reason}, s), do: {:stop, :normal, s}
 end

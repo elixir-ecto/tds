@@ -27,10 +27,24 @@ defmodule Tds do
           | {:database, String.t()}
           | {:username, String.t()}
           | {:password, String.t()}
+          | {:access_token, access_token()}
+          | {:max_response_bytes, pos_integer()}
           | {:timeout, timeout()}
           | {:connect_timeout, timeout()}
           | {:execution_mode, :prepare_execute | :executesql}
           | DBConnection.start_option()
+
+  @typedoc """
+  A Microsoft Entra ID access token for federated authentication, or a
+  function / MFA returning `token`, `{:ok, token}` or `{:error, reason}` that is
+  called on every connect so pooled connections can pick up a refreshed token.
+  A function that fails, raises or runs past `:connect_timeout` fails the
+  connect, and the pool backs off and retries.
+  """
+  @type access_token ::
+          String.t()
+          | (-> String.t() | {:ok, String.t()} | {:error, term})
+          | {module(), atom(), [term()]}
 
   @type isolation_level ::
           :read_uncommitted
@@ -179,9 +193,19 @@ defmodule Tds do
   end
 
   defp default(opts) do
+    validate_max_response_bytes!(opts[:max_response_bytes])
+
     opts
     |> Keyword.put_new(:idle_timeout, @timeout)
     |> Keyword.put_new(:execution_mode, @execution_mode)
+  end
+
+  defp validate_max_response_bytes!(nil), do: :ok
+  defp validate_max_response_bytes!(limit) when is_integer(limit) and limit > 0, do: :ok
+
+  defp validate_max_response_bytes!(limit) do
+    raise ArgumentError,
+          "expected :max_response_bytes to be a positive integer or nil, got: #{inspect(limit)}"
   end
 
   @doc """

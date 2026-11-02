@@ -38,7 +38,7 @@ defmodule Tds.Protocol.Prelogin do
   @instopt_token 0x02
   @thread_id_token 0x03
   @mars_token 0x04
-  # @trace_id_token 0x05
+  @trace_id_token 0x05
   @fed_auth_required_token 0x06
   @nonce_opt_token 0x07
   @terminator_token 0xFF
@@ -62,6 +62,7 @@ defmodule Tds.Protocol.Prelogin do
       # encode_instance(opts),
       encode_thread_id(opts),
       encode_mars(opts),
+      encode_trace_id(opts),
       encode_fed_auth_required(opts)
     ]
 
@@ -156,6 +157,14 @@ defmodule Tds.Protocol.Prelogin do
     {@mars_token, <<0x00>>}
   end
 
+  # Connection id, then activity id and its sequence number, new for every
+  # PRELOGIN. A Fabric backend refuses a routed login without them.
+  defp encode_trace_id(_opts) do
+    conn_id = :crypto.strong_rand_bytes(16)
+    activity_id = :crypto.strong_rand_bytes(16)
+    {@trace_id_token, conn_id <> activity_id <> <<0::little-32>>}
+  end
+
   defp encode_fed_auth_required(_opts) do
     {@fed_auth_required_token, <<0x01>>}
   end
@@ -166,14 +175,16 @@ defmodule Tds.Protocol.Prelogin do
           | {:login, state()}
           | {:disconnect, Tds.Error.t(), state()}
   def decode(packet_data, %{opts: opts} = s) do
-    {:ok, %{encryption: encryption, instance: instance}} =
+    {:ok, %{encryption: encryption, instance: instance, fed_auth_required: fed_auth_required}} =
       packet_data
       |> IO.iodata_to_binary()
       |> decode_tokens([], s)
 
+    s = %{s | fed_auth_echo: fed_auth_required}
+
     case {ssl?(opts), encryption, instance} do
       {_, _, false} ->
-        msg = "Connection terminated, connected instance is not '#{instance}'!"
+        msg = "Connection terminated, the server is not the instance the client asked for"
         disconnect(msg, s)
 
       # Encryption is off. Allowed server response is :off or :not_supported
@@ -194,6 +205,11 @@ defmodule Tds.Protocol.Prelogin do
 
       # Encryption is required. The server needs to respond with :on
       {:required, <<@encryption_on>>, _} ->
+        {:encrypt, s}
+
+      # The server requires encryption (Azure SQL, Fabric): the whole
+      # connection is encrypted, as with :on
+      {client, <<@encryption_required>>, _} when client in [:on, :required] ->
         {:encrypt, s}
 
       {_, _, _} ->
@@ -224,7 +240,7 @@ defmodule Tds.Protocol.Prelogin do
          tokens,
          s
        ) do
-    tokens = [{:encryption, offset, length} | tokens]
+    tokens = [{:instance, offset, length} | tokens]
     decode_tokens(tail, tokens, s)
   end
 
@@ -272,6 +288,17 @@ defmodule Tds.Protocol.Prelogin do
     {:ok, decode_data(Enum.reverse(tokens), tail, %__MODULE__{})}
   end
 
+  # Any other option, such as TRACEID echoed back by Azure SQL, is kept only so
+  # decode_data/3 skips its bytes. Clients must ignore options they don't know.
+  defp decode_tokens(
+         <<token, offset::ushort(), length::ushort(), tail::binary>>,
+         tokens,
+         s
+       ) do
+    tokens = [{{:unknown, token}, offset, length} | tokens]
+    decode_tokens(tail, tokens, s)
+  end
+
   defp decode_data([], _, result), do: result
 
   defp decode_data([{key, _, length} | tokens], bin, m) do
@@ -301,9 +328,15 @@ defmodule Tds.Protocol.Prelogin do
           %{m | instance: data == <<0x00>>}
         )
 
+      :fed_auth_required ->
+        decode_data(
+          tokens,
+          tail,
+          %{m | fed_auth_required: data != <<0x00>>}
+        )
+
       # :thread_id ->
       # :mars ->
-      # :fed_auth_required ->
       # :nonce_opt ->
       _ ->
         decode_data(tokens, tail, m)

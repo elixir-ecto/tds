@@ -144,10 +144,73 @@ Requires connecting with a user with appropriate rights.
 More info [here](https://docs.microsoft.com/en-us/dotnet/framework/data/adonet/sql/snapshot-isolation-in-sql-server).
 
 
-## Federation Authentication
+## Federated Authentication
 
-This Authentication mechanism is not supported.
-This functionality requires specific environment to be developed.
+Azure SQL Database and Microsoft Fabric SQL endpoints accept a Microsoft Entra ID
+access token instead of a username and password. Acquire the token yourself
+(scope `https://database.windows.net/.default`) and pass it as `:access_token`.
+Username and password are ignored, and encryption is required.
+
+`:access_token` accepts a string, a zero-arity function or an `{module, function, args}`
+tuple. Functions and MFAs are called on every connect and return the token,
+`{:ok, token}` or `{:error, reason}`, so connections opened after the token expired get
+a fresh one. If the function returns `{:error, reason}`, raises, throws, exits or takes
+longer than `:connect_timeout` (default 15 seconds), the connect fails with a
+`Tds.Error` and the pool retries with its usual backoff. A raised exception or an
+`{:error, reason}` struct is reported by its module name only (an atom reason as is,
+any other reason not at all), so secrets in it never reach the logs.
+
+```elixir
+config :your_app, :tds_conn,
+  hostname: "xxxx.datawarehouse.fabric.microsoft.com",
+  database: "my_warehouse",
+  access_token: {MyApp.Entra, :fetch_sql_token, []},
+  ssl: true,
+  ssl_opts: [
+    verify: :verify_peer,
+    cacerts: :public_key.cacerts_get(),
+    server_name_indication: ~c"xxxx.datawarehouse.fabric.microsoft.com",
+    customize_hostname_check: [
+      match_fun: :public_key.pkix_verify_hostname_match_fun(:https)
+    ]
+  ]
+```
+
+When the server routes the login elsewhere (the Azure SQL gateway redirect), the driver
+closes the gateway connection and connects to the routed host with the same options,
+except that a pinned `server_name_indication` is replaced by the routed host name, so
+the hostname check runs against the server that is actually reached.
+
+Only the Security Token workflow is supported: the driver does not acquire tokens
+itself (no ADAL/MSAL `FEDAUTHINFO` exchange).
+
+### Known limitations
+
+A connect can block indefinitely if the server stops responding during the TLS
+handshake or before it answers LOGIN7: the handshake runs with an `:infinity` timeout
+and the login response is read without one. This predates federated authentication
+and applies to every login.
+
+## Limiting response size
+
+The driver buffers a whole response, across every result set, before decoding it.
+Set `max_response_bytes: pos_integer()` to cap that buffer (anything else but `nil`
+raises `ArgumentError` at `start_link`). The cap applies to query responses only, not
+to the PRELOGIN, LOGIN7 and session setup exchanges of a connect. The count covers the
+bytes read for one response, TDS packet headers included; over TLS these are the
+decrypted bytes. Once it goes over the limit the driver stops reading, closes the
+connection (the rest of the response is still on the wire) and the query returns:
+
+```elixir
+{:error, %Tds.ResponseTooLargeError{
+   limit: 10_000_000,
+   received: 10_002_432,
+   message: "response exceeded max_response_bytes (limit 10000000 bytes)"
+ }}
+```
+
+`received` is the number of bytes read when the driver stopped. The pool opens a new
+connection for the next checkout. Without the option there is no limit.
 
 ## Data representation
 

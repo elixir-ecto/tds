@@ -27,6 +27,8 @@ defmodule Tds.Tokens do
           | :doneproc
           | :envchange
           | :error
+          | :featureextack
+          | :fedauthinfo
           | :info
           | :loginack
           | :order
@@ -53,8 +55,8 @@ defmodule Tds.Tokens do
         0xFF -> decode_doneinproc(tail, collmetadata)
         0xE3 -> decode_envchange(tail, collmetadata)
         0xAA -> decode_error(tail, collmetadata)
-        # 0xAE -> decode_featureextack(tail, collmetadata)
-        # 0xEE -> decode_fedauthinfo(tail, collmetadata)
+        0xAE -> decode_featureextack(tail, collmetadata)
+        0xEE -> decode_fedauthinfo(tail, collmetadata)
         0xAB -> decode_info(tail, collmetadata)
         0xAD -> decode_loginack(tail, collmetadata)
         0xD2 -> decode_nbcrow(tail, collmetadata)
@@ -484,6 +486,33 @@ defmodule Tds.Tokens do
     }
 
     {{:loginack, token}, tail, collmetadata}
+  end
+
+  # FEATUREEXTACK: one FeatureAckOpt per feature the server acknowledged,
+  # each FeatureId, FeatureAckDataLen (DWORD) and FeatureAckData, ending with
+  # the 0xFF terminator
+  defp decode_featureextack(bin, collmetadata, acc \\ [])
+
+  defp decode_featureextack(<<0xFF, tail::binary>>, collmetadata, acc) do
+    {{:featureextack, Enum.reverse(acc)}, tail, collmetadata}
+  end
+
+  defp decode_featureextack(
+         <<feature_id, length::ulong(), data::binary-size(length), tail::binary>>,
+         collmetadata,
+         acc
+       ) do
+    decode_featureextack(tail, collmetadata, [{feature_id, data} | acc])
+  end
+
+  # FEDAUTHINFO: sent when the client asked the server for the information
+  # needed to acquire a token (ADAL workflows). The token is passed up front
+  # here, so the payload is only skipped and reported as unsupported.
+  defp decode_fedauthinfo(
+         <<length::ulong(), data::binary-size(length), tail::binary>>,
+         collmetadata
+       ) do
+    {{:fedauthinfo, data}, tail, collmetadata}
   end
 
   defp decode_column_order(tail, n, acc \\ [])
