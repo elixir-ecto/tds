@@ -3,13 +3,13 @@ defmodule Tds.Protocol do
   Implements DBConnection behaviour for TDS protocol.
   """
   alias Tds.{Parameter, Query}
+  alias Tds.Protocol.Login7
   import Tds.{BinaryUtils, Messages, Utils}
   require Logger
   use DBConnection
 
   @timeout 5_000
   @sock_opts [packet: :raw, mode: :binary, active: false]
-  @feature_ext_fedauth 0x02
   @trans_levels [
     :read_uncommitted,
     :read_committed,
@@ -69,6 +69,7 @@ defmodule Tds.Protocol do
   @spec connect(opts :: Keyword.t()) :: {:ok, state :: t()} | {:error, Exception.t()}
   def connect(opts) do
     with :ok <- validate_access_token(opts) do
+      if opts[:access_token], do: warn_unverified_tls(opts[:ssl_opts] || [])
       do_connect(opts)
     end
   end
@@ -120,7 +121,7 @@ defmodule Tds.Protocol do
          )}
 
       true ->
-        warn_unverified_tls(opts[:ssl_opts] || [])
+        :ok
     end
   end
 
@@ -131,8 +132,6 @@ defmodule Tds.Protocol do
           "the server certificate is not verified"
       )
     end
-
-    :ok
   end
 
   @spec disconnect(err :: Exception.t() | String.t(), state :: t()) :: :ok
@@ -792,18 +791,24 @@ defmodule Tds.Protocol do
     end
   end
 
+  # `opts` already carries the environment defaults, so the redirect skips
+  # `connect/1`'s validation of the caller's options.
   def message(
         :login,
         msg_loginack(redirect: %{hostname: host, port: port}),
-        %{opts: opts} = s
+        %{opts: opts, sock: {mod, sock}} = s
       ) do
     opts
     |> Keyword.put(:hostname, host)
     |> Keyword.put(:port, port)
-    |> connect()
+    |> do_connect()
     |> case do
-      {:error, error} -> {:error, error, s}
-      ok -> ok
+      {:ok, _} = ok ->
+        mod.close(sock)
+        ok
+
+      {:error, error} ->
+        {:error, error, s}
     end
   end
 
@@ -811,7 +816,7 @@ defmodule Tds.Protocol do
   def message(:login, msg_loginack(feature_acks: acks), %{opts: opts} = s) do
     state = %{s | opts: clean_opts(opts)}
 
-    if Keyword.has_key?(opts, :access_token) and not Map.has_key?(acks, @feature_ext_fedauth) do
+    if opts[:access_token] && not Map.has_key?(acks, Login7.feature_ext_fedauth()) do
       {:error, Tds.Error.exception("Server did not acknowledge the FEDAUTH login feature."),
        state}
     else

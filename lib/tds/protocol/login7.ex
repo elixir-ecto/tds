@@ -119,6 +119,9 @@ defmodule Tds.Protocol.Login7 do
     end
   end
 
+  @doc false
+  def feature_ext_fedauth, do: @feature_ext_fedauth
+
   def encode(%__MODULE__{} = login) do
     # Fixed login configuration
     fixed_login = fixed_login(login)

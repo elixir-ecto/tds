@@ -8,6 +8,7 @@ defmodule FedAuthTest do
   alias Tds.Protocol.{Login7, Prelogin}
 
   @login_opts [hostname: "db.example.net", username: "sa", password: "pw", database: "app"]
+  @token "eyJhbGciOi.secret-access-token.c2lnbmF0dXJl"
 
   # Fixes the two fields `Login7.new/2` reads from the host.
   defp login7_bytes(opts, fed_auth \\ %{echo: false, nonce: nil}) do
@@ -184,6 +185,26 @@ defmodule FedAuthTest do
       end
     end
 
+    test "is refused alongside a password" do
+      assert {:error, %Tds.Error{message: message}} =
+               Tds.Protocol.connect(@conn ++ [ssl: true, password: "pw", access_token: "tkn"])
+
+      assert message =~ "not both"
+    end
+
+    test "is refused when it is not UTF-8, without echoing it" do
+      assert {:error, %Tds.Error{message: message}} =
+               Tds.Protocol.connect(@conn ++ [ssl: true, access_token: <<0xFF, 0xFE>>])
+
+      assert message =~ "UTF-8"
+      refute message =~ <<0xFF>>
+    end
+
+    test "nil means SQL authentication" do
+      assert {:error, %Tds.Error{message: "tcp connect: econnrefused"}} =
+               Tds.Protocol.connect(@conn ++ [access_token: nil])
+    end
+
     test "is refused when the token is empty" do
       assert {:error, %Tds.Error{message: message}} =
                Tds.Protocol.connect(@conn ++ [ssl: true, access_token: ""])
@@ -227,8 +248,6 @@ defmodule FedAuthTest do
   end
 
   describe "the access token stays out of errors and state" do
-    @token "eyJhbGciOi.secret-access-token.c2lnbmF0dXJl"
-
     defp login_failed do
       text = UCS2.from_string("Login failed for user '<token-identified principal>'.")
       server = UCS2.from_string("db")
@@ -269,18 +288,18 @@ defmodule FedAuthTest do
   end
 
   describe "logging in over a connection" do
-    @token "eyJhbGciOi.secret-access-token.c2lnbmF0dXJl"
     @conn_opts [hostname: "db", database: "app", ssl: true, access_token: @token]
 
-    defp tds_packet(payload) do
-      <<0x04, 0x01, byte_size(payload) + 8::16, 0::16, 1, 0>> <> payload
+    defp listen do
+      {:ok, listen} = :gen_tcp.listen(0, [:binary, active: false])
+      {:ok, port} = :inet.port(listen)
+      {listen, port}
     end
 
     # Accepts one connection, forwards each client message to the test, and
     # answers it with the next of `responses`.
     defp fake_server(responses) do
-      {:ok, listen} = :gen_tcp.listen(0, [:binary, active: false])
-      {:ok, port} = :inet.port(listen)
+      {listen, port} = listen()
       test = self()
 
       spawn_link(fn ->
@@ -288,11 +307,8 @@ defmodule FedAuthTest do
 
         for response <- responses do
           send(test, {:client_sent, port, recv_message(sock)})
-          :ok = :gen_tcp.send(sock, tds_packet(response))
+          :ok = :gen_tcp.send(sock, Messages.encode_packets(0x04, response))
         end
-
-        if responses == [], do: send(test, {:client_sent, port, recv_message(sock)})
-        :gen_tcp.close(sock)
       end)
 
       port
@@ -307,9 +323,9 @@ defmodule FedAuthTest do
         else: recv_message(sock, acc <> body)
     end
 
-    defp prelogged_in(port, fed_auth_required) do
+    defp prelogged_in(port, fed_auth_required, opts \\ @conn_opts) do
       {:ok, sock} = :gen_tcp.connect(~c"127.0.0.1", port, [:binary, active: false])
-      s = %Tds.Protocol{sock: {:gen_tcp, sock}, opts: @conn_opts}
+      s = %Tds.Protocol{sock: {:gen_tcp, sock}, opts: opts}
       {:encrypt, s} = Prelogin.decode(prelogin_response(0x01, fed_auth_required), s)
       s
     end
@@ -321,21 +337,15 @@ defmodule FedAuthTest do
         token
     end
 
-    test "LOGIN7 echoes the server's FEDAUTHREQUIRED and the token is redacted once logged in" do
-      port = fake_server([@loginack <> @featureextack <> @done, @done])
+    for {answer, echo} <- [{0x01, 1}, {0x00, 0}] do
+      test "LOGIN7 echoes FEDAUTHREQUIRED #{answer} as fFedAuthEcho #{echo} and the token is redacted once logged in" do
+        port = fake_server([@loginack <> @featureextack <> @done, @done])
 
-      assert {:ok, s} = port |> prelogged_in(0x01) |> Tds.Protocol.login()
-      assert_received {:client_sent, ^port, login7}
-      assert :binary.match(login7, fedauth_feature(1)) != :nomatch
-      assert s.opts[:access_token] == :REDACTED
-    end
-
-    test "LOGIN7 leaves fFedAuthEcho clear when the server answered 0x00" do
-      port = fake_server([@loginack <> @featureextack <> @done, @done])
-
-      assert {:ok, _} = port |> prelogged_in(0x00) |> Tds.Protocol.login()
-      assert_received {:client_sent, ^port, login7}
-      assert :binary.match(login7, fedauth_feature(0)) != :nomatch
+        assert {:ok, s} = port |> prelogged_in(unquote(answer)) |> Tds.Protocol.login()
+        assert_received {:client_sent, ^port, login7}
+        assert :binary.match(login7, fedauth_feature(unquote(echo))) != :nomatch
+        assert s.opts[:access_token] == :REDACTED
+      end
     end
 
     test "a LOGINACK without a FEDAUTH acknowledgement fails the login" do
@@ -348,8 +358,10 @@ defmodule FedAuthTest do
       refute inspect(s) =~ @token
     end
 
+    # The state's options carry an environment-default password by then, which
+    # `connect/1` would refuse alongside the token.
     test "a routing redirect reconnects with the token to the named server" do
-      target = fake_server([])
+      {listen, target} = listen()
       host = UCS2.from_string("127.0.0.1")
 
       routing =
@@ -360,45 +372,17 @@ defmodule FedAuthTest do
           routing
 
       port = fake_server([envchange <> @loginack <> @featureextack <> @done])
+      s = prelogged_in(port, 0x01, @conn_opts ++ [password: "from-env"])
+      test = self()
 
-      assert {:error, %Tds.Error{} = error, _} =
-               port |> prelogged_in(0x01) |> Tds.Protocol.login()
+      spawn_link(fn ->
+        {:ok, sock} = :gen_tcp.accept(listen)
+        send(test, {:prelogin, recv_message(sock)})
+      end)
 
-      assert_received {:client_sent, ^target, <<_::binary>>}
+      assert {:error, %Tds.Error{} = error, _} = Tds.Protocol.login(s)
+      assert_receive {:prelogin, <<0x00, _::binary>>}
       refute inspect(error) =~ @token
-    end
-  end
-
-  describe "connect/1 option checks" do
-    test "refuses an access token alongside a password" do
-      assert {:error, %Tds.Error{message: message}} =
-               Tds.Protocol.connect(
-                 hostname: "127.0.0.1",
-                 port: 1,
-                 ssl: true,
-                 password: "pw",
-                 access_token: "tkn"
-               )
-
-      assert message =~ "not both"
-    end
-
-    test "refuses an access token that is not UTF-8, without echoing it" do
-      assert {:error, %Tds.Error{message: message}} =
-               Tds.Protocol.connect(
-                 hostname: "127.0.0.1",
-                 port: 1,
-                 ssl: true,
-                 access_token: <<0xFF, 0xFE>>
-               )
-
-      assert message =~ "UTF-8"
-      refute message =~ <<0xFF>>
-    end
-
-    test "treats access_token: nil as SQL authentication" do
-      assert {:error, %Tds.Error{message: "tcp connect: econnrefused"}} =
-               Tds.Protocol.connect(hostname: "127.0.0.1", port: 1, access_token: nil)
     end
   end
 end
