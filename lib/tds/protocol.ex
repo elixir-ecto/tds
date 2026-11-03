@@ -9,6 +9,7 @@ defmodule Tds.Protocol do
 
   @timeout 5_000
   @sock_opts [packet: :raw, mode: :binary, active: false]
+  @feature_ext_fedauth 0x02
   @trans_levels [
     :read_uncommitted,
     :read_committed,
@@ -67,6 +68,12 @@ defmodule Tds.Protocol do
 
   @spec connect(opts :: Keyword.t()) :: {:ok, state :: t()} | {:error, Exception.t()}
   def connect(opts) do
+    with :ok <- validate_access_token(opts) do
+      do_connect(opts)
+    end
+  end
+
+  defp do_connect(opts) do
     opts =
       opts
       |> Keyword.put_new(:username, System.get_env("MSSQLUSER") || System.get_env("USER"))
@@ -77,14 +84,11 @@ defmodule Tds.Protocol do
 
     s = %__MODULE__{}
 
-    case {validate_access_token(opts), opts[:instance]} do
-      {{:error, _} = error, _} ->
-        error
-
-      {:ok, nil} ->
+    case opts[:instance] do
+      nil ->
         connect(opts, s)
 
-      {:ok, _instance} ->
+      _instance ->
         case instance(opts, s) do
           {:ok, s} -> connect(opts, s)
           err -> {:error, err}
@@ -92,25 +96,43 @@ defmodule Tds.Protocol do
     end
   end
 
-  # An access token is a bearer credential: refuse it before any socket opens
-  # unless the whole connection, LOGIN7 included, will be encrypted.
+  # Runs on the caller's options, before the MSSQL* environment defaults fill
+  # in a password. An access token is a bearer credential, so it is refused
+  # before any socket opens unless LOGIN7 will travel encrypted. No error
+  # message includes the token.
   defp validate_access_token(opts) do
-    case Keyword.fetch(opts, :access_token) do
-      :error ->
+    token = opts[:access_token]
+
+    cond do
+      is_nil(token) ->
         :ok
 
-      {:ok, token} when not is_binary(token) or token == "" ->
-        {:error, Tds.Error.exception(":access_token must be a non-empty binary")}
+      not is_binary(token) or token == "" or not String.valid?(token) ->
+        {:error, Tds.Error.exception(":access_token must be a non-empty UTF-8 string")}
 
-      {:ok, _token} ->
-        if opts[:ssl] in [true, :on, :required],
-          do: :ok,
-          else:
-            {:error,
-             Tds.Error.exception(
-               "Login with :access_token requires an encrypted connection (ssl: true)."
-             )}
+      not is_nil(opts[:password]) ->
+        {:error, Tds.Error.exception("Pass either :access_token or :password, not both.")}
+
+      opts[:ssl] not in [true, :on, :required] ->
+        {:error,
+         Tds.Error.exception(
+           "Login with :access_token requires an encrypted connection (ssl: true)."
+         )}
+
+      true ->
+        warn_unverified_tls(opts[:ssl_opts] || [])
     end
+  end
+
+  defp warn_unverified_tls(ssl_opts) do
+    if ssl_opts[:verify] == :verify_none do
+      Logger.warning(
+        "Tds: :access_token sent with ssl_opts verify: :verify_none; " <>
+          "the server certificate is not verified"
+      )
+    end
+
+    :ok
   end
 
   @spec disconnect(err :: Exception.t() | String.t(), state :: t()) :: :ok
@@ -773,21 +795,31 @@ defmodule Tds.Protocol do
   def message(
         :login,
         msg_loginack(redirect: %{hostname: host, port: port}),
-        %{opts: opts}
+        %{opts: opts} = s
       ) do
     opts
     |> Keyword.put(:hostname, host)
     |> Keyword.put(:port, port)
     |> connect()
+    |> case do
+      {:error, error} -> {:error, error, s}
+      ok -> ok
+    end
   end
 
-  def message(:login, msg_loginack(), %{opts: opts} = s) do
+  # MS-TDS: a server that accepts a FEDAUTH login MUST acknowledge the feature.
+  def message(:login, msg_loginack(feature_acks: acks), %{opts: opts} = s) do
     state = %{s | opts: clean_opts(opts)}
 
-    opts
-    |> conn_opts()
-    |> IO.iodata_to_binary()
-    |> send_query(state)
+    if Keyword.has_key?(opts, :access_token) and not Map.has_key?(acks, @feature_ext_fedauth) do
+      {:error, Tds.Error.exception("Server did not acknowledge the FEDAUTH login feature."),
+       state}
+    else
+      opts
+      |> conn_opts()
+      |> IO.iodata_to_binary()
+      |> send_query(state)
+    end
   end
 
   def message(:executing, msg_result(set: set), s) do

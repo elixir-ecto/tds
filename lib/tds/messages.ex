@@ -23,7 +23,7 @@ defmodule Tds.Messages do
 
   # responses
   defrecord :msg_preloginack, [:response]
-  defrecord :msg_loginack, [:redirect]
+  defrecord :msg_loginack, [:redirect, feature_acks: %{}]
   defrecord :msg_prepared, [:params]
   defrecord :msg_sql_result, [:columns, :rows, :row_count]
   defrecord :msg_result, [:set, :params, :status]
@@ -79,6 +79,9 @@ defmodule Tds.Messages do
       {:envchange, other}, {msg, s} ->
         {msg, on_envchange(other, s)}
 
+      {:featureextack, acks}, {msg_loginack() = msg, s} ->
+        {msg_loginack(msg, feature_acks: acks), s}
+
       {:loginack, %{tds_version: version}}, {msg, s} ->
         Process.put(:tds_version, version)
         {msg, s}
@@ -93,8 +96,6 @@ defmodule Tds.Messages do
       {:error, error}, _ ->
         {msg_error(error: error), s}
 
-      # FEATUREEXTACK is decoded so it does not break the token stream; no
-      # feature this client requests needs anything from its acknowledgement.
       _, msg ->
         msg
     end)
