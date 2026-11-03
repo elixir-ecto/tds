@@ -597,7 +597,26 @@ defmodule Tds.Types do
     {value, tail}
   end
 
-  # TODO Variant Types
+  # Variant Types
+  # See: https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-tds/2435ed85-583b-4d14-9ffe-a2c7d6b4b4b8
+  def decode_data(%{data_reader: :variant}, <<0::little-unsigned-32, tail::binary>>),
+    do: {nil, tail}
+
+  def decode_data(
+        %{data_reader: :variant},
+        <<
+          size::little-unsigned-32,
+          base_type::unsigned-8,
+          prop_bytes::unsigned-8,
+          props::binary-size(prop_bytes),
+          tail::binary
+        >>
+      ) do
+    # size counts the base type and prop bytes count bytes too
+    data_size = size - 2 - prop_bytes
+    <<data::binary-size(data_size), tail::binary>> = tail
+    {decode_variant(base_type, props, data), tail}
+  end
 
   def decode_data(%{data_reader: :plp}, <<
         @tds_plp_null::little-unsigned-64,
@@ -643,6 +662,61 @@ defmodule Tds.Types do
 
     {value, tail}
   end
+
+  # Unlike fixed length columns, tinyint is unsigned
+  defp decode_variant(@tds_data_type_tinyint, <<>>, <<val::unsigned-8>>), do: val
+
+  defp decode_variant(base_type, <<>>, data)
+       when is_map_key(@fixed_data_types, base_type) do
+    info = %{
+      data_type: :fixed,
+      data_type_code: base_type,
+      length: @fixed_data_types[base_type]
+    }
+
+    {value, _tail} = decode_data(info, data)
+    value
+  end
+
+  defp decode_variant(@tds_data_type_uniqueidentifier, <<>>, data),
+    do: decode_uuid(:binary.copy(data))
+
+  defp decode_variant(@tds_data_type_daten, <<>>, data), do: decode_date(data)
+
+  defp decode_variant(@tds_data_type_timen, <<scale>>, data),
+    do: decode_time(scale, data)
+
+  defp decode_variant(@tds_data_type_datetime2n, <<scale>>, data),
+    do: decode_datetime2(scale, data)
+
+  defp decode_variant(@tds_data_type_datetimeoffsetn, <<scale>>, data),
+    do: decode_datetimeoffset(scale, data)
+
+  defp decode_variant(base_type, <<precision, scale>>, data)
+       when base_type in [@tds_data_type_decimaln, @tds_data_type_numericn],
+       do: decode_decimal(precision, scale, data)
+
+  defp decode_variant(base_type, <<_max_length::little-unsigned-16>>, data)
+       when base_type in [@tds_data_type_bigvarbinary, @tds_data_type_bigbinary],
+       do: :binary.copy(data)
+
+  defp decode_variant(
+         base_type,
+         <<collation::binary-5, _max_length::little-unsigned-16>>,
+         data
+       )
+       when base_type in [@tds_data_type_bigvarchar, @tds_data_type_bigchar] do
+    {:ok, collation} = decode_collation(collation)
+    decode_char(%{collation: collation}, data)
+  end
+
+  defp decode_variant(
+         base_type,
+         <<_collation::binary-5, _max_length::little-unsigned-16>>,
+         data
+       )
+       when base_type in [@tds_data_type_nvarchar, @tds_data_type_nchar],
+       do: decode_nchar(%{}, data)
 
   def decode_plp_chunk(<<chunksize::little-unsigned-32, tail::binary>>, buf)
       when chunksize == 0,
