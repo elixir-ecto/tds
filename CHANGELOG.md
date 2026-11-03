@@ -5,6 +5,10 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## Unreleased
+### Improvements
+* Decode `sql_variant` values, e.g. `SELECT SERVERPROPERTY('EngineEdition')`, which raised a `FunctionClauseError` in `Tds.Types.decode_data/2`
+
 ## v2.4.0 (2026-08-19)
 ### Fixes
 * Fix `unique_constraint` support in Ecto for en-US error messages: MSSQL error metadata is now preserved when re-raising from `query!/4`, `prepare!/3`, `execute!/4` and `close!/2` (#173)
