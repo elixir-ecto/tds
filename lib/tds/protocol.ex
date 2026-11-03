@@ -3,6 +3,7 @@ defmodule Tds.Protocol do
   Implements DBConnection behaviour for TDS protocol.
   """
   alias Tds.{Parameter, Query}
+  alias Tds.Protocol.Login7
   import Tds.{BinaryUtils, Messages, Utils}
   require Logger
   use DBConnection
@@ -42,7 +43,8 @@ defmodule Tds.Protocol do
           result: nil | list(),
           query: nil | String.t(),
           transaction: transaction,
-          env: env
+          env: env,
+          fed_auth: %{echo: boolean(), nonce: nil | binary()}
         }
 
   defstruct sock: nil,
@@ -59,10 +61,20 @@ defmodule Tds.Protocol do
               savepoint: 0,
               collation: %Tds.Protocol.Collation{},
               packetsize: 4096
-            }
+            },
+            # The server's PRELOGIN FEDAUTHREQUIRED answer and NONCE, both echoed
+            # back in LOGIN7's FEDAUTH feature
+            fed_auth: %{echo: false, nonce: nil}
 
   @spec connect(opts :: Keyword.t()) :: {:ok, state :: t()} | {:error, Exception.t()}
   def connect(opts) do
+    with :ok <- validate_access_token(opts) do
+      if opts[:access_token], do: warn_unverified_tls(opts[:ssl_opts] || [])
+      do_connect(opts)
+    end
+  end
+
+  defp do_connect(opts) do
     opts =
       opts
       |> Keyword.put_new(:username, System.get_env("MSSQLUSER") || System.get_env("USER"))
@@ -82,6 +94,43 @@ defmodule Tds.Protocol do
           {:ok, s} -> connect(opts, s)
           err -> {:error, err}
         end
+    end
+  end
+
+  # Runs on the caller's options, before the MSSQL* environment defaults fill
+  # in a password. An access token is a bearer credential, so it is refused
+  # before any socket opens unless LOGIN7 will travel encrypted. No error
+  # message includes the token.
+  defp validate_access_token(opts) do
+    token = opts[:access_token]
+
+    cond do
+      is_nil(token) ->
+        :ok
+
+      not is_binary(token) or token == "" or not String.valid?(token) ->
+        {:error, Tds.Error.exception(":access_token must be a non-empty UTF-8 string")}
+
+      not is_nil(opts[:password]) ->
+        {:error, Tds.Error.exception("Pass either :access_token or :password, not both.")}
+
+      opts[:ssl] not in [true, :on, :required] ->
+        {:error,
+         Tds.Error.exception(
+           "Login with :access_token requires an encrypted connection (ssl: true)."
+         )}
+
+      true ->
+        :ok
+    end
+  end
+
+  defp warn_unverified_tls(ssl_opts) do
+    if ssl_opts[:verify] == :verify_none do
+      Logger.warning(
+        "Tds: :access_token sent with ssl_opts verify: :verify_none; " <>
+          "the server certificate is not verified"
+      )
     end
   end
 
@@ -528,7 +577,7 @@ defmodule Tds.Protocol do
   end
 
   def login(%{opts: opts} = s) do
-    msg = msg_login(params: opts)
+    msg = msg_login(params: opts, fed_auth: s.fed_auth)
 
     case login_send(msg, %{s | state: :login}) do
       {:ok, s} ->
@@ -742,24 +791,40 @@ defmodule Tds.Protocol do
     end
   end
 
+  # `opts` already carries the environment defaults, so the redirect skips
+  # `connect/1`'s validation of the caller's options.
   def message(
         :login,
         msg_loginack(redirect: %{hostname: host, port: port}),
-        %{opts: opts}
+        %{opts: opts, sock: {mod, sock}} = s
       ) do
     opts
     |> Keyword.put(:hostname, host)
     |> Keyword.put(:port, port)
-    |> connect()
+    |> do_connect()
+    |> case do
+      {:ok, _} = ok ->
+        mod.close(sock)
+        ok
+
+      {:error, error} ->
+        {:error, error, s}
+    end
   end
 
-  def message(:login, msg_loginack(), %{opts: opts} = s) do
+  # MS-TDS: a server that accepts a FEDAUTH login MUST acknowledge the feature.
+  def message(:login, msg_loginack(feature_acks: acks), %{opts: opts} = s) do
     state = %{s | opts: clean_opts(opts)}
 
-    opts
-    |> conn_opts()
-    |> IO.iodata_to_binary()
-    |> send_query(state)
+    if opts[:access_token] && not Map.has_key?(acks, Login7.feature_ext_fedauth()) do
+      {:error, Tds.Error.exception("Server did not acknowledge the FEDAUTH login feature."),
+       state}
+    else
+      opts
+      |> conn_opts()
+      |> IO.iodata_to_binary()
+      |> send_query(state)
+    end
   end
 
   def message(:executing, msg_result(set: set), s) do
@@ -941,8 +1006,11 @@ defmodule Tds.Protocol do
     end
   end
 
-  defp clean_opts(opts) do
-    Keyword.put(opts, :password, :REDACTED)
+  @doc false
+  def clean_opts(opts) do
+    opts
+    |> Keyword.put(:password, :REDACTED)
+    |> Keyword.replace(:access_token, :REDACTED)
   end
 
   @spec conn_opts(Keyword.t()) :: list() | no_return
@@ -1159,4 +1227,14 @@ defmodule Tds.Protocol do
     |> Keyword.values()
     |> Enum.max()
   end
+end
+
+defimpl Inspect, for: Tds.Protocol do
+  # Connection state holds the credentials until login completes, and is
+  # logged by `handle_info/2` and by DBConnection on crashes.
+  def inspect(%{opts: conn_opts} = state, opts) when is_list(conn_opts) do
+    Inspect.Any.inspect(%{state | opts: Tds.Protocol.clean_opts(conn_opts)}, opts)
+  end
+
+  def inspect(state, opts), do: Inspect.Any.inspect(state, opts)
 end

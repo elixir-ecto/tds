@@ -123,6 +123,45 @@ config :your_app, :tds_conn,
 
 ```
 
+## Microsoft Entra ID (Azure AD) access tokens
+
+Azure SQL Database and Azure SQL Managed Instance accept a Microsoft Entra ID
+access token in place of a SQL login. Pass it as `:access_token`; Tds then logs
+in with the FEDAUTH feature extension (library SECURITYTOKEN) and sends an empty
+username and password. `:access_token` and `:password` are mutually exclusive.
+
+The token is a bearer credential, so Tds refuses it unless `ssl` is `true`,
+`:on` or `:required`, and the login fails if the server does not acknowledge
+FEDAUTH. Encryption alone does not authenticate the server: verify its
+certificate and host name, or the token can be read by whoever answers.
+
+An access token expires (typically after an hour), so supply it through
+DBConnection's `:configure` option, which runs before every connect and lets a
+reconnect pick up a fresh token (`:public_key.cacerts_get/0` needs OTP 25+):
+
+```elixir
+host = "myserver.database.windows.net"
+
+Tds.start_link(
+  hostname: host,
+  database: "my_db",
+  ssl: true,
+  ssl_opts: [
+    verify: :verify_peer,
+    cacerts: :public_key.cacerts_get(),
+    server_name_indication: String.to_charlist(host),
+    customize_hostname_check: [
+      match_fun: :public_key.pkix_verify_hostname_match_fun(:https)
+    ]
+  ],
+  configure: fn opts -> Keyword.put(opts, :access_token, MyApp.Token.fetch!()) end
+)
+```
+
+Use the Proxy connection policy on Azure SQL. Under Redirect, the gateway
+routes the client to another host, which Tds follows with the same options,
+so a pinned `server_name_indication` no longer matches that host's certificate.
+
 ## Connecting to SQL Server Instances
 
 Tds supports SQL Server instances by passing `instance: "instancename"` to the connection options.

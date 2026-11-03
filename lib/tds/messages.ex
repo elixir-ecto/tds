@@ -14,7 +14,7 @@ defmodule Tds.Messages do
 
   # requests
   defrecord :msg_prelogin, [:params]
-  defrecord :msg_login, [:params]
+  defrecord :msg_login, [:params, :fed_auth]
   defrecord :msg_ready, [:status]
   defrecord :msg_sql, [:query]
   defrecord :msg_transmgr, [:command, :name, :isolation_level]
@@ -23,7 +23,7 @@ defmodule Tds.Messages do
 
   # responses
   defrecord :msg_preloginack, [:response]
-  defrecord :msg_loginack, [:redirect]
+  defrecord :msg_loginack, [:redirect, feature_acks: %{}]
   defrecord :msg_prepared, [:params]
   defrecord :msg_sql_result, [:columns, :rows, :row_count]
   defrecord :msg_result, [:set, :params, :status]
@@ -79,6 +79,9 @@ defmodule Tds.Messages do
       {:envchange, other}, {msg, s} ->
         {msg, on_envchange(other, s)}
 
+      {:featureextack, acks}, {msg_loginack() = msg, s} ->
+        {msg_loginack(msg, feature_acks: acks), s}
+
       {:loginack, %{tds_version: version}}, {msg, s} ->
         Process.put(:tds_version, version)
         {msg, s}
@@ -94,7 +97,6 @@ defmodule Tds.Messages do
         {msg_error(error: error), s}
 
       _, msg ->
-        # FeatureExtAck should be processed here in future
         msg
     end)
   end
@@ -247,9 +249,9 @@ defmodule Tds.Messages do
     Prelogin.encode(opts)
   end
 
-  defp encode(msg_login(params: opts), _env) do
+  defp encode(msg_login(params: opts, fed_auth: fed_auth), _env) do
     opts
-    |> Login7.new()
+    |> Login7.new(fed_auth)
     |> Login7.encode()
   end
 

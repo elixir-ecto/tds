@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## Unreleased
+### Improvements
+* Support Microsoft Entra ID access token login through the `:access_token` option (MS-TDS FEDAUTH feature extension, SECURITYTOKEN library), and decode the `FEATUREEXTACK` token
+* Redact `:access_token` and `:password` when inspecting connection state
+
+### Fixes
+* Return a connection error instead of crashing when reconnecting to a server named by a routing `ENVCHANGE` fails
+
 ## v2.4.0 (2026-08-19)
 ### Fixes
 * Fix `unique_constraint` support in Ecto for en-US error messages: MSSQL error metadata is now preserved when re-raising from `query!/4`, `prepare!/3`, `execute!/4` and `close!/2` (#173)
