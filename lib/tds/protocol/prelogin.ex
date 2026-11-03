@@ -171,7 +171,7 @@ defmodule Tds.Protocol.Prelogin do
       |> IO.iodata_to_binary()
       |> decode_tokens([], s)
 
-    s = %{s | fed_auth_echo: prelogin.fed_auth_required, fed_auth_nonce: prelogin.nonce_opt}
+    s = %{s | fed_auth: %{echo: prelogin.fed_auth_required, nonce: prelogin.nonce_opt}}
 
     case {ssl?(opts), encryption, instance} do
       {_, _, false} ->
@@ -186,14 +186,9 @@ defmodule Tds.Protocol.Prelogin do
       {:off, <<@encryption_required>>, _} ->
         disconnect("Server does not allow the requested encryption level.", s)
 
-      # Encryption is not supported. The server needs to respond with :not_supported.
-      # An access token is a bearer credential, so LOGIN7 must not travel in clear text.
+      # Encryption is not supported. The server needs to respond with :not_supported
       {:not_supported, <<@encryption_not_supported>>, _} ->
-        if Keyword.has_key?(opts, :access_token) do
-          disconnect("Login with :access_token requires an encrypted connection (ssl: true).", s)
-        else
-          {:login, s}
-        end
+        {:login, s}
 
       # Encryption is on. The server needs to respond with :on
       {:on, <<@encryption_on>>, _} ->

@@ -67,10 +67,8 @@ defmodule Tds.Protocol.Login7 do
     :database,
     # Entra (Azure AD) access token for FEDAUTH SECURITYTOKEN login
     :access_token,
-    # Whether the server answered PRELOGIN FEDAUTHREQUIRED with 0x01
-    fed_auth_echo: false,
-    # The server's 32-byte PRELOGIN NONCE, if it sent one
-    fed_auth_nonce: nil
+    # The server's PRELOGIN FEDAUTHREQUIRED answer and NONCE, echoed in FEDAUTH
+    fed_auth: %{echo: false, nonce: nil}
   ]
 
   @doc """
@@ -78,9 +76,10 @@ defmodule Tds.Protocol.Login7 do
 
   With `:access_token` set, the login authenticates with the FEDAUTH
   SECURITYTOKEN feature extension and sends an empty username and password,
-  whatever `:username` and `:password` hold.
+  whatever `:username` and `:password` hold. `fed_auth` carries what the
+  server's PRELOGIN response said, which that feature echoes.
   """
-  def new(opts) do
+  def new(opts, fed_auth \\ %{echo: false, nonce: nil}) do
     # gethostname/0 always succeeds
     {:ok, hostname} = :inet.gethostname()
 
@@ -108,19 +107,15 @@ defmodule Tds.Protocol.Login7 do
       nil ->
         login
 
-      token when is_binary(token) and token != "" ->
+      token ->
         %{
           login
           | username: "",
             password: "",
             option_flags_3: @option_flags_3_extension,
             access_token: token,
-            fed_auth_echo: Keyword.get(opts, :fed_auth_echo, false),
-            fed_auth_nonce: Keyword.get(opts, :fed_auth_nonce)
+            fed_auth: fed_auth
         }
-
-      _ ->
-        raise ArgumentError, ":access_token must be a non-empty binary"
     end
   end
 
@@ -183,18 +178,22 @@ defmodule Tds.Protocol.Login7 do
     variable_login = variable_login <> servername
     current_offset = current_offset + byte_size(servername)
 
-    # Unused, or ibExtension/cbExtension: a DWORD holding the FeatureExt offset,
-    # inserted once every variable field before the FeatureExt block is laid out
-    {offsets, current_offset, extension_at} =
+    clt_int_name = UCS2.from_string(@clt_int_name)
+    database = UCS2.from_string(login.database)
+
+    # Unused, or ibExtension/cbExtension: a DWORD, after the database field,
+    # holding the offset of the FeatureExt block that follows it
+    extension_at = current_offset + byte_size(clt_int_name) + byte_size(database)
+
+    offsets =
       if login.access_token do
-        {offsets <> <<current_offset::ushort(), 4::ushort()>>, current_offset + 4,
-         byte_size(variable_login)}
+        offsets <> <<extension_at::ushort(), 4::ushort()>>
       else
-        {offsets <> <<0::ushort(), 0::ushort()>>, current_offset, nil}
+        offsets <> <<0::ushort(), 0::ushort()>>
       end
 
     # Client Int Name
-    variable_login = variable_login <> UCS2.from_string(@clt_int_name)
+    variable_login = variable_login <> clt_int_name
     offsets = offsets <> <<current_offset::ushort(), 4::ushort()>>
     current_offset = current_offset + 8
 
@@ -202,19 +201,16 @@ defmodule Tds.Protocol.Login7 do
     offsets = offsets <> <<0::ushort(), 0::ushort()>>
 
     # Database
-    variable_login = variable_login <> UCS2.from_string(login.database)
+    variable_login = variable_login <> database
 
     # The legacy 0xAC length for an empty database would run that field over
-    # the FeatureExt block, so a token login sends a true zero length.
-    database =
-      cond do
-        login.database != "" -> String.length(login.database)
-        login.access_token -> 0
-        true -> 0xAC
-      end
+    # the extension data after it, so a token login sends a true zero length.
+    database_length =
+      if login.database == "" and is_nil(login.access_token),
+        do: 0xAC,
+        else: String.length(login.database)
 
-    offsets = offsets <> <<current_offset::ushort(), database::ushort()>>
-    current_offset = current_offset + byte_size(UCS2.from_string(login.database))
+    offsets = offsets <> <<current_offset::ushort(), database_length::ushort()>>
 
     # Client ID
     offsets = offsets <> <<0::sixbyte()>>
@@ -232,28 +228,24 @@ defmodule Tds.Protocol.Login7 do
     offsets = offsets <> <<0::dword()>>
 
     variable_login =
-      case extension_at do
-        nil ->
-          variable_login
-
-        at ->
-          <<head::binary-size(at), rest::binary>> = variable_login
-          head <> <<current_offset::little-size(32)>> <> rest <> feature_ext(login)
+      if login.access_token do
+        variable_login <> <<extension_at + 4::dword()>> <> feature_ext(login)
+      else
+        variable_login
       end
 
     {variable_login, offsets}
   end
 
-  defp feature_ext(%{access_token: token, fed_auth_echo: echo, fed_auth_nonce: nonce}) do
+  defp feature_ext(%{access_token: token, fed_auth: %{echo: echo, nonce: nonce}}) do
     token = UCS2.from_string(token)
+    echo = if echo, do: 1, else: 0
 
-    options =
-      Bitwise.bor(Bitwise.bsl(@fedauth_library_security_token, 1), if(echo, do: 1, else: 0))
+    data =
+      <<@fedauth_library_security_token::7, echo::1, byte_size(token)::dword()>> <>
+        token <> (nonce || <<>>)
 
-    data = <<options, byte_size(token)::little-size(32)>> <> token <> (nonce || <<>>)
-
-    <<@feature_ext_fedauth, byte_size(data)::little-size(32)>> <>
-      data <> <<@feature_ext_terminator>>
+    <<@feature_ext_fedauth, byte_size(data)::dword()>> <> data <> <<@feature_ext_terminator>>
   end
 
   defp encode_tds_password(list) do

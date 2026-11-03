@@ -9,9 +9,9 @@ defmodule FedAuthTest do
 
   @login_opts [hostname: "db.example.net", username: "sa", password: "pw", database: "app"]
 
-  # Fixes the two fields `Login7.new/1` reads from the host.
-  defp login7_bytes(opts) do
-    login = %{Login7.new(opts) | hostname: "client", client_pid: <<0, 0, 3, 34>>}
+  # Fixes the two fields `Login7.new/2` reads from the host.
+  defp login7_bytes(opts, fed_auth \\ %{echo: false, nonce: nil}) do
+    login = %{Login7.new(opts, fed_auth) | hostname: "client", client_pid: <<0, 0, 3, 34>>}
     login |> Login7.encode() |> IO.iodata_to_binary()
   end
 
@@ -68,224 +68,37 @@ defmodule FedAuthTest do
     end
 
     test "an access token sends empty credentials, fExtension and a FEDAUTH SECURITYTOKEN feature" do
-      bytes = login7_bytes(@login_opts ++ [access_token: "tkn", fed_auth_echo: true])
+      bytes = login7_bytes(@login_opts ++ [access_token: "tkn"], %{echo: true, nonce: nil})
+
+      # packet header (LOGIN7, EOM, 197 bytes), then Length 189
+      header = <<0x10, 0x01, 0x00, 0xC5, 0x00, 0x00, 0x01, 0x00, 189, 0, 0, 0>>
+      # TDSVersion, PacketSize, ClientProgVer, ClientPID, ConnectionID
+      fixed = <<4, 0, 0, 116, 0, 16, 0, 0, 4, 0, 0, 7, 0, 0, 3, 34, 0, 0, 0, 0>>
+
+      # OptionFlags1, OptionFlags2, TypeFlags, OptionFlags3 (fExtension), ClientTimeZone, ClientLCID
+      flags = <<0x00, 0x00, 0x00, 0x10, 0, 0, 0, 0, 9, 4, 0, 0>>
+      # HostName 94/6, UserName 106/0, Password 106/0, AppName 106/10, ServerName 126/14
+      names = <<94, 0, 6, 0, 106, 0, 0, 0, 106, 0, 0, 0, 106, 0, 10, 0, 126, 0, 14, 0>>
+      # ibExtension 168/4, CltIntName 154/4, Language, Database 162/3
+      more = <<168, 0, 4, 0, 154, 0, 4, 0, 0, 0, 0, 0, 162, 0, 3, 0>>
+      # ClientID, SSPI, AtchDBFile, ChangePassword, cbSSPILong
+      rest = :binary.copy(<<0>>, 22)
+
+      data =
+        Enum.map_join(
+          ["client", "Elixir TDS", "db.example.net", "ODBC", "app"],
+          &UCS2.from_string/1
+        )
+
+      # Extension DWORD: the FeatureExt block starts at offset 172
+      extension = <<172, 0, 0, 0>>
+      # FEDAUTH, FeatureDataLen 11, bOptions (SECURITYTOKEN << 1 | fFedAuthEcho),
+      # FedAuthToken (DWORD length, UTF-16LE "tkn"), terminator
+      feature_ext = <<0x02, 11, 0, 0, 0, 0x03, 6, 0, 0, 0, 116, 0, 107, 0, 110, 0, 0xFF>>
 
       assert bytes ==
-               <<
-                 # packet header: LOGIN7, EOM, length 197
-                 0x10,
-                 0x01,
-                 0x00,
-                 0xC5,
-                 0x00,
-                 0x00,
-                 0x01,
-                 0x00,
-                 # Length 189, TDSVersion, PacketSize, ClientProgVer, ClientPID, ConnectionID
-                 189,
-                 0,
-                 0,
-                 0,
-                 4,
-                 0,
-                 0,
-                 116,
-                 0,
-                 16,
-                 0,
-                 0,
-                 4,
-                 0,
-                 0,
-                 7,
-                 0,
-                 0,
-                 3,
-                 34,
-                 0,
-                 0,
-                 0,
-                 0,
-                 # OptionFlags1, OptionFlags2, TypeFlags, OptionFlags3 (fExtension)
-                 0x00,
-                 0x00,
-                 0x00,
-                 0x10,
-                 # ClientTimeZone, ClientLCID
-                 0,
-                 0,
-                 0,
-                 0,
-                 9,
-                 4,
-                 0,
-                 0,
-                 # HostName 94/6, UserName 106/0, Password 106/0, AppName 106/10, ServerName 126/14
-                 94,
-                 0,
-                 6,
-                 0,
-                 106,
-                 0,
-                 0,
-                 0,
-                 106,
-                 0,
-                 0,
-                 0,
-                 106,
-                 0,
-                 10,
-                 0,
-                 126,
-                 0,
-                 14,
-                 0,
-                 # ibExtension 154/4, CltIntName 158/4, Language, Database 166/3
-                 154,
-                 0,
-                 4,
-                 0,
-                 158,
-                 0,
-                 4,
-                 0,
-                 0,
-                 0,
-                 0,
-                 0,
-                 166,
-                 0,
-                 3,
-                 0,
-                 # ClientID, SSPI, AtchDBFile, ChangePassword, cbSSPILong
-                 0,
-                 0,
-                 0,
-                 0,
-                 0,
-                 0,
-                 0,
-                 0,
-                 0,
-                 0,
-                 0,
-                 0,
-                 0,
-                 0,
-                 0,
-                 0,
-                 0,
-                 0,
-                 0,
-                 0,
-                 0,
-                 0,
-                 # "client"
-                 99,
-                 0,
-                 108,
-                 0,
-                 105,
-                 0,
-                 101,
-                 0,
-                 110,
-                 0,
-                 116,
-                 0,
-                 # "Elixir TDS"
-                 69,
-                 0,
-                 108,
-                 0,
-                 105,
-                 0,
-                 120,
-                 0,
-                 105,
-                 0,
-                 114,
-                 0,
-                 32,
-                 0,
-                 84,
-                 0,
-                 68,
-                 0,
-                 83,
-                 0,
-                 # "db.example.net"
-                 100,
-                 0,
-                 98,
-                 0,
-                 46,
-                 0,
-                 101,
-                 0,
-                 120,
-                 0,
-                 97,
-                 0,
-                 109,
-                 0,
-                 112,
-                 0,
-                 108,
-                 0,
-                 101,
-                 0,
-                 46,
-                 0,
-                 110,
-                 0,
-                 101,
-                 0,
-                 116,
-                 0,
-                 # Extension DWORD: FeatureExt starts at offset 172
-                 172,
-                 0,
-                 0,
-                 0,
-                 # "ODBC", "app"
-                 79,
-                 0,
-                 68,
-                 0,
-                 66,
-                 0,
-                 67,
-                 0,
-                 97,
-                 0,
-                 112,
-                 0,
-                 112,
-                 0,
-                 # FeatureId FEDAUTH, FeatureDataLen 11
-                 0x02,
-                 11,
-                 0,
-                 0,
-                 0,
-                 # bFedAuthLibrary SECURITYTOKEN << 1 | fFedAuthEcho
-                 0x03,
-                 # FedAuthToken: DWORD byte length, then UTF-16LE "tkn"
-                 6,
-                 0,
-                 0,
-                 0,
-                 116,
-                 0,
-                 107,
-                 0,
-                 110,
-                 0,
-                 # FeatureExt terminator
-                 0xFF
-               >>
+               header <>
+                 fixed <> flags <> names <> more <> rest <> data <> extension <> feature_ext
     end
 
     test "fFedAuthEcho is clear when the server did not answer FEDAUTHREQUIRED" do
@@ -300,7 +113,8 @@ defmodule FedAuthTest do
         bytes
 
       assert cch_database == 0
-      assert <<_::binary-size(8 + ib_database), 0x02, _::binary>> = bytes
+      <<_::binary-size(8 + ib_database), feature_ext_at::little-32, _::binary>> = bytes
+      assert <<_::binary-size(8 + feature_ext_at), 0x02, _::binary>> = bytes
     end
 
     test "a token larger than one packet spans several LOGIN7 packets" do
@@ -320,15 +134,11 @@ defmodule FedAuthTest do
 
     test "echoes the server's PRELOGIN nonce after the token" do
       nonce = :binary.copy(<<0xAB>>, 32)
-      bytes = login7_bytes(@login_opts ++ [access_token: "tkn", fed_auth_nonce: nonce])
+      bytes = login7_bytes(@login_opts ++ [access_token: "tkn"], %{echo: false, nonce: nonce})
 
       assert binary_part(bytes, byte_size(bytes) - 49, 49) ==
                <<0x02, 43::little-32, 0x02, 6::little-32, 116, 0, 107, 0, 110, 0>> <>
                  nonce <> <<0xFF>>
-    end
-
-    test "rejects an empty access token" do
-      assert_raise ArgumentError, fn -> Login7.new(@login_opts ++ [access_token: ""]) end
     end
   end
 
@@ -342,10 +152,10 @@ defmodule FedAuthTest do
     test "records the server's FEDAUTHREQUIRED answer for LOGIN7 to echo" do
       s = %Tds.Protocol{opts: [ssl: true, access_token: "tkn"]}
 
-      assert {:encrypt, %{fed_auth_echo: true}} =
+      assert {:encrypt, %{fed_auth: %{echo: true}}} =
                Prelogin.decode(prelogin_response(0x01, 0x01), s)
 
-      assert {:encrypt, %{fed_auth_echo: false}} =
+      assert {:encrypt, %{fed_auth: %{echo: false}}} =
                Prelogin.decode(prelogin_response(0x01, 0x00), s)
     end
 
@@ -356,22 +166,29 @@ defmodule FedAuthTest do
         <<0x01, 0x00, 0x0B, 0x00, 0x01, 0x07, 0x00, 0x0C, 0x00, 0x20, 0xFF, 0x01>> <> nonce
 
       s = %Tds.Protocol{opts: [ssl: true, access_token: "tkn"]}
-      assert {:encrypt, %{fed_auth_nonce: ^nonce}} = Prelogin.decode(response, s)
+      assert {:encrypt, %{fed_auth: %{nonce: ^nonce}}} = Prelogin.decode(response, s)
+    end
+  end
+
+  describe "connecting with an access token" do
+    # Port 1 refuses connections, so an error naming the token proves no socket was opened.
+    @conn [hostname: "127.0.0.1", port: 1, database: "app"]
+
+    test "is refused without encryption, before LOGIN7 is sent" do
+      for ssl <- [false, :not_supported] do
+        assert {:error, %Tds.Error{message: message}} =
+                 Tds.Protocol.connect(@conn ++ [ssl: ssl, access_token: "tkn"])
+
+        assert message =~ "requires an encrypted connection"
+        refute message =~ "tkn"
+      end
     end
 
-    test "refuses to send an access token over an unencrypted connection" do
-      s = %Tds.Protocol{opts: [ssl: false, access_token: "tkn"]}
+    test "is refused when the token is empty" do
+      assert {:error, %Tds.Error{message: message}} =
+               Tds.Protocol.connect(@conn ++ [ssl: true, access_token: ""])
 
-      assert {:disconnect, %Tds.Error{message: message}, _} =
-               Prelogin.decode(prelogin_response(0x02, 0x01), s)
-
-      assert message =~ "encrypted"
-      refute message =~ "tkn"
-    end
-
-    test "still logs in unencrypted without an access token" do
-      s = %Tds.Protocol{opts: [ssl: false]}
-      assert {:login, _} = Prelogin.decode(prelogin_response(0x02, 0x00), s)
+      assert message =~ "non-empty"
     end
   end
 

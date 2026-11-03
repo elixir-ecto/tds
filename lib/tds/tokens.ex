@@ -495,7 +495,7 @@ defmodule Tds.Tokens do
   end
 
   defp decode_featureextack(
-         <<feature_id, length::little-uint32(), data::binary-size(length), tail::binary>>,
+         <<feature_id, length::dword(), data::binary-size(length), tail::binary>>,
          collmetadata,
          acks
        ) do

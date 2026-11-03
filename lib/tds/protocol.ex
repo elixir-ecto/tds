@@ -43,8 +43,7 @@ defmodule Tds.Protocol do
           query: nil | String.t(),
           transaction: transaction,
           env: env,
-          fed_auth_echo: boolean(),
-          fed_auth_nonce: nil | binary()
+          fed_auth: %{echo: boolean(), nonce: nil | binary()}
         }
 
   defstruct sock: nil,
@@ -64,8 +63,7 @@ defmodule Tds.Protocol do
             },
             # The server's PRELOGIN FEDAUTHREQUIRED answer and NONCE, both echoed
             # back in LOGIN7's FEDAUTH feature
-            fed_auth_echo: false,
-            fed_auth_nonce: nil
+            fed_auth: %{echo: false, nonce: nil}
 
   @spec connect(opts :: Keyword.t()) :: {:ok, state :: t()} | {:error, Exception.t()}
   def connect(opts) do
@@ -79,15 +77,39 @@ defmodule Tds.Protocol do
 
     s = %__MODULE__{}
 
-    case opts[:instance] do
-      nil ->
+    case {validate_access_token(opts), opts[:instance]} do
+      {{:error, _} = error, _} ->
+        error
+
+      {:ok, nil} ->
         connect(opts, s)
 
-      _instance ->
+      {:ok, _instance} ->
         case instance(opts, s) do
           {:ok, s} -> connect(opts, s)
           err -> {:error, err}
         end
+    end
+  end
+
+  # An access token is a bearer credential: refuse it before any socket opens
+  # unless the whole connection, LOGIN7 included, will be encrypted.
+  defp validate_access_token(opts) do
+    case Keyword.fetch(opts, :access_token) do
+      :error ->
+        :ok
+
+      {:ok, token} when not is_binary(token) or token == "" ->
+        {:error, Tds.Error.exception(":access_token must be a non-empty binary")}
+
+      {:ok, _token} ->
+        if opts[:ssl] in [true, :on, :required],
+          do: :ok,
+          else:
+            {:error,
+             Tds.Error.exception(
+               "Login with :access_token requires an encrypted connection (ssl: true)."
+             )}
     end
   end
 
@@ -534,8 +556,7 @@ defmodule Tds.Protocol do
   end
 
   def login(%{opts: opts} = s) do
-    opts = Keyword.merge(opts, fed_auth_echo: s.fed_auth_echo, fed_auth_nonce: s.fed_auth_nonce)
-    msg = msg_login(params: opts)
+    msg = msg_login(params: opts, fed_auth: s.fed_auth)
 
     case login_send(msg, %{s | state: :login}) do
       {:ok, s} ->
@@ -952,11 +973,7 @@ defmodule Tds.Protocol do
   def clean_opts(opts) do
     opts
     |> Keyword.put(:password, :REDACTED)
-    |> redact(:access_token)
-  end
-
-  defp redact(opts, key) do
-    if Keyword.has_key?(opts, key), do: Keyword.put(opts, key, :REDACTED), else: opts
+    |> Keyword.replace(:access_token, :REDACTED)
   end
 
   @spec conn_opts(Keyword.t()) :: list() | no_return
