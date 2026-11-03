@@ -27,6 +27,7 @@ defmodule Tds.Tokens do
           | :doneproc
           | :envchange
           | :error
+          | :featureextack
           | :info
           | :loginack
           | :order
@@ -53,7 +54,7 @@ defmodule Tds.Tokens do
         0xFF -> decode_doneinproc(tail, collmetadata)
         0xE3 -> decode_envchange(tail, collmetadata)
         0xAA -> decode_error(tail, collmetadata)
-        # 0xAE -> decode_featureextack(tail, collmetadata)
+        0xAE -> decode_featureextack(tail, collmetadata)
         # 0xEE -> decode_fedauthinfo(tail, collmetadata)
         0xAB -> decode_info(tail, collmetadata)
         0xAD -> decode_loginack(tail, collmetadata)
@@ -484,6 +485,21 @@ defmodule Tds.Tokens do
     }
 
     {{:loginack, token}, tail, collmetadata}
+  end
+
+  # FEATUREEXTACK: FeatureId, DWORD FeatureAckDataLen, FeatureAckData, ..., 0xFF
+  defp decode_featureextack(bin, collmetadata, acks \\ %{})
+
+  defp decode_featureextack(<<0xFF, tail::binary>>, collmetadata, acks) do
+    {{:featureextack, acks}, tail, collmetadata}
+  end
+
+  defp decode_featureextack(
+         <<feature_id, length::little-uint32(), data::binary-size(length), tail::binary>>,
+         collmetadata,
+         acks
+       ) do
+    decode_featureextack(tail, collmetadata, Map.put(acks, feature_id, data))
   end
 
   defp decode_column_order(tail, n, acc \\ [])

@@ -166,10 +166,12 @@ defmodule Tds.Protocol.Prelogin do
           | {:login, state()}
           | {:disconnect, Tds.Error.t(), state()}
   def decode(packet_data, %{opts: opts} = s) do
-    {:ok, %{encryption: encryption, instance: instance}} =
+    {:ok, %{encryption: encryption, instance: instance} = prelogin} =
       packet_data
       |> IO.iodata_to_binary()
       |> decode_tokens([], s)
+
+    s = %{s | fed_auth_echo: prelogin.fed_auth_required, fed_auth_nonce: prelogin.nonce_opt}
 
     case {ssl?(opts), encryption, instance} do
       {_, _, false} ->
@@ -184,9 +186,14 @@ defmodule Tds.Protocol.Prelogin do
       {:off, <<@encryption_required>>, _} ->
         disconnect("Server does not allow the requested encryption level.", s)
 
-      # Encryption is not supported. The server needs to respond with :not_supported
+      # Encryption is not supported. The server needs to respond with :not_supported.
+      # An access token is a bearer credential, so LOGIN7 must not travel in clear text.
       {:not_supported, <<@encryption_not_supported>>, _} ->
-        {:login, s}
+        if Keyword.has_key?(opts, :access_token) do
+          disconnect("Login with :access_token requires an encrypted connection (ssl: true).", s)
+        else
+          {:login, s}
+        end
 
       # Encryption is on. The server needs to respond with :on
       {:on, <<@encryption_on>>, _} ->
@@ -301,10 +308,18 @@ defmodule Tds.Protocol.Prelogin do
           %{m | instance: data == <<0x00>>}
         )
 
+      :fed_auth_required ->
+        decode_data(
+          tokens,
+          tail,
+          %{m | fed_auth_required: data == <<0x01>>}
+        )
+
+      :nonce_opt ->
+        decode_data(tokens, tail, %{m | nonce_opt: data})
+
       # :thread_id ->
       # :mars ->
-      # :fed_auth_required ->
-      # :nonce_opt ->
       _ ->
         decode_data(tokens, tail, m)
     end

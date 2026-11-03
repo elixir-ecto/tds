@@ -27,6 +27,7 @@ defmodule Tds do
           | {:database, String.t()}
           | {:username, String.t()}
           | {:password, String.t()}
+          | {:access_token, String.t()}
           | {:timeout, timeout()}
           | {:connect_timeout, timeout()}
           | {:execution_mode, :prepare_execute | :executesql}

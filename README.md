@@ -123,6 +123,30 @@ config :your_app, :tds_conn,
 
 ```
 
+## Microsoft Entra ID (Azure AD) access tokens
+
+Azure SQL Database and Azure SQL Managed Instance accept a Microsoft Entra ID
+access token in place of a SQL login. Pass it as `:access_token`; Tds then logs
+in with the FEDAUTH feature extension (library SECURITYTOKEN) and sends an empty
+username and password. Fetching and refreshing the token is up to the caller,
+for example through the `:configure` option of `DBConnection` so that each new
+connection reads a fresh token.
+
+An access token requires an encrypted connection: with `ssl: false` (or
+`:not_supported`) the connection is refused before the token is sent.
+
+```elixir
+Tds.start_link(
+  hostname: "myserver.database.windows.net",
+  database: "my_db",
+  access_token: token,
+  ssl: true
+)
+```
+
+Azure SQL must use the Proxy connection policy, since Tds does not follow
+gateway redirects.
+
 ## Connecting to SQL Server Instances
 
 Tds supports SQL Server instances by passing `instance: "instancename"` to the connection options.

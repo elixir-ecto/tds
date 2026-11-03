@@ -42,7 +42,9 @@ defmodule Tds.Protocol do
           result: nil | list(),
           query: nil | String.t(),
           transaction: transaction,
-          env: env
+          env: env,
+          fed_auth_echo: boolean(),
+          fed_auth_nonce: nil | binary()
         }
 
   defstruct sock: nil,
@@ -59,7 +61,11 @@ defmodule Tds.Protocol do
               savepoint: 0,
               collation: %Tds.Protocol.Collation{},
               packetsize: 4096
-            }
+            },
+            # The server's PRELOGIN FEDAUTHREQUIRED answer and NONCE, both echoed
+            # back in LOGIN7's FEDAUTH feature
+            fed_auth_echo: false,
+            fed_auth_nonce: nil
 
   @spec connect(opts :: Keyword.t()) :: {:ok, state :: t()} | {:error, Exception.t()}
   def connect(opts) do
@@ -528,6 +534,7 @@ defmodule Tds.Protocol do
   end
 
   def login(%{opts: opts} = s) do
+    opts = Keyword.merge(opts, fed_auth_echo: s.fed_auth_echo, fed_auth_nonce: s.fed_auth_nonce)
     msg = msg_login(params: opts)
 
     case login_send(msg, %{s | state: :login}) do
@@ -941,8 +948,15 @@ defmodule Tds.Protocol do
     end
   end
 
-  defp clean_opts(opts) do
-    Keyword.put(opts, :password, :REDACTED)
+  @doc false
+  def clean_opts(opts) do
+    opts
+    |> Keyword.put(:password, :REDACTED)
+    |> redact(:access_token)
+  end
+
+  defp redact(opts, key) do
+    if Keyword.has_key?(opts, key), do: Keyword.put(opts, key, :REDACTED), else: opts
   end
 
   @spec conn_opts(Keyword.t()) :: list() | no_return
@@ -1159,4 +1173,14 @@ defmodule Tds.Protocol do
     |> Keyword.values()
     |> Enum.max()
   end
+end
+
+defimpl Inspect, for: Tds.Protocol do
+  # Connection state holds the credentials until login completes, and is
+  # logged by `handle_info/2` and by DBConnection on crashes.
+  def inspect(%{opts: conn_opts} = state, opts) when is_list(conn_opts) do
+    Inspect.Any.inspect(%{state | opts: Tds.Protocol.clean_opts(conn_opts)}, opts)
+  end
+
+  def inspect(state, opts), do: Inspect.Any.inspect(state, opts)
 end

@@ -1,0 +1,453 @@
+defmodule FedAuthTest do
+  use ExUnit.Case, async: true
+
+  import Tds.Messages, only: [msg_loginack: 1]
+
+  alias Tds.Encoding.UCS2
+  alias Tds.Messages
+  alias Tds.Protocol.{Login7, Prelogin}
+
+  @login_opts [hostname: "db.example.net", username: "sa", password: "pw", database: "app"]
+
+  # Fixes the two fields `Login7.new/1` reads from the host.
+  defp login7_bytes(opts) do
+    login = %{Login7.new(opts) | hostname: "client", client_pid: <<0, 0, 3, 34>>}
+    login |> Login7.encode() |> IO.iodata_to_binary()
+  end
+
+  defp prelogin_bytes(opts) do
+    opts |> Prelogin.encode() |> IO.iodata_to_binary()
+  end
+
+  # Prelogin's THREADID option carries the calling process's pid serial.
+  defp thread_id do
+    [_, serial, _] = self() |> inspect() |> String.split(".")
+    <<String.to_integer(serial)::unsigned-32>>
+  end
+
+  defp version do
+    [major, minor, build] =
+      Mix.Project.config()[:version] |> String.split(".") |> Enum.map(&String.to_integer/1)
+
+    <<build::little-unsigned-16, minor, major, 0, 0>>
+  end
+
+  defp expected_prelogin do
+    <<0x12, 0x01, 0x00, 0x2F, 0x00, 0x00, 0x01, 0x00>> <>
+      <<0x00, 0x00, 0x1A, 0x00, 0x06>> <>
+      <<0x01, 0x00, 0x20, 0x00, 0x01>> <>
+      <<0x03, 0x00, 0x21, 0x00, 0x04>> <>
+      <<0x04, 0x00, 0x25, 0x00, 0x01>> <>
+      <<0x06, 0x00, 0x26, 0x00, 0x01>> <>
+      <<0xFF>> <>
+      version() <> <<0x03>> <> thread_id() <> <<0x00>> <> <<0x01>>
+  end
+
+  describe "PRELOGIN golden bytes" do
+    test "SQL authentication requests encryption and advertises FEDAUTHREQUIRED" do
+      assert prelogin_bytes(ssl: true) == expected_prelogin()
+    end
+
+    test "an access token does not change the PRELOGIN packet" do
+      assert prelogin_bytes(ssl: true, access_token: "tkn") == expected_prelogin()
+    end
+  end
+
+  describe "LOGIN7 golden bytes" do
+    test "SQL authentication is unchanged: credentials set, no FeatureExt" do
+      assert login7_bytes(@login_opts) ==
+               <<16, 1, 0, 184, 0, 0, 1, 0, 176, 0, 0, 0, 4, 0, 0, 116, 0, 16, 0, 0, 4, 0, 0, 7,
+                 0, 0, 3, 34, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 9, 4, 0, 0, 94, 0, 6, 0, 106, 0,
+                 2, 0, 110, 0, 2, 0, 114, 0, 10, 0, 134, 0, 14, 0, 0, 0, 0, 0, 162, 0, 4, 0, 0, 0,
+                 0, 0, 170, 0, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                 0, 0, 99, 0, 108, 0, 105, 0, 101, 0, 110, 0, 116, 0, 115, 0, 97, 0, 162, 165,
+                 210, 165, 69, 0, 108, 0, 105, 0, 120, 0, 105, 0, 114, 0, 32, 0, 84, 0, 68, 0, 83,
+                 0, 100, 0, 98, 0, 46, 0, 101, 0, 120, 0, 97, 0, 109, 0, 112, 0, 108, 0, 101, 0,
+                 46, 0, 110, 0, 101, 0, 116, 0, 79, 0, 68, 0, 66, 0, 67, 0, 97, 0, 112, 0, 112,
+                 0>>
+    end
+
+    test "an access token sends empty credentials, fExtension and a FEDAUTH SECURITYTOKEN feature" do
+      bytes = login7_bytes(@login_opts ++ [access_token: "tkn", fed_auth_echo: true])
+
+      assert bytes ==
+               <<
+                 # packet header: LOGIN7, EOM, length 197
+                 0x10,
+                 0x01,
+                 0x00,
+                 0xC5,
+                 0x00,
+                 0x00,
+                 0x01,
+                 0x00,
+                 # Length 189, TDSVersion, PacketSize, ClientProgVer, ClientPID, ConnectionID
+                 189,
+                 0,
+                 0,
+                 0,
+                 4,
+                 0,
+                 0,
+                 116,
+                 0,
+                 16,
+                 0,
+                 0,
+                 4,
+                 0,
+                 0,
+                 7,
+                 0,
+                 0,
+                 3,
+                 34,
+                 0,
+                 0,
+                 0,
+                 0,
+                 # OptionFlags1, OptionFlags2, TypeFlags, OptionFlags3 (fExtension)
+                 0x00,
+                 0x00,
+                 0x00,
+                 0x10,
+                 # ClientTimeZone, ClientLCID
+                 0,
+                 0,
+                 0,
+                 0,
+                 9,
+                 4,
+                 0,
+                 0,
+                 # HostName 94/6, UserName 106/0, Password 106/0, AppName 106/10, ServerName 126/14
+                 94,
+                 0,
+                 6,
+                 0,
+                 106,
+                 0,
+                 0,
+                 0,
+                 106,
+                 0,
+                 0,
+                 0,
+                 106,
+                 0,
+                 10,
+                 0,
+                 126,
+                 0,
+                 14,
+                 0,
+                 # ibExtension 154/4, CltIntName 158/4, Language, Database 166/3
+                 154,
+                 0,
+                 4,
+                 0,
+                 158,
+                 0,
+                 4,
+                 0,
+                 0,
+                 0,
+                 0,
+                 0,
+                 166,
+                 0,
+                 3,
+                 0,
+                 # ClientID, SSPI, AtchDBFile, ChangePassword, cbSSPILong
+                 0,
+                 0,
+                 0,
+                 0,
+                 0,
+                 0,
+                 0,
+                 0,
+                 0,
+                 0,
+                 0,
+                 0,
+                 0,
+                 0,
+                 0,
+                 0,
+                 0,
+                 0,
+                 0,
+                 0,
+                 0,
+                 0,
+                 # "client"
+                 99,
+                 0,
+                 108,
+                 0,
+                 105,
+                 0,
+                 101,
+                 0,
+                 110,
+                 0,
+                 116,
+                 0,
+                 # "Elixir TDS"
+                 69,
+                 0,
+                 108,
+                 0,
+                 105,
+                 0,
+                 120,
+                 0,
+                 105,
+                 0,
+                 114,
+                 0,
+                 32,
+                 0,
+                 84,
+                 0,
+                 68,
+                 0,
+                 83,
+                 0,
+                 # "db.example.net"
+                 100,
+                 0,
+                 98,
+                 0,
+                 46,
+                 0,
+                 101,
+                 0,
+                 120,
+                 0,
+                 97,
+                 0,
+                 109,
+                 0,
+                 112,
+                 0,
+                 108,
+                 0,
+                 101,
+                 0,
+                 46,
+                 0,
+                 110,
+                 0,
+                 101,
+                 0,
+                 116,
+                 0,
+                 # Extension DWORD: FeatureExt starts at offset 172
+                 172,
+                 0,
+                 0,
+                 0,
+                 # "ODBC", "app"
+                 79,
+                 0,
+                 68,
+                 0,
+                 66,
+                 0,
+                 67,
+                 0,
+                 97,
+                 0,
+                 112,
+                 0,
+                 112,
+                 0,
+                 # FeatureId FEDAUTH, FeatureDataLen 11
+                 0x02,
+                 11,
+                 0,
+                 0,
+                 0,
+                 # bFedAuthLibrary SECURITYTOKEN << 1 | fFedAuthEcho
+                 0x03,
+                 # FedAuthToken: DWORD byte length, then UTF-16LE "tkn"
+                 6,
+                 0,
+                 0,
+                 0,
+                 116,
+                 0,
+                 107,
+                 0,
+                 110,
+                 0,
+                 # FeatureExt terminator
+                 0xFF
+               >>
+    end
+
+    test "fFedAuthEcho is clear when the server did not answer FEDAUTHREQUIRED" do
+      bytes = login7_bytes(@login_opts ++ [access_token: "tkn"])
+      assert binary_part(bytes, byte_size(bytes) - 12, 1) == <<0x02>>
+    end
+
+    test "an empty database is sent as an empty field, not read past the FeatureExt" do
+      bytes = login7_bytes(Keyword.put(@login_opts, :database, "") ++ [access_token: "tkn"])
+
+      <<_::binary-size(8 + 4 + 64), ib_database::little-16, cch_database::little-16, _::binary>> =
+        bytes
+
+      assert cch_database == 0
+      assert <<_::binary-size(8 + ib_database), 0x02, _::binary>> = bytes
+    end
+
+    test "a token larger than one packet spans several LOGIN7 packets" do
+      token = String.duplicate("a", 4096)
+      packets = Login7.encode(%{Login7.new(@login_opts ++ [access_token: token]) | hostname: "c"})
+
+      assert length(packets) == 3
+
+      body =
+        Enum.map_join(packets, fn p ->
+          binary_part(IO.iodata_to_binary(p), 8, byte_size(IO.iodata_to_binary(p)) - 8)
+        end)
+
+      assert :binary.match(body, <<byte_size(token) * 2::little-32>> <> UCS2.from_string(token)) !=
+               :nomatch
+    end
+
+    test "echoes the server's PRELOGIN nonce after the token" do
+      nonce = :binary.copy(<<0xAB>>, 32)
+      bytes = login7_bytes(@login_opts ++ [access_token: "tkn", fed_auth_nonce: nonce])
+
+      assert binary_part(bytes, byte_size(bytes) - 49, 49) ==
+               <<0x02, 43::little-32, 0x02, 6::little-32, 116, 0, 107, 0, 110, 0>> <>
+                 nonce <> <<0xFF>>
+    end
+
+    test "rejects an empty access token" do
+      assert_raise ArgumentError, fn -> Login7.new(@login_opts ++ [access_token: ""]) end
+    end
+  end
+
+  describe "PRELOGIN response" do
+    # VERSION, ENCRYPTION and FEDAUTHREQUIRED options, as a server sends them.
+    defp prelogin_response(encryption, fed_auth_required) do
+      <<0x00, 0x00, 0x10, 0x00, 0x06, 0x01, 0x00, 0x16, 0x00, 0x01, 0x06, 0x00, 0x17, 0x00, 0x01,
+        0xFF, 16, 0, 0x0F, 0xA0, 0, 0, encryption, fed_auth_required>>
+    end
+
+    test "records the server's FEDAUTHREQUIRED answer for LOGIN7 to echo" do
+      s = %Tds.Protocol{opts: [ssl: true, access_token: "tkn"]}
+
+      assert {:encrypt, %{fed_auth_echo: true}} =
+               Prelogin.decode(prelogin_response(0x01, 0x01), s)
+
+      assert {:encrypt, %{fed_auth_echo: false}} =
+               Prelogin.decode(prelogin_response(0x01, 0x00), s)
+    end
+
+    test "records a server NONCE for LOGIN7 to echo" do
+      nonce = :binary.copy(<<0xCD>>, 32)
+
+      response =
+        <<0x01, 0x00, 0x0B, 0x00, 0x01, 0x07, 0x00, 0x0C, 0x00, 0x20, 0xFF, 0x01>> <> nonce
+
+      s = %Tds.Protocol{opts: [ssl: true, access_token: "tkn"]}
+      assert {:encrypt, %{fed_auth_nonce: ^nonce}} = Prelogin.decode(response, s)
+    end
+
+    test "refuses to send an access token over an unencrypted connection" do
+      s = %Tds.Protocol{opts: [ssl: false, access_token: "tkn"]}
+
+      assert {:disconnect, %Tds.Error{message: message}, _} =
+               Prelogin.decode(prelogin_response(0x02, 0x01), s)
+
+      assert message =~ "encrypted"
+      refute message =~ "tkn"
+    end
+
+    test "still logs in unencrypted without an access token" do
+      s = %Tds.Protocol{opts: [ssl: false]}
+      assert {:login, _} = Prelogin.decode(prelogin_response(0x02, 0x00), s)
+    end
+  end
+
+  describe "FEATUREEXTACK" do
+    @featureextack <<0xAE, 0x02, 0, 0, 0, 0, 0xFF>>
+    @loginack <<0xAD, 28::little-16, 1, 0x74, 0, 0, 4, 9>> <>
+                UCS2.from_string("SQLServer") <> <<16, 0, 0x10, 0x34>>
+    @done <<0xFD, 0::little-16, 0::little-16, 0::little-64>>
+
+    test "decodes a FEATUREEXTACK followed by a LOGINACK" do
+      assert [
+               {:featureextack, %{0x02 => ""}},
+               {:loginack, %{program: "SQLServer", version: "16.0.16.52"}},
+               {:done, _}
+             ] = Tds.Tokens.decode_tokens(@featureextack <> @loginack <> @done)
+    end
+
+    test "decodes a LOGINACK followed by a FEATUREEXTACK, as servers send them" do
+      assert [{:loginack, _}, {:featureextack, %{0x02 => ""}}, {:done, _}] =
+               Tds.Tokens.decode_tokens(@loginack <> @featureextack <> @done)
+    end
+
+    test "carries each feature's acknowledgement data" do
+      ack = <<0xAE, 0x02, 2, 0, 0, 0, 0xAB, 0xCD, 0x0A, 1, 0, 0, 0, 0x01, 0xFF>>
+
+      assert [{:featureextack, %{0x02 => <<0xAB, 0xCD>>, 0x0A => <<0x01>>}}] =
+               Tds.Tokens.decode_tokens(ack)
+    end
+
+    test "a login response carrying one is a login acknowledgement" do
+      s = %Tds.Protocol{opts: [access_token: "tkn"]}
+
+      assert {msg_loginack(redirect: nil), _} =
+               Messages.parse(:login, @loginack <> @featureextack <> @done, s)
+    end
+  end
+
+  describe "the access token stays out of errors and state" do
+    @token "eyJhbGciOi.secret-access-token.c2lnbmF0dXJl"
+
+    defp login_failed do
+      text = UCS2.from_string("Login failed for user '<token-identified principal>'.")
+      server = UCS2.from_string("db")
+
+      data =
+        <<18456::little-32, 1, 14, div(byte_size(text), 2)::little-16>> <>
+          text <> <<div(byte_size(server), 2)>> <> server <> <<0, 1::little-32>>
+
+      <<0xAA, byte_size(data)::little-16>> <> data <> @done
+    end
+
+    test "a login refusal is a Tds.Error without the token" do
+      s = %Tds.Protocol{opts: [hostname: "db", access_token: @token], state: :login}
+      {msg, s} = Messages.parse(:login, login_failed(), s)
+
+      assert {:error, %Tds.Error{} = error, state} = Tds.Protocol.message(:login, msg, s)
+      assert Exception.message(error) =~ "Login failed"
+      refute Exception.message(error) =~ @token
+      refute inspect(error) =~ @token
+      refute inspect(state) =~ @token
+    end
+
+    test "inspecting connection state redacts the token and the password" do
+      s = %Tds.Protocol{opts: [hostname: "db", password: "hunter2", access_token: @token]}
+
+      refute inspect(s) =~ @token
+      refute inspect(s) =~ "hunter2"
+      assert inspect(s) =~ "hostname"
+      assert s.opts[:access_token] == @token
+    end
+
+    test "inspecting a LOGIN7 message redacts the token and the password" do
+      login = Login7.new(@login_opts ++ [access_token: @token])
+      refute inspect(login) =~ @token
+
+      refute inspect(Login7.new(@login_opts)) =~ ~s(password: "pw")
+    end
+  end
+end

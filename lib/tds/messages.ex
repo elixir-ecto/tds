@@ -93,8 +93,9 @@ defmodule Tds.Messages do
       {:error, error}, _ ->
         {msg_error(error: error), s}
 
+      # FEATUREEXTACK is decoded so it does not break the token stream; no
+      # feature this client requests needs anything from its acknowledgement.
       _, msg ->
-        # FeatureExtAck should be processed here in future
         msg
     end)
   end
