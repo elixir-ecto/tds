@@ -9,6 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixes
 * Fix `unique_constraint` support in Ecto for en-US error messages: MSSQL error metadata is now preserved when re-raising from `query!/4`, `prepare!/3`, `execute!/4` and `close!/2` (#173)
 * Fix connection process crash when the server responds with an error to `sp_unprepare`, e.g. calling `close!/2` on an already closed statement
+* Fix connection process crash when a request cannot be sent because the connection is lost: the request now disconnects instead of answering `{:error, reason}`, which is not a `DBConnection` callback result
+* Fix `CaseClauseError` when the connection is lost while a transaction is begun, committed or rolled back
+* Disconnect a connection that is lost while its statement is unprepared after execution, instead of returning it to the pool
 
 ## v2.3.8 (2026-05-18)
 ### Improvements

@@ -102,6 +102,9 @@ defmodule Tds.Protocol do
       {:disconnect, :closed, s} ->
         {:disconnect, %Tds.Error{message: "Connection closed."}, s}
 
+      {:disconnect, err, s} when is_exception(err) ->
+        {:disconnect, err, s}
+
       {:error, err, s} ->
         err =
           if is_exception(err) do
@@ -169,25 +172,42 @@ defmodule Tds.Protocol do
     params = opts[:parameters] || params
     Process.put(:resultset, Keyword.get(opts, :resultset, false))
 
-    if params != [] do
-      send_param_query(query, params, s)
+    result =
+      try do
+        if params != [] do
+          send_param_query(query, params, s)
+        else
+          send_query(statement, s)
+        end
+      rescue
+        exception ->
+          {:error, exception, s}
+      else
+        {:ok, result, state} ->
+          {:ok, query, result, state}
+
+        other ->
+          other
+      after
+        Process.delete(:resultset)
+      end
+
+    if is_nil(handle) do
+      result
     else
-      send_query(statement, s)
+      unprepare(result, query, opts, s)
     end
-  rescue
-    exception ->
-      {:error, exception, s}
-  else
-    {:ok, result, state} ->
-      {:ok, query, result, state}
+  end
 
-    other ->
-      other
-  after
-    Process.delete(:resultset)
+  # A prepared statement is unprepared whatever its execution answered. When the
+  # connection is lost while doing so, the answer is a disconnect, so that the
+  # connection does not go back to the pool with a socket that is gone.
+  defp unprepare({:disconnect, _err, _s} = disconnect, _query, _opts, _s0), do: disconnect
 
-    if not is_nil(handle) do
-      handle_close(query, opts, %{s | state: :executing})
+  defp unprepare(result, query, opts, s) do
+    case handle_close(query, opts, %{s | state: :executing}) do
+      {:disconnect, _err, _s} = disconnect -> disconnect
+      _closed -> result
     end
   end
 
@@ -592,11 +612,11 @@ defmodule Tds.Protocol do
       {:ok, %{result: result} = s} ->
         {:ok, result, s}
 
-      {:error, err} ->
-        {:disconnect, err, s}
-
       {:error, err, s} ->
         {:disconnect, err, s}
+
+      {:disconnect, _err, _s} = disconnect ->
+        disconnect
     end
   end
 
@@ -854,6 +874,15 @@ defmodule Tds.Protocol do
       buffer
       |> IO.iodata_to_binary()
       |> decode(s)
+    else
+      {:error, reason} ->
+        {:disconnect,
+         %Tds.Error{
+           message: "Connection failed to send packet due #{inspect(reason)}"
+         }, s}
+
+      disconnect ->
+        disconnect
     end
   end
 
