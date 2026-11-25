@@ -686,9 +686,7 @@ defmodule Tds.Types do
     do: raise(ArgumentError, "Invalid uuid value #{inspect(any)}")
 
   # Decimal
-  def decode_decimal(precision, scale, <<sign::int8(), value::binary>>) do
-    set_decimal_precision(precision)
-
+  def decode_decimal(_precision, scale, <<sign::int8(), value::binary>>) do
     size = byte_size(value)
     <<value::little-size(size)-unit(8)>> = value
 
@@ -877,11 +875,9 @@ defmodule Tds.Types do
   end
 
   def encode_decimal_type(%Parameter{value: value}) do
-    set_decimal_precision(38)
-
     value_list =
       value
-      |> Decimal.abs()
+      |> abs_decimal()
       |> Decimal.to_string(:normal)
       |> String.split(".")
 
@@ -896,7 +892,7 @@ defmodule Tds.Types do
 
     dec_abs =
       value
-      |> Decimal.abs()
+      |> abs_decimal()
 
     value =
       dec_abs.coef
@@ -930,11 +926,9 @@ defmodule Tds.Types do
   end
 
   def encode_float_type(%Parameter{value: %Decimal{} = value}) do
-    set_decimal_precision(38)
-
     value_list =
       value
-      |> Decimal.abs()
+      |> abs_decimal()
       |> Decimal.to_string(:normal)
       |> String.split(".")
 
@@ -949,7 +943,7 @@ defmodule Tds.Types do
 
     dec_abs =
       value
-      |> Decimal.abs()
+      |> abs_decimal()
 
     value =
       dec_abs.coef
@@ -1119,11 +1113,9 @@ defmodule Tds.Types do
   end
 
   def encode_decimal_descriptor(%Parameter{value: %Decimal{} = dec}) do
-    set_decimal_precision(38)
-
     value_list =
       dec
-      |> Decimal.abs()
+      |> abs_decimal()
       |> Decimal.to_string(:normal)
       |> String.split(".")
 
@@ -1277,7 +1269,6 @@ defmodule Tds.Types do
 
   # decimal
   def encode_data(@tds_data_type_decimaln, %Decimal{} = value, attr) do
-    set_decimal_precision(38)
     precision = attr[:precision]
 
     d =
@@ -1293,7 +1284,7 @@ defmodule Tds.Types do
 
     value_binary =
       value
-      |> Decimal.abs()
+      |> abs_decimal()
       |> Decimal.to_string(:normal)
       |> String.replace(".", "")
       |> String.to_integer()
@@ -1875,9 +1866,7 @@ defmodule Tds.Types do
     {type, data, scale: 7}
   end
 
-  defp set_decimal_precision(precision) do
-    Decimal.Context.get()
-    |> Map.put(:precision, precision)
-    |> Decimal.Context.set()
-  end
+  # Decimal.abs/1 rounds to the process' Decimal.Context precision, so flip the
+  # sign directly instead of reading (or changing) the caller's context.
+  defp abs_decimal(%Decimal{} = decimal), do: %{decimal | sign: 1}
 end
